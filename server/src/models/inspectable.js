@@ -2,35 +2,26 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Failure extends Model {}
-    Failure.init(
+    class Inspectable extends Model {}
+    Inspectable.init(
         {
-            failure_id: {
+            ins_id: {
                 type: DataTypes.UUID,
                 defaultValue: DataTypes.UUIDV4,
                 primaryKey: true,
             },
-            response_id: {
-                type: DataTypes.UUID,
+            name: {
+                type: DataTypes.STRING,
                 allowNull: false,
             },
             description: {
                 type: DataTypes.STRING,
                 allowNull: false,
             },
-            severity: {
-                type: DataTypes.STRING,
-                allowNull: false,
+            type_code: {
+                type: DataTypes.ENUM("device", "attraction", "other"),
             },
-            reported_at: {
-                type: DataTypes.DATE,
-                allowNull: false,
-            },
-            resolved_at: {
-                type: DataTypes.DATE,
-                allowNull: false,
-            },
-            responded_by: {
+            premise_id: {
                 type: DataTypes.UUID,
                 allowNull: false,
             },
@@ -48,9 +39,9 @@ module.exports = (sequelize, DataTypes) => {
         },
         {
             sequelize,
-            modelName: "Failure",
+            modelName: "Inspectable",
             timestamps: true,
         }
     );
-    return Failure;
+    return Inspectable;
 };

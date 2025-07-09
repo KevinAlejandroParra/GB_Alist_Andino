@@ -2,36 +2,20 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Failure extends Model {}
-    Failure.init(
+    class Family extends Model {}
+    Family.init(
         {
-            failure_id: {
+            family_id: {
                 type: DataTypes.UUID,
                 defaultValue: DataTypes.UUIDV4,
                 primaryKey: true,
             },
-            response_id: {
-                type: DataTypes.UUID,
-                allowNull: false,
-            },
-            description: {
+            family_name: {
                 type: DataTypes.STRING,
                 allowNull: false,
             },
-            severity: {
+            family_description: {
                 type: DataTypes.STRING,
-                allowNull: false,
-            },
-            reported_at: {
-                type: DataTypes.DATE,
-                allowNull: false,
-            },
-            resolved_at: {
-                type: DataTypes.DATE,
-                allowNull: false,
-            },
-            responded_by: {
-                type: DataTypes.UUID,
                 allowNull: false,
             },
             createdAt: {
@@ -48,9 +32,9 @@ module.exports = (sequelize, DataTypes) => {
         },
         {
             sequelize,
-            modelName: "Failure",
+            modelName: "Family",
             timestamps: true,
         }
     );
-    return Failure;
+    return Family;
 };

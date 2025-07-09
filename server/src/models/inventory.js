@@ -2,35 +2,19 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Failure extends Model {}
-    Failure.init(
+    class Inventory extends Model {}
+    Inventory.init(
         {
-            failure_id: {
+            part_id: {
                 type: DataTypes.UUID,
                 defaultValue: DataTypes.UUIDV4,
                 primaryKey: true,
             },
-            response_id: {
-                type: DataTypes.UUID,
+            quantity_available: {
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
-            description: {
-                type: DataTypes.STRING,
-                allowNull: false,
-            },
-            severity: {
-                type: DataTypes.STRING,
-                allowNull: false,
-            },
-            reported_at: {
-                type: DataTypes.DATE,
-                allowNull: false,
-            },
-            resolved_at: {
-                type: DataTypes.DATE,
-                allowNull: false,
-            },
-            responded_by: {
+            location_id: {
                 type: DataTypes.UUID,
                 allowNull: false,
             },
@@ -48,9 +32,9 @@ module.exports = (sequelize, DataTypes) => {
         },
         {
             sequelize,
-            modelName: "Failure",
+            modelName: "Inventory",
             timestamps: true,
         }
     );
-    return Failure;
+    return Inventory;
 };
