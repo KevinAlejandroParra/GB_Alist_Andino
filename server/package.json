@@ -2,16 +2,26 @@
   "name": "server",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+"scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node --watch src/index.js",
+    "server": "node --watch --env-file=.env src/index.js",
+    "db:migrate": "npx sequelize-cli db:migrate",
+    "db:migrate:undo": "npx sequelize-cli db:migrate:undo",
+    "db:seed": "npx sequelize-cli db:seed:all",
+    "db:seed:undo": "npx sequelize-cli db:seed:undo:all",
+    "db:reset": "npx sequelize-cli db:migrate:undo:all && npx sequelize-cli db:migrate && npx sequelize-cli db:seed:all"
+},
   "keywords": [],
-  "author": "",
+  "author": "Kevin Alejandro Parra Cifuentes <luisparra5380@gmail.com>",
   "license": "ISC",
-  "description": "",
+  "description": "API para el sistema de gestión de Alist Andino",
   "dependencies": {
     "express": "^5.1.0",
     "pg": "^8.16.3",
-    "sequelize": "^6.37.7"
+    "sequelize": "^6.37.7",
+    "sequelize-cli": "^6.6.3",
+    "bcrypt": "^5.1.1"
+
   }
 }
