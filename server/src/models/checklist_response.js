@@ -11,11 +11,11 @@ module.exports = (sequelize, DataTypes) => {
                 primaryKey: true,
             },
             checklist_id: {
-                type: DataTypes.STRING,
+                type: DataTypes.UUID,
                 allowNull: false,
             },
             checklist_item_id: {
-                type: DataTypes.STRING,
+                type: DataTypes.UUID,
                 allowNull: false,
             },
             value: {

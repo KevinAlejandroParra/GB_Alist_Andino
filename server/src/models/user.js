@@ -83,11 +83,11 @@ module.exports = (sequelize, DataTypes) => {
                 defaultValue: 'activo'
             },
             role_id: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.UUID,
                 allowNull: false,
             },
             premise_id: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.UUID,
                 allowNull: false,
             },
         },
