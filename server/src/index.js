@@ -4,7 +4,7 @@
     const userRoutes = require("./routes/userRoutes");
     app.use(express.json()); 
 
-    app.use("/api", userRoutes);
+    app.use("/users", userRoutes);
 
     app.listen(port, () => {
       console.log(`Servidor escuchando en el puerto http://localhost:${port}`);
