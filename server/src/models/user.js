@@ -103,13 +103,6 @@ module.exports = (sequelize, DataTypes) => {
                         user.user_password = await bcrypt.hash(user.user_password, salt);
                     }
                 },
-                // Hook para encriptar la contraseña antes de actualizar
-                beforeUpdate: async (user) => {
-                    if (user.changed('user_password')) {
-                        const salt = await bcrypt.genSalt(10);
-                        user.user_password = await bcrypt.hash(user.user_password, salt);
-                    }
-                }
             }
         }
     );
