@@ -1,59 +1,42 @@
-const { User, Role, Premise, connection } = require('../models');
+'use strict';
 
-const seedDatabase = async () => {
-    try {
-        await connection.sync({ force: true }); // Reinicia la base de datos para pruebas
+module.exports = {
+  async up(queryInterface, Sequelize) {
+    await queryInterface.bulkInsert('Users', [
+      {
+        user_id: 1,
+        user_name: 'Usuario1',
+        user_email: 'usuario1@example.com',
+        user_password: 'password1',
+        user_document_type: 'CC',
+        user_document: 123456789,
+        user_phone: 987654321,
+        user_image: 'image1.png',
+        user_state: 'activo',
+        role_id: 'role-id-1',
+        premise_id: 'premise-id-1',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        user_id: 2,
+        user_name: 'Usuario2',
+        user_email: 'usuario2@example.com',
+        user_password: 'password2',
+        user_document_type: 'TI',
+        user_document: 987654321,
+        user_phone: 123456789,
+        user_image: 'image2.png',
+        user_state: 'activo',
+        role_id: 'role-id-2',
+        premise_id: 'premise-id-2',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ]);
+  },
 
-        // Insertar roles
-        const adminRole = await Role.create({
-            role_name: 'Admin',
-            role_description: 'Administrador del sistema'
-        });
-
-        const userRole = await Role.create({
-            role_name: 'User',
-            role_description: 'Usuario regular'
-        });
-
-        // Insertar premises (asegurando que existan)
-        const premise1 = await Premise.create({
-            // Aquí debes definir los campos necesarios para crear una premise
-            premise_name: 'Premise 1',
-            premise_description: 'Descripción de la Premise 1',
-            premise_address: 'Andino'
-        });
-
-        // Insertar usuarios
-        const user1 = await User.create({
-            user_name: 'Juan Perez',
-            user_email: 'juan.perez@example.com',
-            user_password: 'password123',
-            user_document_type: 'CC',
-            user_document: 123456789,
-            user_phone: 321654987,
-            user_image: 'path/to/image.jpg',
-            role_id: adminRole.role_id,
-            premise_id: premise1.premise_id
-        });
-
-        const user2 = await User.create({
-            user_name: 'Maria Gomez',
-            user_email: 'maria.gomez@example.com',
-            user_password: 'password123',
-            user_document_type: 'TI',
-            user_document: 987654321,
-            user_phone: 654321987,
-            user_image: 'path/to/image.jpg',
-            role_id: userRole.role_id,
-            premise_id: premise1.premise_id
-        });
-
-        console.log('Datos insertados correctamente');
-    } catch (error) {
-        console.error('Error al insertar datos:', error);
-    } finally {
-        await connection.close();
-    }
-};
-
-seedDatabase(); 
+  async down(queryInterface, Sequelize) {
+    await queryInterface.bulkDelete('Users', null, {});
+  }
+}; 

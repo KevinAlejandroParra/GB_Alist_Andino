@@ -79,9 +79,9 @@ static async deleteUser(req, res) {
             where: { user_id }
         });
         if (deleted) {
-            res.status(204).json({
+            res.status(200).json({ 
                 success: true,
-                message: "Usuario desactivado correctamente"
+                message: "Usuario eliminado correctamente"
             });
         } else {
             res.status(404).json({
@@ -93,7 +93,7 @@ static async deleteUser(req, res) {
         res.status(500).json({
             success: false,
             data: error.message,
-            message: "Error al desactivar el usuario",
+            message: "Error al eliminar el usuario",
         });
     }
 }
