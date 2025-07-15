@@ -76,6 +76,7 @@ module.exports = (sequelize, DataTypes) => {
             user_image: {
                 type: DataTypes.STRING,
                 allowNull: false,
+                defaultValue: 'https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.flaticon.com%2Ffree-icon%2Fuser_149071&psig=AOvVaw0971-0-0-0&ust=1721060000000000&source=images&cd=vfe&opi=89978449&ved=0CBEQjRxqFwoTCLi0-42-_4ADFQAAAAAdAAAAABAE'
             },
             user_state: {
                 type: DataTypes.ENUM('activo', 'inactivo'),
@@ -85,10 +86,12 @@ module.exports = (sequelize, DataTypes) => {
             role_id: {
                 type: DataTypes.UUID,
                 allowNull: false,
+                defaultValue: '9'
             },
             premise_id: {
                 type: DataTypes.UUID,
                 allowNull: false,
+                defaultValue: '1'
             },
         },
         {

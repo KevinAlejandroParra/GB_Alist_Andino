@@ -3,7 +3,11 @@
     const port = 5000;
     const userRoutes = require("./routes/userRoutes");
     app.use(express.json()); 
-
+    const cors = require('cors');
+    app.use(cors({
+        origin: 'http://localhost:3000',
+        credentials: true,
+    }));
     app.use("/users", userRoutes);
 
     app.listen(port, () => {
