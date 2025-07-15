@@ -58,6 +58,13 @@ module.exports = {
         role_description: 'Anfitrion de Game Box Andino',
         createdAt: new Date(),
         updatedAt: new Date()
+      },
+      {
+        role_id: 9,
+        role_name: 'Invitado',
+        role_description: 'Invitado de Game Box Andino',
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     ]);
   },
