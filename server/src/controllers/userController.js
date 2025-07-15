@@ -4,16 +4,21 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
 class UserController {
-static async getUsers(req, res){
-    try{
+static async getUsers(req, res) {
+    try {
+        console.log('Obteniendo usuarios...'); // Imprimir mensaje al inicio de la función
+
         const page = req.query.page || 1;
         const limit = 10;
         const offset = (page - 1) * limit;
 
-        const { rows, count} = await User.findAndCountAll({
+        const { rows, count } = await User.findAndCountAll({
             limit,
             offset,
         });
+
+        console.log('Usuarios obtenidos:', rows); // Imprimir los usuarios obtenidos
+
         res.status(200).json({
             success: true,
             data: rows,
@@ -21,6 +26,7 @@ static async getUsers(req, res){
             message: "usuarios obtenidos correctamente"
         });
     } catch (error) {
+        console.error('Error al obtener usuarios:', error); // Imprimir el error
         res.status(500).json({
             success: false,
             data: error.message,
@@ -145,10 +151,11 @@ static async loginUser(req, res) {
                 message: 'Credenciales inválidas'
             });
         }
-        const token = jwt.sign({ user_id: user.user_id }, "fullsecret", { expiresIn: '1h' });
+        const token = jwt.sign({ user_id: user.user_id, role_id: user.role_id }, process.env.JWT_KEY, { expiresIn: '1h' });
         res.status(200).json({
             success: true,
-            token
+            token,
+            message: 'Inicio de sesión exitoso'
         });
     } catch (error) {
         res.status(500).json({

@@ -1,11 +1,15 @@
 const express = require('express');
 const UserController = require('../controllers/userController');
 const { verifyToken } = require('../middleware/authMiddleware');
+const { checkRole } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 
-router.get('/', UserController.getUsers); // Obtener todos los usuarios
+router.get('/', verifyToken, checkRole([1]), (req, res, next) => {
+    console.log('Ruta de obtener usuarios llamada'); // Imprimir mensaje al acceder a la ruta
+    next();
+}, UserController.getUsers); // Obtener todos los usuarios
 router.post('/', UserController.createUser); // Crear un usuario
 router.put('/:user_id', UserController.updateUser); // Actualizar un usuario
 router.delete('/:user_id', UserController.deleteUser); // Eliminar un usuario definitivamente

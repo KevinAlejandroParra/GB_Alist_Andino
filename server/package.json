@@ -10,7 +10,8 @@
     "db:migrate:undo": "npx sequelize-cli db:migrate:undo",
     "db:seed": "npx sequelize-cli db:seed:all",
     "db:seed:undo": "npx sequelize-cli db:seed:undo:all",
-    "db:reset": "npx sequelize-cli db:migrate:undo:all && npx sequelize-cli db:migrate && npx sequelize-cli db:seed:all"
+    "db:reset": "npx sequelize-cli db:migrate:undo:all && npx sequelize-cli db:migrate && npx sequelize-cli db:seed:all",
+    "db:reset:seeds": "npx sequelize-cli db:seed:undo:all && npx sequelize-cli db:seed:all"
   },
   "keywords": [],
   "author": "Kevin Alejandro Parra Cifuentes <luisparra5380@gmail.com>",
@@ -18,6 +19,7 @@
   "description": "API para el sistema de gestión de Alist Andino",
   "dependencies": {
     "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.14.2",
