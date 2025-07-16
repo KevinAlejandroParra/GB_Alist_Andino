@@ -6,6 +6,7 @@ export default function Home() {
       <h1>Bienvenido a ALIST</h1>
       <Link href="/login">Iniciar Sesión</Link>
       <Link href="/register">Registrarse</Link>
+      <Link href="/Admins">Dashboard</Link>
     </div>
   );
 }

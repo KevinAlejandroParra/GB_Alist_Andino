@@ -26,7 +26,8 @@ export default function Login() {
       return;
     }
 
-    // Aquí puedes manejar el token o redirigir al usuario
+    const data = await response.json(); 
+    localStorage.setItem('token', data.token); 
     alert('Inicio de sesión exitoso');
   };
 
