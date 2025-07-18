@@ -1,7 +1,7 @@
 {
     "development": {
         "username": "root",
-        "password": "gamebox2023",
+        "password": "gamebox2023", 
         "database": "alist_andino",
         "host": "127.0.0.1",
         "dialect": "mysql",
