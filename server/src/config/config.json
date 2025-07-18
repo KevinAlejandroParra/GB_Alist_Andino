@@ -1,14 +1,13 @@
 {
     "development": {
         "username": "root",
-        "password": "",
+        "password": "gamebox2023",
         "database": "alist_andino",
         "host": "127.0.0.1",
         "dialect": "mysql",
-        "dialectOptions": {         
-            "engine": "InnoDB"
-        }
+        "dialectOptions": {}
     },
+    
     "test": {
         "username": "root",
         "password": null,
