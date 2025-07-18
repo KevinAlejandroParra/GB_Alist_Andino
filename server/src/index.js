@@ -1,5 +1,6 @@
     const express = require('express');
     const app = express();
+    require('dotenv').config();
     const port = 5000;
     const userRoutes = require("./routes/userRoutes");
     const swaggerUi = require('swagger-ui-express');
