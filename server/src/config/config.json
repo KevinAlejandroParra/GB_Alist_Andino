@@ -4,8 +4,11 @@
         "password": "gamebox2023", 
         "database": "alist_andino",
         "host": "127.0.0.1",
+        "port": 3306,
         "dialect": "mysql",
-        "dialectOptions": {}
+        "dialectOptions": {
+            "socketPath": null
+        }
     },
     
     "test": {
