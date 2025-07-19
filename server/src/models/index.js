@@ -39,6 +39,8 @@ const FamilyModel = require("./family.js");
 const EntityModel = require("./entity.js");
 const AuditModel = require("./audit.js");
 
+console.log("Modelos cargados:", Object.keys(db));
+
 // Inicializar modelos
 const User = UserModel(connection, DataTypes);
 const Role = RoleModel(connection, DataTypes);

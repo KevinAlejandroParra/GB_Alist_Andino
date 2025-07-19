@@ -3,6 +3,8 @@ const { User } = require("../models");
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
+console.log("Modelos disponibles:", Object.keys(db));
+
 class UserController {
 static async getUsers(req, res) {
     try {
