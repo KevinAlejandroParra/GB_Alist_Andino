@@ -8,9 +8,12 @@
     app.use(express.json()); 
     const cors = require('cors');
     app.use(cors({
-        origin: 'http://localhost:3000',
+        origin: '*',
         credentials: true,
     }));
+    app.get('/', (req, res) => {
+      res.send('API Andino funcionando correctamente.');
+    });    
     app.use("/users", userRoutes);
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 
