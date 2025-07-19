@@ -5,8 +5,7 @@ const { checkRole } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-
-router.get('/', verifyToken, checkRole([1]), (req, res, next) => {
+router.get('/users', (req, res, next) => {
     console.log('Ruta de obtener usuarios llamada'); // Imprimir mensaje al acceder a la ruta
     next();
 }, UserController.getUsers); // Obtener todos los usuarios
