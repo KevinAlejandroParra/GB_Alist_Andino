@@ -46,6 +46,7 @@ module.exports = (sequelize, DataTypes) => {
             sequelize,
             modelName: "ChecklistSignature",
             timestamps: true,
+            tableName: "checklist_signatures",
         }
     );
     return ChecklistSignature;

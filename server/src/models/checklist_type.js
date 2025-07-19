@@ -41,6 +41,7 @@ module.exports = (sequelize, DataTypes) => {
             sequelize,
             modelName: "ChecklistType",
             timestamps: true,
+            tableName: "checklist_types",
         }
     );
     return ChecklistType;

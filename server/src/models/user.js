@@ -97,6 +97,7 @@ module.exports = (sequelize, DataTypes) => {
         {
             sequelize,
             modelName: "User",
+            tableName: "users",
             timestamps: true,
             hooks: {
                 // Hook para encriptar la contraseña antes de guardar

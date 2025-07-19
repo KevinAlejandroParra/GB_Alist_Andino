@@ -42,6 +42,7 @@ module.exports = (sequelize, DataTypes) => {
             sequelize,
             modelName: "Device",
             timestamps: true,
+            tableName: "devices",
         }
     );
     return Device;

@@ -42,6 +42,7 @@ module.exports = (sequelize, DataTypes) => {
             sequelize,
             modelName: "MaintenanceAction",
             timestamps: true,
+            tableName: "maintenance_actions",
         }
     );
     return MaintenanceAction;

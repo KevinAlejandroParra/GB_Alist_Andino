@@ -34,6 +34,7 @@ module.exports = (sequelize, DataTypes) => {
             sequelize,
             modelName: "Premise",
             timestamps: true,
+            tableName: "premises",
         }
     );
     return Premise;

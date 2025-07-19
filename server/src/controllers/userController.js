@@ -6,7 +6,6 @@ const bcrypt = require('bcrypt');
 class UserController {
 static async getUsers(req, res) {
     try {
-        console.log('Obteniendo usuarios...'); // Imprimir mensaje al inicio de la función
 
         const page = req.query.page || 1;
         const limit = 10;
