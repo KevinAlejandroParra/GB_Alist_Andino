@@ -11,8 +11,8 @@
         origin: '*',
         credentials: true,
     }));
-  
-    app.use("/users", userRoutes);
+
+    app.use("/api/users", userRoutes);
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 
     app.listen(port, () => {

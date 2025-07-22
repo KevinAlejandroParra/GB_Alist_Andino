@@ -11,7 +11,7 @@
     "http"
   ],
   "paths": {
-    "/users/": {
+    "/api/users/": {
       "get": {
         "description": "",
         "parameters": [
@@ -53,7 +53,7 @@
         }
       }
     },
-    "/users/{user_id}": {
+    "/api/users/{user_id}": {
       "put": {
         "description": "",
         "parameters": [
@@ -111,7 +111,7 @@
         }
       }
     },
-    "/users/{user_id}/state": {
+    "/api/users/{user_id}/state": {
       "patch": {
         "description": "",
         "parameters": [
@@ -135,7 +135,7 @@
         }
       }
     },
-    "/users/login": {
+    "/api/users/login": {
       "post": {
         "description": "",
         "parameters": [
@@ -168,7 +168,7 @@
         }
       }
     },
-    "/users/logout": {
+    "/api/users/logout": {
       "post": {
         "description": "",
         "parameters": [
@@ -191,7 +191,7 @@
         }
       }
     },
-    "/users/protected": {
+    "/api/users/protected": {
       "get": {
         "description": "",
         "parameters": [
