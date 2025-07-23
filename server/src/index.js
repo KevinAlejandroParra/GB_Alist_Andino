@@ -8,13 +8,13 @@
     app.use(express.json()); 
     const cors = require('cors');
     app.use(cors({
-        origin: '*',
+        origin: 'http://192.168.57.200:3000',
         credentials: true,
     }));
 
     app.use("/api/users", userRoutes);
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 
-    app.listen(port, () => {
-      console.log(`Servidor escuchando en el puerto http://localhost:${port}`);
-    });
+  app.listen(port, '0.0.0.0', () => {
+  console.log(`Servidor escuchando en http://0.0.0.0:${port}`);
+});

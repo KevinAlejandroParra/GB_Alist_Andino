@@ -17,7 +17,7 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API}users`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API}/api/users`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

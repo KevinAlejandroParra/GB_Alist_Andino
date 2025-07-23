@@ -12,13 +12,14 @@ export default function Login() {
     e.preventDefault();
     setError('');
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API}users/login`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API}/api/users/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ user_email: email, user_password: password }),
     });
+          console.log(response);
 
     if (!response.ok) {
       const data = await response.json();
@@ -30,20 +31,21 @@ export default function Login() {
     localStorage.setItem('token', data.token); 
     alert('Inicio de sesión exitoso');
   };
+    console.log("la direccion de la peticion es: ", `${process.env.NEXT_PUBLIC_API}`);
 
   return (
     <div>
-      <h1>Iniciar Sesión</h1>
+      <h1>Inicializa Sesión</h1>
       <form onSubmit={handleSubmit}>
         <div>
-          <label>Email:</label>
+          <label>Correo:</label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </div>
         <div>
           <label>Contraseña:</label>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
-        <button type="submit">Iniciar Sesión</button>
+        <button type="submit">Inicia Sesión</button>
         {error && <p style={{ color: 'red' }}>{error}</p>}
       </form>
     </div>

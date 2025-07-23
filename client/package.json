@@ -6,7 +6,7 @@
     "dev:client": "npm --prefix client run dev",
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "next start",
+    "start": "next start & npm run build",
     "lint": "next lint"
   },
   "dependencies": {
