@@ -6,13 +6,19 @@
     "dev:client": "npm --prefix client run dev",
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "next start & npm run build",
+    "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.0.0",
+    "@fortawesome/fontawesome-svg-core": "^7.0.0",
+    "@fortawesome/free-solid-svg-icons": "^7.0.0",
+    "@fortawesome/react-fontawesome": "^0.2.3",
+    "framer-motion": "^12.23.12",
     "next": "^15.4.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.61.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
