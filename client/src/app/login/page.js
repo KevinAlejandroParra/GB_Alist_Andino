@@ -2,20 +2,12 @@
 import { useState } from 'react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import {
-  faHome,
-  faUser,
   faEnvelope,
   faLock,
-  faIdCard,
-  faPhone,
-  faBirthdayCake,
-  faUserTag,
-  faIdBadge,
-  faSchool
 } from "@fortawesome/free-solid-svg-icons"
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
-
+import Image from 'next/image';
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +21,7 @@ export default function AuthPage() {
     setIsLoading(true);
     console.log('Datos de login:', data);
     // Aquí conectarás con tu API
-    setTimeout(() => setIsLoading(false), 2000); // Simulación
+    setTimeout(() => setIsLoading(false), 2000); 
   };
 
   // Función para manejar el envío del registro
@@ -37,7 +29,7 @@ export default function AuthPage() {
     setIsLoading(true);
     console.log('Datos de registro:', data);
     // Aquí conectarás con tu API
-    setTimeout(() => setIsLoading(false), 2000); // Simulación
+    setTimeout(() => setIsLoading(false), 2000); 
   };
 
   // Variantes de animación para el contenedor principal
@@ -185,9 +177,18 @@ export default function AuthPage() {
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                      className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center"
+                      className="w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center border border-white border-2"
                     >
-                      { /*<FontAwesomeIcon icon={faUser} className=" text-white text-2xl" />*/}
+                      <Image
+                        src="/resources/felix.png"
+                        alt="Imagen de Felix"
+                        layout="fixed"
+                        width={65}
+                        height={65}
+                        objectFit="cover"
+                        className="rounded-full drop-shadow-[0_0_20px_rgba(191,219,254,0.5)]"
+                        priority
+                      />
                     </motion.div>
                     <h1 className="text-3xl font-bold text-white mb-2">¡Bienvenido!</h1>
                     <p className="text-white/70">Inicia sesión en tu cuenta</p>
@@ -421,6 +422,8 @@ export default function AuthPage() {
                         <option value="yopal" className="bg-gray-800">Yopal</option>
                         <option value="ibague" className="bg-gray-800">Ibagué</option>
                         <option value="girardot" className="bg-gray-800">Girardot</option>
+                        <option value="pereira" className="bg-gray-800">Pereira</option>
+                        <option value="armenia" className="bg-gray-800">Armenia</option>
                       </select>
                     </motion.div>
 
