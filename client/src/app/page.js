@@ -1,13 +1,19 @@
+"use client"; 
+
 import Link from 'next/link';
-import "./globals.css"
+import { AuthProvider } from '../components/AuthContext';
+import "./globals.css";
 
 export default function Home() {
   return (
-    <div>
-      <h1>Bienvenido a ALIST</h1>
-      <Link href="/login">Iniciar Sesión</Link>
-      <Link href="/register">Registrarse</Link>
-      <Link href="/Admins">Dashboard</Link>
-    </div>
+    <AuthProvider>
+      <div className="container">
+        <h1>Bienvenido a ALIST</h1>
+        <div className="auth-links">
+          <Link href="/login" className="auth-link">Iniciar Sesión</Link>
+          <Link href="/register" className="auth-link">Registrarse</Link>
+        </div>
+      </div>
+    </AuthProvider>
   );
 }
