@@ -64,11 +64,12 @@ export default function AuthPage() {
 
       // Guardar el token en localStorage
       localStorage.setItem('authToken', result.token);
+      console.log ('tokens del localstorage:', localStorage.getItem('authToken'))
 
       await Swal.fire({
         title: '<div class="flex flex-col items-center"><i class="fas fa-check-circle text-5xl mb-3 text-purple-400"></i><span class="text-white text-2xl font-bold">¡Éxito!</span></div>',
         html: '<div class="text-white/80 mb-4">Inicio de sesión exitoso</div>',
-        background: 'rgba(99, 102, 241, 0.15)', // Fondo morado claro
+        background: 'rgba(99, 102, 241, 0.15)', 
         backdrop: `
           rgba(59, 130, 246, 0.1)
           url("/images/glass-texture.png")
@@ -108,7 +109,7 @@ export default function AuthPage() {
         grow: 'row'
       });
       // Redirigir al dashboard o página principal
-      window.location.href = '/dashboard';
+      window.location.href = '/';
 
     } catch (error) {
       await Swal.fire({
@@ -223,7 +224,7 @@ export default function AuthPage() {
     }
   };
 
-  // Variantes de animación (mantener las que ya tienes)
+  // Variantes de animación 
   const containerVariants = {
     initial: { opacity: 0, scale: 0.9 },
     animate: { 
