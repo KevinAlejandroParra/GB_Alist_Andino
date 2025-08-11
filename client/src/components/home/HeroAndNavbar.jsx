@@ -1,3 +1,4 @@
+"use client"
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -7,33 +8,71 @@ const HeroandNavbar = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  //authentication check
-  useEffect(() => {
-    const checkAuth = () => {
-      const authToken = localStorage?.getItem('authToken');
-      const userData = localStorage?.getItem('userData');
+  // Fetch user data 
+  const fetchUserData = async (token) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API}/api/users/protected`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
-      if (authToken && userData) {
+      if (response.ok) {
+        const data = await response.json();
+        return data.user;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      return null;
+    }
+  };
+
+  
+  useEffect(() => {
+    const checkAuth = async () => {
+      const authToken = localStorage?.getItem('authToken');
+      
+      if (authToken) {
         try {
-          setUser(JSON.parse(userData));
-          setIsAuthenticated(true);
+          const userData = await fetchUserData(authToken);
+          
+          if (userData) {
+            setUser(userData);
+            setIsAuthenticated(true);
+            localStorage.setItem('userData', JSON.stringify(userData));
+          } else {
+            localStorage?.removeItem('authToken');
+            localStorage?.removeItem('userData');
+          }
         } catch (error) {
-          console.error('Error parsing user data:', error);
+          console.error('Error checking authentication:', error);
         }
       }
     };
-    
+
     checkAuth();
   }, []);
 
-  const handleLogout = () => {
-    localStorage?.removeItem('authToken');
-    localStorage?.removeItem('userData');
-    localStorage?.removeItem('user');
-    setIsAuthenticated(false);
-    setUser(null);
-    setShowProfileMenu(false);
-    window.location.href = '/';
+  const handleLogout = async () => {
+    try {
+      // llamada al logout API endpoint
+      await fetch('/api/users/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage?.removeItem('authToken');
+      localStorage?.removeItem('userData');
+      setIsAuthenticated(false);
+      setUser(null);
+      setShowProfileMenu(false);
+      window.location.href = '/';
+    }
   };
 
   const redirectToLogin = () => {
@@ -41,14 +80,12 @@ const HeroandNavbar = () => {
   };
 
   const goToWorkspace = () => {
-    const user = localStorage?.getItem('user');
-    if (user || isAuthenticated) {
+    if (isAuthenticated || localStorage?.getItem('authToken')) {
       window.location.href = '/workspace';
     } else {
       redirectToLogin();
     }
   };
-
   const navItems = [
     { name: 'Inicio', href: '#home', icon: 'fas fa-home' },
     { name: 'Características', href: '#features', icon: 'fas fa-star' },
