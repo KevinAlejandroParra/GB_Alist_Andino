@@ -16,10 +16,7 @@ module.exports = {
             entity_description: {
                 type: Sequelize.STRING,
             },
-            premise_id: {
-                type: Sequelize.UUID,
-                allowNull: false,
-            },
+            
             createdAt: {
                 type: Sequelize.DATE,
                 defaultValue: Sequelize.NOW,

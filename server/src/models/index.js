@@ -67,6 +67,7 @@ const Audit = AuditModel(connection, DataTypes);
 // 1. Asociaciones de User
 User.belongsTo(Role, { as: "role", foreignKey: "role_id" });
 User.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
+User.belongsTo(Entity, { as: "entity", foreignKey: "entity_id" });
 User.hasMany(Checklist, { as: "createdChecklists", foreignKey: "created_by" });
 User.hasMany(ChecklistItem, { as: "respondedItems", foreignKey: "responded_by" });
 User.hasMany(ChecklistResponse, { as: "responses", foreignKey: "responded_by" });
@@ -140,7 +141,6 @@ ChecklistSignature.belongsTo(Checklist, { as: "checklist", foreignKey: "checklis
 ChecklistSignature.belongsTo(User, { as: "user", foreignKey: "user_id" });
 
 // 14. Asociaciones de Entity
-Entity.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
 Premise.hasMany(Entity, { as: "entities", foreignKey: "premise_id" });
 
 // Asociaciones de Audit
