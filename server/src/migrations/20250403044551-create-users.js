@@ -49,6 +49,10 @@ module.exports = {
                 type: Sequelize.UUID,
                 allowNull: false,
             },
+            entity_id: {
+                type: Sequelize.UUID,
+                allowNull: true,
+            },
             createdAt: {
                 type: Sequelize.DATE,
                 defaultValue: Sequelize.NOW,
