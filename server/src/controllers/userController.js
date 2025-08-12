@@ -2,6 +2,7 @@ const path = require("path");
 const { User } = require("../models");
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const { Op } = require('sequelize');
 
 class UserController {
 static async getUsers(req, res) {
@@ -34,22 +35,85 @@ static async getUsers(req, res) {
     }
 }
 
+
 static async createUser(req, res) {
     try {
+        // Validación adicional
+        const requiredFields = [
+            'user_name', 
+            'user_email', 
+            'user_document_type',
+            'user_document',
+            'user_phone',
+            'premise_id',
+            'user_password',
+            'role_id'
+        ];
+
+        for (const field of requiredFields) {
+            if (!req.body[field]) {
+                return res.status(400).json({
+                    success: false,
+                    message: `El campo ${field} es requerido`
+                });
+            }
+        }
+
+        // Verificar si el usuario ya existe
+        const existingUser = await User.findOne({
+            where: {
+                [Op.or]: [
+                    { user_email: req.body.user_email },
+                    { user_document: req.body.user_document }
+                ]
+            }
+        });
+
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: existingUser.user_email === req.body.user_email 
+                    ? 'El correo electrónico ya está registrado' 
+                    : 'El número de documento ya está registrado'
+            });
+        }
+
+        // Crear el usuario
         const user = await User.create(req.body);
+        
+        // No devolver la contraseña en la respuesta
+        const userData = user.get({ plain: true });
+        delete userData.user_password;
+        
         res.status(201).json({
             success: true,
-            data: user,
+            data: userData,
             message: "Usuario creado correctamente"
         });
     } catch (error) {
+        console.error('Error al crear usuario:', error);
+        
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return res.status(400).json({
+                success: false,
+                message: 'El correo o documento ya están registrados'
+            });
+        }
+        
+        if (error.name === 'SequelizeValidationError') {
+            return res.status(400).json({
+                success: false,
+                message: error.errors.map(e => e.message).join(', ')
+            });
+        }
+
         res.status(500).json({
             success: false,
-            data: error.message,
             message: "Error al crear el usuario",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
-}
+};
 
 static async updateUser(req, res) {
     try {

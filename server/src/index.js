@@ -8,7 +8,7 @@
     app.use(express.json()); 
     const cors = require('cors');
     app.use(cors({
-        origin: 'http://192.168.57.200:3000',
+        origin: '*',
         credentials: true,
     }));
 
