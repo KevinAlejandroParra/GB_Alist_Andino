@@ -1,5 +1,8 @@
 const path = require("path");
 const { User } = require("../models");
+const {Entity} = require("../models")
+const {Premise} = require("../models")
+const {Role} = require("../models")
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { Op } = require('sequelize');
@@ -259,7 +262,24 @@ static async getProtectedData(req, res) {
         const user = await User.findOne({
             where: {
                 user_id: req.user.user_id
-            }
+            },
+            include: [
+                {
+                    model: Entity, 
+                    attributes: ['entity_name'], 
+                    as: 'entity' 
+                },
+                {
+                    model: Premise, 
+                    attributes: ['premise_name'],
+                    as: 'premise'
+                },
+                {
+                    model: Role, 
+                    attributes: ['role_name'],
+                    as: 'role'
+                }
+            ]
         });
         
         if (!user) {
@@ -269,7 +289,8 @@ static async getProtectedData(req, res) {
             });
         }
         
-        return res.status(200).json({
+        // Formatear la respuesta
+        const response = {
             success: true,
             user: {
                 id: user.user_id,
@@ -277,19 +298,31 @@ static async getProtectedData(req, res) {
                 type_document: user.user_document_type,
                 document: user.user_document,
                 phone: user.user_phone,
-                role: user.role_id,
+                role: {
+                    id: user.role_id,
+                    name: user.role?.role_name || null 
+                },
                 name: user.user_name,
                 lastname: user.user_lastname,
                 image: user.user_image,
                 state: user.user_state,
-                premise: user.premise_id
+                premise: {
+                    id: user.premise_id,
+                    name: user.premise?.premise_name || null
+                },
+                entity: {
+                    id: user.entity_id,
+                    name: user.entity?.entity_name || null
+                }
             }
-        });
+        };
+        
+        return res.status(200).json(response);
     } catch (error) {
-        console.error("Error al validar token:", error);
+        console.error("Error al obtener datos del usuario:", error);
         return res.status(500).json({
             success: false,
-            message: "Error al validar el token",
+            message: "Error al obtener los datos del usuario",
             error: error.message
         });
     }

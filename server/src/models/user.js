@@ -94,7 +94,7 @@ module.exports = (sequelize, DataTypes) => {
                 defaultValue: '1'
             },
             entity_id: {
-                type: Sequelize.UUID,
+                type: DataTypes.UUID,
                 allowNull: true,
             },
         },
