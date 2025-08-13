@@ -14,7 +14,7 @@ module.exports = {
         user_image: 'image1.png',
         user_state: 'activo',
         role_id: '1',
-        premise_id: 'premise-id-1',
+        premise_id: '1',
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -29,7 +29,7 @@ module.exports = {
         user_image: 'image2.png',
         user_state: 'activo',
         role_id: '3',
-        premise_id: 'premise-id-2',
+        premise_id: '2',
         createdAt: new Date(),
         updatedAt: new Date()
       }
