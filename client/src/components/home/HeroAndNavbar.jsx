@@ -78,6 +78,9 @@ const HeroandNavbar = () => {
   const redirectToLogin = () => {
     window.location.href = '/login';
   };
+    const redirectToEdit = () => {
+    window.location.href = '/Profile';
+  };
 
   const goToWorkspace = () => {
     if (isAuthenticated || localStorage?.getItem('authToken')) {
@@ -236,6 +239,14 @@ const HeroandNavbar = () => {
                                 {user?.user_email || user?.email || ''}
                               </p>
                             </div>
+                            <motion.button
+                              whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
+                              onClick={redirectToEdit}
+                              className="w-full text-left px-4 py-2 text-gray-300 hover:text-white flex items-center space-x-3 transition-colors"
+                            >
+                              <i className="fas fa-pen-alt text-green-500 w-4"></i>
+                              <span className="text-sm">Editar Perfil</span>
+                            </motion.button>
                             <motion.button
                               whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
                               onClick={goToWorkspace}

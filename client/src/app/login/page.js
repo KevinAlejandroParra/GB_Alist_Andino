@@ -153,7 +153,7 @@ export default function AuthPage() {
           user_phone: data.telefono,
           premise_id: data.sede,
           user_password: data.password,
-          role_id: 2 
+          role_id: 9 
         }),
       });
   
@@ -609,7 +609,7 @@ export default function AuthPage() {
                         </div>
                         <select
                           {...registerForm.register('tipoDocumento', { required: 'Selecciona el tipo de documento' })}
-                          className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl text-white backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 appearance-none"
+                          className="w-full pl-12 pr-4 py-4 bg-green-500/50 border border-white/20 rounded-2xl text-white backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 appearance-none"
                         >
                           <option value="">Tipo Doc.</option>
                           <option value="TI">TI</option>
@@ -701,7 +701,7 @@ export default function AuthPage() {
                         </div>
                         <select
                           {...registerForm.register('sede', { required: 'Selecciona una sede' })}
-                          className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl text-white backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 appearance-none"
+                          className="w-full pl-12 pr-4 py-4 bg-green-500/50 border border-white/20 rounded-2xl text-white backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 appearance-none"
                         >
                           <option value="">Elige</option>
                           <option value="bogota">Bogotá</option>

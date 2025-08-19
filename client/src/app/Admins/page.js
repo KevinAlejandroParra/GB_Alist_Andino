@@ -7,11 +7,11 @@ export default function Admins() {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const token = localStorage.getItem('token');
+      const authToken = localStorage.getItem('authToken');
       const response = await fetch(`${process.env.NEXT_PUBLIC_API}/api/users`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${authToken}`
         }
       });
 
