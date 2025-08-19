@@ -120,39 +120,92 @@ static async createUser(req, res) {
 
 static async updateUser(req, res) {
     try {
-        const { user_id } = req.params;
-        const { user_password } = req.body;
+        const userId = req.params.user_id; 
+        let userJSON = {};
+
+        try {
+            if (req.body.user) {
+                if (typeof req.body.user === "string") {
+                    userJSON = JSON.parse(req.body.user);
+                } else if (typeof req.body.user === "object") {
+                    userJSON = req.body.user;
+                }
+            } else {
+                userJSON = req.body; 
+            }
+        } catch (err) {
+            console.error("Error al parsear JSON:", err);
+            userJSON = req.body; 
+        }
+
+        const user = await User.findByPk(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Usuario no encontrado",
+            });
+        }
+
+        console.log("BODY:", req.body);
+        console.log("USER PARSED:", userJSON);
+
+        // Si hay imagen, actualizarla
+        if (req.file) {
+            const imagePath = path.join("images/users", req.file.filename).replace(/\\/g, "/");
+            user.user_image = imagePath;
+        }
+
+        // Validación adicional para contraseña
+        if (userJSON.user_password && userJSON.user_password.length < 8) {
+            return res.status(400).json({
+                success: false,
+                message: "La contraseña debe tener al menos 8 caracteres",
+            });
+        }
 
         // Si se proporciona una nueva contraseña, encriptarla
-        if (user_password) {
+        if (userJSON.user_password) {
             const salt = await bcrypt.genSalt(10);
-            req.body.user_password = await bcrypt.hash(user_password, salt);
+            userJSON.user_password = await bcrypt.hash(userJSON.user_password, salt);
         }
 
-        const [updated] = await User.update(req.body, {
-            where: { user_id }
+        // Campos que se pueden actualizar
+        const campos = [
+            "user_name",
+            "user_email",
+            "user_phone",
+            "user_document_type",
+            "user_document",
+            "user_password",
+            "user_image"
+        ];
+
+        campos.forEach((campo) => {
+            if (userJSON[campo] !== undefined) {
+                user[campo] = userJSON[campo];
+            }
         });
-        if (updated) {
-            const updatedUser = await User.findByPk(user_id);
-            res.status(200).json({
-                success: true,
-                data: updatedUser,
-                message: "Usuario actualizado correctamente"
-            });
-        } else {
-            res.status(404).json({
-                success: false,
-                message: "Usuario no encontrado"
-            });
-        }
+
+        await user.save();
+
+        const userResponse = user.toJSON();
+        delete userResponse.user_password;
+
+        return res.status(200).json({
+            success: true,
+            user: userResponse,
+            message: "Perfil actualizado correctamente",
+        });
     } catch (error) {
-        res.status(500).json({
+        console.error("Error al actualizar usuario:", error);
+        return res.status(500).json({
             success: false,
-            data: error.message,
             message: "Error al actualizar el usuario",
+            error: error.message,
         });
     }
 }
+
 
 static async deleteUser(req, res) {
     try {
