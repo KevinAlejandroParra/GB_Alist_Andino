@@ -89,7 +89,7 @@
             "schema": {
               "type": "object",
               "properties": {
-                "user_password": {
+                "user": {
                   "example": "any"
                 }
               }
@@ -97,14 +97,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
-          },
           "404": {
             "description": "Not Found"
-          },
-          "500": {
-            "description": "Internal Server Error"
           }
         }
       },
