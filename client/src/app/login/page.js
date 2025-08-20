@@ -279,7 +279,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 via-purple-800 to-slate-900 p-4">
       {/* Elementos decorativos de fondo */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
@@ -292,7 +292,7 @@ export default function AuthPage() {
             repeat: Infinity,
             ease: "linear"
           }}
-          className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-r from-cyan-500/80 to-transparent rounded-full"
+          className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-r from-violet-500/80 to-transparent rounded-full"
         />
         <motion.div
           animate={{
@@ -304,7 +304,7 @@ export default function AuthPage() {
             repeat: Infinity,
             ease: "linear"
           }}
-          className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-l from-blue-600/20 to-transparent rounded-full"
+          className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-l from-indigo-500/40 to-transparent rounded-full"
         />
       </div>
 
