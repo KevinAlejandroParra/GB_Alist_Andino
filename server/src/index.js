@@ -3,6 +3,9 @@ const app = express();
 require('dotenv').config();
 const port = 5000;
 const userRoutes = require("./routes/userRoutes");
+const premiseRoutes = require("./routes/premiseRoutes");
+const entityRoutes = require("./routes/entityRoutes");
+const roleRoutes = require("./routes/roleRoutes");
 const swaggerUi = require('swagger-ui-express');
 const swaggerFile = require('./swagger-output.json');
 const path = require("path"); 
@@ -39,6 +42,9 @@ app.use(express.static(path.join(__dirname, "../public"), {
 
 
 app.use("/api/users", userRoutes);
+app.use("/api/premises", premiseRoutes);
+app.use("/api/entities", entityRoutes);
+app.use("/api/roles", roleRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 
 app.listen(port, '0.0.0.0', () => {
