@@ -13,8 +13,8 @@ module.exports = {
         user_phone: 3256987458,
         user_image: 'image1.png',
         user_state: 'activo',
-        role_id: '1',
-        premise_id: '1',
+        role_id: 1,
+        premise_id: 1,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -28,8 +28,8 @@ module.exports = {
         user_phone: 3256987458,
         user_image: 'image2.png',
         user_state: 'activo',
-        role_id: '3',
-        premise_id: '2',
+        role_id: 3,
+        premise_id: 2,
         createdAt: new Date(),
         updatedAt: new Date()
       }
