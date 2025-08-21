@@ -37,5 +37,6 @@ router.patch('/:user_id/state', UserController.changeUserState); // Cambiar el e
 router.post('/login', UserController.loginUser); // Ruta para iniciar sesión
 router.post('/logout', verifyToken, UserController.logoutUser); // Ruta para cerrar sesión
 router.get('/protected', verifyToken, UserController.getProtectedData); // Ruta protegida
+router.put('/:user_id/admin', verifyToken, checkRole([1]), UserController.updateUserAdmin); // Actualizar rol, sede o entidad de un usuario por administrador
 
 module.exports = router;

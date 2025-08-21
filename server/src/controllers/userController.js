@@ -380,6 +380,58 @@ static async getProtectedData(req, res) {
         });
     }
 }
+
+static async updateUserAdmin(req, res) {
+    try {
+        // Verificar si el usuario que realiza la solicitud tiene role_id 1 (administrador)
+        if (req.user.role_id !== 1) {
+            return res.status(403).json({
+                success: false,
+                message: 'Acceso denegado. Solo los administradores pueden realizar esta acción.'
+            });
+        }
+
+        const { user_id } = req.params;
+        const { role_id, premise_id, entity_id } = req.body;
+
+        const user = await User.findByPk(user_id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'Usuario no encontrado'
+            });
+        }
+
+        if (role_id !== undefined) {
+            user.role_id = role_id;
+        }
+        if (premise_id !== undefined) {
+            user.premise_id = premise_id;
+        }
+        if (entity_id !== undefined) {
+            user.entity_id = entity_id;
+        }
+
+        await user.save();
+
+        const userResponse = user.toJSON();
+        delete userResponse.user_password;
+
+        return res.status(200).json({
+            success: true,
+            user: userResponse,
+            message: 'Datos de usuario actualizados por administrador correctamente'
+        });
+
+    } catch (error) {
+        console.error('Error al actualizar datos de usuario por administrador:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al actualizar datos de usuario por administrador',
+            error: error.message
+        });
+    }
+}
 }
 
 module.exports = UserController;
