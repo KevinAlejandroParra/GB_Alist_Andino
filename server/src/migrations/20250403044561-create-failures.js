@@ -1,17 +1,18 @@
 "use strict";
+const { DataTypes } = require("sequelize"); 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
     async up(queryInterface, Sequelize) {
         await queryInterface.createTable("failures", {
             failure_id: {
-                type: Sequelize.UUID,
-                defaultValue: Sequelize.UUIDV4,
+                type: DataTypes.INTEGER,
                 primaryKey: true,
+                autoIncrement: true,
                 allowNull: false,
                 unique: true,
             },
             response_id: {
-                type: Sequelize.UUID,
+                type: Sequelize.INTEGER,
                 allowNull: false,
             },
             description: {
@@ -30,7 +31,7 @@ module.exports = {
                 type: Sequelize.DATE,
             },
             responded_by: {
-                type: Sequelize.UUID,
+                type: Sequelize.INTEGER,
                 allowNull: false,
             },
             createdAt: {

@@ -1,12 +1,13 @@
 "use strict";
+const { DataTypes } = require("sequelize"); 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
     async up(queryInterface, Sequelize) {
         await queryInterface.createTable("inspectables", {
             ins_id: {
-                type: Sequelize.UUID,
-                defaultValue: Sequelize.UUIDV4,
+                type: DataTypes.INTEGER,
                 primaryKey: true,
+                autoIncrement: true,
                 allowNull: false,
                 unique: true,
             },
@@ -21,7 +22,7 @@ module.exports = {
                 type: Sequelize.ENUM("device", "attraction", "other"),
             },
             premise_id: {
-                type: Sequelize.UUID,
+                type: Sequelize.INTEGER,
                 allowNull: false,
             },
             createdAt: {

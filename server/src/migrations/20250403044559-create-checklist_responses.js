@@ -1,21 +1,22 @@
 "use strict";
+const { DataTypes } = require("sequelize"); 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
     async up(queryInterface, Sequelize) {
         await queryInterface.createTable("checklist_responses", {
             response_id: {
-                type: Sequelize.UUID,
-                defaultValue: Sequelize.UUIDV4,
+                type: DataTypes.INTEGER,
                 primaryKey: true,
+                autoIncrement: true,
                 allowNull: false,
                 unique: true,   
             },
             checklist_id: {
-                type: Sequelize.UUID,
+                type: Sequelize.INTEGER,
                 allowNull: false,
             },
             checklist_item_id: {
-                type: Sequelize.UUID,
+                type: Sequelize.INTEGER,
                 allowNull: false,
             },
             value: {
@@ -29,7 +30,7 @@ module.exports = {
                 type: Sequelize.STRING,
             },
             responded_by: {
-                type: Sequelize.UUID,
+                type: Sequelize.INTEGER,
                 allowNull: false,
             },
             createdAt: {
