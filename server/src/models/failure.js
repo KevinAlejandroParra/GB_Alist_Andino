@@ -6,12 +6,12 @@ module.exports = (sequelize, DataTypes) => {
     Failure.init(
         {
             failure_id: {
-                type: DataTypes.UUID,
-                defaultValue: DataTypes.UUIDV4,
+                type: DataTypes.INTEGER,
+                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             response_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             description: {
@@ -31,7 +31,7 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: false,
             },
             responded_by: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             createdAt: {

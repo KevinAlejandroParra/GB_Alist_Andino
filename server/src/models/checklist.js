@@ -6,16 +6,16 @@ module.exports = (sequelize, DataTypes) => {
     Checklist.init(
         {
             checklist_id: {
-                type: DataTypes.UUID,
-                defaultValue: DataTypes.UUIDV4,
+                type: DataTypes.INTEGER,
+                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             premise_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             checklist_type_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             createdAt: {

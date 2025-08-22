@@ -13,8 +13,8 @@ module.exports = (sequelize, DataTypes) => {
     User.init(
         {
             user_id: {
-                type: DataTypes.UUID,
-                defaultValue: DataTypes.UUIDV4,
+                type: DataTypes.INTEGER,
+                autoIncrement: true,
                 primaryKey: true,
             },
             user_name: {
@@ -84,17 +84,17 @@ module.exports = (sequelize, DataTypes) => {
                 defaultValue: 'activo'
             },
             role_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
                 defaultValue: '9'
             },
             premise_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
                 defaultValue: '1'
             },
             entity_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: true,
             },
         },

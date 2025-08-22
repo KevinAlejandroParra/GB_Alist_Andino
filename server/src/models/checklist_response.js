@@ -6,16 +6,16 @@ module.exports = (sequelize, DataTypes) => {
     ChecklistResponse.init(
         {
             response_id: {
-                type: DataTypes.UUID,
-                defaultValue: DataTypes.UUIDV4,
+                type: DataTypes.INTEGER,
+                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             checklist_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             checklist_item_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             value: {
@@ -28,7 +28,7 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.STRING,
             },
             responded_by: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             createdAt: {

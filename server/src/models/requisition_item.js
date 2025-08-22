@@ -5,16 +5,16 @@ module.exports = (sequelize, DataTypes) => {
     class RequisitionItem extends Model {}
     RequisitionItem.init(
         {      requisition_item_id: {
-                type: DataTypes.UUID,
-                defaultValue: DataTypes.UUIDV4,
+                type: DataTypes.INTEGER,
+                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             requisition_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             part_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             quantity_requested: {

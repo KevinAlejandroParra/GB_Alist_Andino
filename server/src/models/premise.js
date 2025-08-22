@@ -6,8 +6,8 @@ module.exports = (sequelize, DataTypes) => {
     Premise.init(
         {
             premise_id: {
-                type: DataTypes.UUID,
-                defaultValue: DataTypes.UUIDV4,
+                type: DataTypes.INTEGER,
+                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             premise_name: {

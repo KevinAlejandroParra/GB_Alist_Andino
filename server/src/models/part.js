@@ -6,8 +6,8 @@ module.exports = (sequelize, DataTypes) => {
     Part.init(
         {
             part_id: {
-                type: DataTypes.UUID,
-                defaultValue: DataTypes.UUIDV4,
+                type: DataTypes.INTEGER,
+                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             part_name: {

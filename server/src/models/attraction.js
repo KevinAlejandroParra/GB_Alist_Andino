@@ -6,8 +6,8 @@ module.exports = (sequelize, DataTypes) => {
     Attraction.init(
         {
             ins_id: {
-                type: DataTypes.UUID,
-                defaultValue: DataTypes.UUIDV4,
+                type: DataTypes.INTEGER,
+                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             public_flag: {

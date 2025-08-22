@@ -6,12 +6,12 @@ module.exports = (sequelize, DataTypes) => {
     MaintenanceAction.init(
         {
             action_id: {
-                type: DataTypes.UUID,
-                defaultValue: DataTypes.UUIDV4,
+                type: DataTypes.INTEGER,
+                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             failure_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             action_taken: {
@@ -19,11 +19,11 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: false,
             },
             completed_by: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             createdAt: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             createdAt: {

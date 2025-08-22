@@ -6,8 +6,8 @@ module.exports = (sequelize, DataTypes) => {
     Inventory.init(
         {
             part_id: {
-                type: DataTypes.UUID,
-                defaultValue: DataTypes.UUIDV4,
+                type: DataTypes.INTEGER,
+                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             quantity_available: {
@@ -15,7 +15,7 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: false,
             },
             location_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             createdAt: {

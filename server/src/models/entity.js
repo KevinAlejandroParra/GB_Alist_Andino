@@ -6,8 +6,8 @@ module.exports = (sequelize, DataTypes) => {
     Entity.init(
         {
             entity_id: {
-                type: DataTypes.UUID,
-                defaultValue: DataTypes.UUIDV4,
+                type: DataTypes.INTEGER,
+                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             entity_name: {
@@ -19,7 +19,7 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: false,
             },
             premise_id: {
-                type: DataTypes.UUID,
+                type: DataTypes.INTEGER,
                 allowNull: true,
             },
             createdAt: {
