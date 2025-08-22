@@ -1,5 +1,7 @@
 'use strict';
 
+const entity = require("../models/entity");
+
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.bulkInsert('users', [
@@ -11,25 +13,43 @@ module.exports = {
         user_document_type: 'CC',
         user_document: 123456789,
         user_phone: 3256987458,
-        user_image: 'image1.png',
+        user_image: 'images/resources/nf.jpg',
         user_state: 'activo',
         role_id: 1,
         premise_id: 1,
+        entity_id: 1,
         createdAt: new Date(),
         updatedAt: new Date()
       },
       {
-        user_id: 3,
+        user_id: 2,
         user_name: 'Juan',
         user_email: 'juan@example.com',
         user_password: '$2b$10$MEVwrngfYxqsgTNBS0hEw.GY8tRmjtiYLRuh2CHFrqJfVDueqBWQC',
         user_document_type: 'TI',
         user_document: 123456789,
         user_phone: 3256987458,
-        user_image: 'image2.png',
+        user_image: 'images/resources/nf.jpg',
         user_state: 'activo',
         role_id: 3,
         premise_id: 2,
+        entity_id: 2,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        user_id: 3,
+        user_name: 'Carlos',
+        user_email: 'carlos@example.com',
+        user_password: '$2b$10$MEVwrngfYxqsgTNBS0hEw.GY8tRmjtiYLRuh2CHFrqJfVDueqBWQC',
+        user_document_type: 'CC',
+        user_document: 123456700,
+        user_phone: 3256987400,
+        user_image: 'images/resources/nf.jpg',
+        user_state: 'activo',
+        role_id: 2,
+        premise_id: 1,
+        entity_id: 2,
         createdAt: new Date(),
         updatedAt: new Date()
       }

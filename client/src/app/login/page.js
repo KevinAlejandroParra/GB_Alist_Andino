@@ -12,6 +12,7 @@ export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [direction, setDirection] = useState(1);
+  const [premises, setPremises] = useState([]);
 
   // Configuración de formularios con react-hook-form
   const loginForm = useForm({
@@ -125,6 +126,27 @@ export default function AuthPage() {
       setIsLoading(false);
     }
   };
+//Extraccion de las sedes
+useEffect(() => {
+  const fetchPremises = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API}/api/premises`);
+      const result = await response.json();
+      
+      if (result.success) {
+        const formattedPremises = result.data.map(premise => ({
+          ...premise,
+          premise_id: premise.premise_id.toString()
+        }));
+        setPremises(formattedPremises);
+      }
+    } catch (error) {
+      console.error('Error cargando sedes:', error);
+    }
+  };
+
+  fetchPremises();
+}, []);
 
   // Función para manejar el registro
   const handleRegister = async (data) => {
@@ -140,6 +162,12 @@ export default function AuthPage() {
   
     setIsLoading(true);
     try {
+      const selectedPremise = premises.find(premise => premise.premise_id === data.sede);
+      
+      if (!selectedPremise) {
+        throw new Error('Sede no válida');
+      }
+  
       const response = await fetch(`${process.env.NEXT_PUBLIC_API}/api/users`, {
         method: 'POST',
         headers: {
@@ -151,7 +179,7 @@ export default function AuthPage() {
           user_document_type: data.tipoDocumento,
           user_document: data.numeroDocumento,
           user_phone: data.telefono,
-          premise_id: data.sede,
+          premise_id: parseInt(data.sede), 
           user_password: data.password,
           role_id: 9 
         }),
@@ -704,12 +732,15 @@ export default function AuthPage() {
                           className="w-full pl-12 pr-4 py-4 bg-green-500/50 border border-white/20 rounded-2xl text-white backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 appearance-none"
                         >
                           <option value="">Elige</option>
-                          <option value="bogota">Bogotá</option>
-                          <option value="yopal">Yopal</option>
-                          <option value="ibague">Ibagué</option>
-                          <option value="girardot">Girardot</option>
-                          <option value="pereira">Pereira</option>
-                          <option value="armenia">Armenia</option>
+                          {premises.length > 0 ? (
+                            premises.map(premise => (
+                              <option key={premise.premise_id} value={premise.premise_id}>
+                                {premise.premise_name}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="" disabled>Cargando sedes...</option>
+                          )}
                         </select>
                         {registerForm.formState.errors.sede && (
                           <motion.p
