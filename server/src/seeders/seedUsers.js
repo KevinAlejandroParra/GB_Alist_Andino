@@ -52,6 +52,38 @@ module.exports = {
         entity_id: 2,
         createdAt: new Date(),
         updatedAt: new Date()
+      },
+      {
+        user_id: 4,
+        user_name: 'Daniel',
+        user_email: 'Daniel@example.com',
+        user_password: '$2b$10$MEVwrngfYxqsgTNBS0hEw.GY8tRmjtiYLRuh2CHFrqJfVDueqBWQC',
+        user_document_type: 'CC',
+        user_document: 123456000,
+        user_phone: 3256987000,
+        user_image: 'images/resources/nf.jpg',
+        user_state: 'activo',
+        role_id: 6,
+        premise_id: 2,
+        entity_id: 3,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        user_id: 5,
+        user_name: 'Santiago',
+        user_email: 'santiago@example.com',
+        user_password: '$2b$10$MEVwrngfYxqsgTNBS0hEw.GY8tRmjtiYLRuh2CHFrqJfVDueqBWQC',
+        user_document_type: 'CC',
+        user_document: 120456700,
+        user_phone: 3206987400,
+        user_image: 'images/resources/nf.jpg',
+        user_state: 'activo',
+        role_id: 7,
+        premise_id: 2,
+        entity_id: 5,
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     ]);
   },

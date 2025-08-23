@@ -82,6 +82,7 @@ Role.hasMany(ChecklistType, { as: "checklistTypes", foreignKey: "role_id" });
 
 // 3. Asociaciones de Premise
 Premise.hasMany(User, { as: "users", foreignKey: "premise_id" });
+Premise.hasMany(Entity, { as: 'entities', foreignKey: 'premise_id' });
 Premise.hasMany(Checklist, { as: "checklists", foreignKey: "premise_id" });
 Premise.hasMany(Inventory, { as: "inventories", foreignKey: "location_id" });
 Premise.hasMany(Inspectable, { as: "inspectables", foreignKey: "premise_id" });
@@ -141,8 +142,7 @@ ChecklistSignature.belongsTo(Checklist, { as: "checklist", foreignKey: "checklis
 ChecklistSignature.belongsTo(User, { as: "user", foreignKey: "user_id" });
 
 // 14. Asociaciones de Entity
-Premise.hasMany(Entity, { as: "entities", foreignKey: "premise_id" });
-
+Entity.belongsTo(Premise, { as: 'premise', foreignKey: 'premise_id' });
 // Asociaciones de Audit
 Audit.belongsTo(User, { as: "user", foreignKey: "user_id" });
 Audit.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });

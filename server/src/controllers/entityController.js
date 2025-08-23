@@ -1,11 +1,22 @@
 
-const { Entity } = require('../models');
+const { Entity, Premise } = require('../models');
 
 const entityController = {
     // Obtener todas las entidades
     getAllEntities: async (req, res) => {
         try {
-            const entities = await Entity.findAll();
+            const entities = await Entity.findAll({
+                include: [
+                    {
+                        model: Premise,
+                        as: 'premise',
+                        attributes: ['premise_name']
+                    }
+                ],
+                order: [
+                    ['premise_id', 'ASC']
+                ]
+            });
             res.status(200).json({
                 success: true,
                 data: entities
@@ -24,7 +35,15 @@ const entityController = {
     getEntityById: async (req, res) => {
         try {
             const { id } = req.params;
-            const entity = await Entity.findByPk(id);
+            const entity = await Entity.findByPk(id, {
+                include: [
+                    {
+                        model: Premise,
+                        as: 'premise',
+                        attributes: ['premise_name']
+                    }
+                ]
+            });
             if (!entity) {
                 return res.status(404).json({
                     success: false,
@@ -48,10 +67,11 @@ const entityController = {
     // Crear una nueva entidad
     createEntity: async (req, res) => {
         try {
-            const { entity_name, entity_description } = req.body;
+            const { entity_name, entity_description, premise_id } = req.body;
             const newEntity = await Entity.create({
                 entity_name,
-                entity_description
+                entity_description,
+                premise_id // Permitir la asignación de premise_id
             });
             res.status(201).json({
                 success: true,
@@ -72,16 +92,25 @@ const entityController = {
     updateEntity: async (req, res) => {
         try {
             const { id } = req.params;
-            const { entity_name, entity_description } = req.body;
+            const { entity_name, entity_description, premise_id } = req.body;
             const [updated] = await Entity.update({
                 entity_name,
-                entity_description
+                entity_description,
+                premise_id // Permitir la actualización de premise_id
             }, {
                 where: { entity_id: id }
             });
 
             if (updated) {
-                const updatedEntity = await Entity.findByPk(id);
+                const updatedEntity = await Entity.findByPk(id, {
+                    include: [
+                        {
+                            model: Premise,
+                            as: 'premise',
+                            attributes: ['premise_name']
+                        }
+                    ]
+                });
                 return res.status(200).json({
                     success: true,
                     message: 'Entidad actualizada exitosamente',

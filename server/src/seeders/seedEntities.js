@@ -22,9 +22,33 @@ module.exports = {
       },
       {
         entity_id: 3,
-        entity_name: 'Administracion de planta',
-        entity_description: 'Entidad encargada de la administracion de los parques',
+        entity_name: 'COPAS',
+        entity_description: 'Comite Paritario de Salud y Seguridad en el trabajo',
         premise_id: 1,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        entity_id: 4,
+        entity_name: 'Administracion de planta',
+        entity_description: 'Entidad encargada de la administracion del parque del centro comercial andino',
+        premise_id: 2,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        entity_id: 5,
+        entity_name: 'Mantenimiento Andino',
+        entity_description: 'Entidad encargada del mantenimiento de dispositivos y atracciones del parque del centro comercial andino',
+        premise_id: 2,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        entity_id: 6,
+        entity_name: 'Anfitriones Andino',
+        entity_description: 'Entidad encargada de logistica y recreacion del parque del centro comercial andino',
+        premise_id: 2,
         createdAt: new Date(),
         updatedAt: new Date()
       }

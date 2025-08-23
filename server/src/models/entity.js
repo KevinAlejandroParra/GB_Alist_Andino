@@ -7,7 +7,7 @@ module.exports = (sequelize, DataTypes) => {
         {
             entity_id: {
                 type: DataTypes.INTEGER,
-                defaultValue: DataTypes.INTEGER,
+                autoIncrement: true,
                 primaryKey: true,
             },
             entity_name: {
@@ -20,7 +20,7 @@ module.exports = (sequelize, DataTypes) => {
             },
             premise_id: {
                 type: DataTypes.INTEGER,
-                allowNull: true,
+                allowNull: false, 
             },
             createdAt: {
                 type: DataTypes.DATE,
