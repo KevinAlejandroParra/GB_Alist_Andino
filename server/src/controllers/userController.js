@@ -6,6 +6,141 @@ const {Role} = require("../models")
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { Op } = require('sequelize');
+const nodemailer = require('nodemailer');
+const { createTransporter } = require('../config/emailConfig');
+
+const JWT_SECRET = process.env.JWT_KEY 
+const JWT_RESET_EXPIRES_IN = '1h';
+
+// Función para generar token JWT de recuperación de contraseña
+const generateResetToken = (email) => {
+  return jwt.sign(
+    {
+      email,
+      type: 'password-reset',
+      timestamp: Date.now()
+    },
+    JWT_SECRET,
+    { expiresIn: JWT_RESET_EXPIRES_IN }
+  );
+};
+
+// Función para verificar token JWT de recuperación
+const verifyResetToken = (token) => {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    // Verificar que sea un token de recuperación
+    if (decoded.type !== 'password-reset') {
+      throw new Error('Tipo de token inválido');
+    }
+
+    return {
+      valid: true,
+      email: decoded.email,
+      timestamp: decoded.timestamp
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      error: error.message
+    };
+  }
+};
+
+// Función para enviar correo de recuperación de contraseña 
+const sendPasswordResetEmail = async (recipientEmail, resetToken) => {
+  const transporter = createTransporter();
+
+  const frontendURL = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const resetURL = `${frontendURL}/reset-password?token=${resetToken}`;
+
+  const mailOptions = {
+    from: `"Alist GBX" <${process.env.EMAIL_USER}>`,
+    to: recipientEmail,
+    subject: 'Recuperación de Contraseña',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Recuperación de Contraseña</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color:rgba(42, 116, 253, 0.99); color: white; padding: 20px; text-align: center; }
+          .content { background-color: #f8f9fa; padding: 30px; }
+          .button { 
+            display: inline-block; 
+            background-color:rgba(134, 248, 252, 0.67); 
+            color: black; 
+            padding: 12px 24px; 
+            text-decoration: none; 
+            border-radius: 5px; 
+            margin: 20px 0; 
+          }
+          .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Recuperación de Contraseña</h1>
+          </div>
+          <div class="content">
+            <p>Hola,</p>
+            <p>Has solicitado restablecer tu contraseña. Haz clic en el botón de abajo para crear una nueva contraseña:</p>
+            <p style="text-align: center;">
+              <a href="${resetURL}" class="button">Restablecer Contraseña</a>
+            </p>
+            <p>Si no puedes hacer clic en el botón, copia y pega este enlace en tu navegador:</p>
+            <p style="word-break: break-all; background-color: #e9ecef; padding: 10px; border-radius: 5px;">
+              ${resetURL}
+            </p>
+            <p><strong>Importante:</strong> Este enlace expirará en 1 hora por motivos de seguridad.</p>
+            <p>Si no solicitaste este restablecimiento, puedes ignorar este correo.</p>
+          </div>
+          <div class="footer">
+            <p>&copy; Alist Game Box Platform 2025. Todos los derechos reservados.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `
+      Recuperación de Contraseña
+      
+      Hola,
+      
+      Has solicitado restablecer tu contraseña. Visita el siguiente enlace para crear una nueva contraseña:
+      
+      ${resetURL}
+      
+      Este enlace expirará en 1 hora por motivos de seguridad.
+      
+      Si no solicitaste este restablecimiento, puedes ignorar este correo.
+      
+      Alist GBX
+    `
+  };
+
+  try {
+    const result = await transporter.sendMail(mailOptions);
+    console.log('Correo enviado exitosamente:', result.messageId);
+    return {
+      success: true,
+      messageId: result.messageId,
+      message: 'Correo de recuperación enviado exitosamente'
+    };
+  } catch (error) {
+    console.error('Error al enviar correo:', error);
+    return {
+      success: false,
+      error: error.message,
+      message: 'Error al enviar el correo de recuperación'
+    };
+  }
+};
 
 class UserController {
 static async getUsers(req, res) {
@@ -133,11 +268,19 @@ static async createUser(req, res) {
         });
     }
 };
-
 static async updateUser(req, res) {
     try {
-        const userId = req.params.user_id; 
+        const userId = parseInt(req.params.user_id, 10); 
+        const requestingUserId = req.user.user_id; 
         let userJSON = {};
+        console.log (requestingUserId)
+        console.log (userId)
+        if (userId !== requestingUserId) {
+            return res.status(403).json({
+                success: false,
+                message: "Solo es posible editar su propio perfil, no el de los demás."
+            });
+        }
 
         try {
             if (req.body.user) {
@@ -456,6 +599,156 @@ static async updateUserAdmin(req, res) {
             success: false,
             message: 'Error al actualizar datos de usuario por administrador',
             error: error.message
+        });
+    }
+}
+
+static async forgotPassword(req, res) {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: 'El email es requerido'
+            });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Formato de email inválido'
+            });
+        }
+
+        const user = await User.findOne({ where: { user_email: email } });
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+        }
+
+        const resetToken = generateResetToken(email);
+
+        const emailResult = await sendPasswordResetEmail(email, resetToken);
+
+        if (emailResult.success) {
+            res.json({
+                success: true,
+                message: 'El correo existe en nuestro sistema, recibirás un enlace de recuperación',
+                debugInfo: process.env.NODE_ENV === 'development' ? {
+                    token: resetToken,
+                    messageId: emailResult.messageId,
+                    decodedToken: jwt.decode(resetToken)
+                } : undefined
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'Error al enviar el correo de recuperación',
+                error: emailResult.error
+            });
+        }
+
+    } catch (error) {
+        console.error('❌ Error en forgot-password:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+}
+
+static async verifyResetTokenEndpoint(req, res) {
+    try {
+        const { token } = req.params;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token de recuperación es requerido'
+            });
+        }
+
+        const verification = verifyResetToken(token);
+
+        if (!verification.valid) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token inválido o expirado',
+                error: verification.error
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Token válido. Puede proceder a cambiar la contraseña',
+            email: verification.email
+        });
+
+    } catch (error) {
+        console.error('❌ Error en verify-reset-token:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al verificar el token',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+}
+
+static async resetPassword(req, res) {
+    try {
+        const { token, newPassword, confirmPassword } = req.body;
+
+        if (!token || !newPassword || !confirmPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token, nueva contraseña y confirmación son requeridos'
+            });
+        }
+
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Las contraseñas no coinciden'
+            });
+        }
+
+        if (newPassword.length < 8) {
+            return res.status(400).json({
+                success: false,
+                message: 'La contraseña debe tener al menos 8 caracteres'
+            });
+        }
+
+        const verification = verifyResetToken(token);
+
+        if (!verification.valid) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token inválido o expirado',
+                error: verification.error
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await User.update(
+            { user_password: hashedPassword },
+            { where: { user_email: verification.email } }
+        );
+
+        res.json({
+            success: true,
+            message: 'Contraseña actualizada exitosamente',
+            email: verification.email
+        });
+
+    } catch (error) {
+        console.error('❌ Error en reset-password:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al actualizar la contraseña',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 }
