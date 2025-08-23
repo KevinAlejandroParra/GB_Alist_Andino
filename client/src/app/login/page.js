@@ -65,7 +65,6 @@ export default function AuthPage() {
 
       // Guardar el token en localStorage
       localStorage.setItem('authToken', result.token);
-      console.log ('tokens del localstorage:', localStorage.getItem('authToken'))
 
       await Swal.fire({
         title: '<div class="flex flex-col items-center"><i class="fas fa-check-circle text-5xl mb-3 text-purple-400"></i><span class="text-white text-2xl font-bold">¡Éxito!</span></div>',

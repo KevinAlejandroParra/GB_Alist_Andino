@@ -18,9 +18,25 @@ static async getUsers(req, res) {
         const { rows, count } = await User.findAndCountAll({
             limit,
             offset,
+            include: [
+                {
+                    model: Role,
+                    as: 'role',
+                    attributes: ['role_name']
+                },
+                {
+                    model: Premise,
+                    as: 'premise',
+                    attributes: ['premise_name']
+                },
+                {
+                    model: Entity,
+                    as: 'entity',
+                    attributes: ['entity_name']
+                }
+            ]
         });
 
-        console.log('Usuarios obtenidos:', rows); // Imprimir los usuarios obtenidos
 
         res.status(200).json({
             success: true,
@@ -29,7 +45,7 @@ static async getUsers(req, res) {
             message: "usuarios obtenidos correctamente"
         });
     } catch (error) {
-        console.error('Error al obtener usuarios:', error); // Imprimir el error
+        console.error('Error al obtener usuarios:', error); 
         res.status(500).json({
             success: false,
             data: error.message,
@@ -259,12 +275,23 @@ static async changeUserState(req, res) {
         });
     }
 }
-
 static async loginUser(req, res) {
     const { user_email, user_password } = req.body;
     try {
         const user = await User.findOne({ where: { user_email } });
-        if (!user || !(await user.comparePassword(user_password))) {
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Credenciales inválidas'
+            });
+        }
+        if (user.user_state === "inactivo") {
+            return res.status(401).json({
+                success: false,
+                message: 'Acceso denegado, usuario temporalmente desactivado'
+            });
+        }
+        if (!(await user.comparePassword(user_password))) {
             return res.status(401).json({
                 success: false,
                 message: 'Credenciales inválidas'
