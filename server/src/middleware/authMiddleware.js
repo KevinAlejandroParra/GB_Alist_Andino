@@ -13,7 +13,7 @@ const verifyToken = async (req, res, next) => {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_KEY);
-        req.user = decoded; // Asegúrate de que el decoded contenga el role_id
+        req.user = decoded; 
         next();
     } catch (error) {
         return res.status(401).json({
@@ -27,10 +27,10 @@ const verifyToken = async (req, res, next) => {
 const checkRole = (roles) => {
     return async (req, res, next) => {
         try {
-            console.log('Verificando rol para el user_id:', req.user.user_id); // Imprimir el user_id
+            console.log('Verificando rol para el user_id:', req.user.user_id); 
 
             const user = await User.findOne({ where: { user_id: req.user.user_id } });
-            console.log('Usuario encontrado:', user); // Imprimir el usuario encontrado
+            console.log('Usuario encontrado:', user); 
 
             if (!user || !roles.includes(Number(user.role_id))) {
                 console.log('Rol del usuario:', user ? user.role_id : 'Usuario no encontrado'); // Imprimir el rol del usuario
