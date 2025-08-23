@@ -16,7 +16,7 @@ export default function UserManagement() {
         entity_id: '',
     });
 
-    const URL_API = `${process.env.NEXT_PUBLIC_API}/`; 
+    const URL_API = `${process.env.NEXT_PUBLIC_API}`; 
 
     useEffect(() => {
         fetchData();
@@ -31,10 +31,10 @@ export default function UserManagement() {
             };
 
             const [usersRes, rolesRes, premisesRes, entitiesRes] = await Promise.all([
-                fetch(`${URL_API}api/users`, { headers }),
-                fetch(`${URL_API}api/roles`, { headers }),
-                fetch(`${URL_API}api/premises`, { headers }),
-                fetch(`${URL_API}api/entities`, { headers }),
+                fetch(`${URL_API}/api/users`, { headers }),
+                fetch(`${URL_API}/api/roles`, { headers }),
+                fetch(`${URL_API}/api/premises`, { headers }),
+                fetch(`${URL_API}/api/entities`, { headers }),
             ]);
 
             const usersData = await usersRes.json();
@@ -80,7 +80,7 @@ export default function UserManagement() {
         setLoading(true);
         try {
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`${URL_API}api/users/${currentUser.user_id}/admin`, {
+            const response = await fetch(`${URL_API}/api/users/${currentUser.user_id}/admin`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -100,6 +100,31 @@ export default function UserManagement() {
                 entity_id: '',
             });
             setCurrentUser(null);
+            fetchData(); 
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleToggleState = async (user_id, currentState) => {
+        if (!confirm(`¿Estás seguro de que quieres cambiar el estado de este usuario a ${currentState === 'activo' ? 'inactivo' : 'activo'}?`)) {
+            return;
+        }
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`${URL_API}/api/users/${user_id}/state`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Error al cambiar el estado del usuario');
+            }
             fetchData(); 
         } catch (err) {
             setError(err.message);
@@ -201,6 +226,7 @@ export default function UserManagement() {
                             <th className="py-3 px-4 text-left">Rol</th>
                             <th className="py-3 px-4 text-left">Sede</th>
                             <th className="py-3 px-4 text-left">Entidad</th>
+                            <th className="py-3 px-4 text-left">Estado</th>
                             <th className="py-3 px-4 text-left">Acciones</th>
                         </tr>
                     </thead>
@@ -213,12 +239,21 @@ export default function UserManagement() {
                                 <td className="py-3 px-4">{user.role?.role_name || 'N/A'}</td>
                                 <td className="py-3 px-4">{user.premise?.premise_name || 'N/A'}</td>
                                 <td className="py-3 px-4">{user.entity?.entity_name || 'N/A'}</td>
+                                <td className="py-3 px-4">{user.user_state}</td>
                                 <td className="py-3 px-4">
                                     <button
-                                        className="bg-yellow-500 text-white px-3 py-1 rounded-md hover:bg-yellow-600 transition-colors"
+                                        className="bg-yellow-500 text-white px-3 py-1 rounded-md mr-2 hover:bg-yellow-600 transition-colors"
                                         onClick={() => handleEdit(user)}
                                     >
                                         Editar
+                                    </button>
+                                    <button
+                                        className={`${
+                                            user.user_state === 'activo' ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
+                                        } text-white px-3 py-1 rounded-md transition-colors`}
+                                        onClick={() => handleToggleState(user.user_id, user.user_state)}
+                                    >
+                                        {user.user_state === 'activo' ? 'Desactivar' : 'Activar'}
                                     </button>
                                 </td>
                             </tr>

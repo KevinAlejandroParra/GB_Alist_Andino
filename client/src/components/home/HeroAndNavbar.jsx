@@ -1,5 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react';
+import { jwtDecode } from 'jwt-decode';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const HeroandNavbar = () => {
@@ -83,10 +84,20 @@ const HeroandNavbar = () => {
   };
 
   const goToWorkspace = () => {
-    if (isAuthenticated || localStorage?.getItem('authToken')) {
-      window.location.href = '/workspace';
-    } else {
-      redirectToLogin();
+    try {
+      const decoded = jwtDecode(localStorage.getItem('authToken'));
+      const role_id = decoded.role_id;
+  
+      if (isAuthenticated) {
+        if (role_id === 1 || role_id === 2) {
+          window.location.href = '/AdminDashboard';
+        } else {
+          window.location.href = '/GeneralDashboard';
+        }
+      }
+    } catch (error) {
+      console.error('Error decoding token:', error);
+      window.location.href = '/GeneralDashboard';
     }
   };
   const navItems = [

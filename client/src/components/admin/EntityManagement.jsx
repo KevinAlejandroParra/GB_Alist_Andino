@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 
 export default function EntityManagement() {
     const [entities, setEntities] = useState([]);
+    const [premises, setPremises] = useState([]); // Nuevo estado para almacenar las sedes
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -10,28 +11,38 @@ export default function EntityManagement() {
     const [form, setForm] = useState({
         entity_name: '',
         entity_description: '',
+        premise_id: '', // Añadir premise_id al formulario
     });
 
     const URL_API = `${process.env.NEXT_PUBLIC_API}`; 
 
     useEffect(() => {
-        fetchEntities();
+        fetchEntitiesAndPremises(); // Cambiar a una función que traiga ambos
     }, []);
 
-    const fetchEntities = async () => {
+    const fetchEntitiesAndPremises = async () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`${URL_API}/api/entities`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-            if (!response.ok) {
-                throw new Error('Error al obtener las entidades');
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+            };
+
+            const [entitiesRes, premisesRes] = await Promise.all([
+                fetch(`${URL_API}/api/entities`, { headers }),
+                fetch(`${URL_API}/api/premises`, { headers }),
+            ]);
+
+            const entitiesData = await entitiesRes.json();
+            const premisesData = await premisesRes.json();
+
+            if (!entitiesRes.ok || !premisesRes.ok) {
+                throw new Error('Error al obtener datos');
             }
-            const data = await response.json();
-            setEntities(data.data);
+
+            setEntities(entitiesData.data);
+            setPremises(premisesData.data);
+
         } catch (err) {
             setError(err.message);
         } finally {
@@ -73,9 +84,10 @@ export default function EntityManagement() {
             setForm({
                 entity_name: '',
                 entity_description: '',
+                premise_id: '',
             });
             setCurrentEntity(null);
-            fetchEntities();
+            fetchEntitiesAndPremises();
         } catch (err) {
             setError(err.message);
         } finally {
@@ -88,6 +100,7 @@ export default function EntityManagement() {
         setForm({
             entity_name: entity.entity_name,
             entity_description: entity.entity_description,
+            premise_id: entity.premise_id || '', // Asignar premise_id al formulario
         });
         setIsModalOpen(true);
     };
@@ -109,7 +122,7 @@ export default function EntityManagement() {
             if (!response.ok) {
                 throw new Error('Error al eliminar la entidad');
             }
-            fetchEntities();
+            fetchEntitiesAndPremises();
         } catch (err) {
             setError(err.message);
         } finally {
@@ -128,7 +141,7 @@ export default function EntityManagement() {
                 className="bg-green-500 text-white px-4 py-2 rounded-md mb-4 hover:bg-green-600 transition-colors"
                 onClick={() => {
                     setCurrentEntity(null);
-                    setForm({ entity_name: '', entity_description: '' });
+                    setForm({ entity_name: '', entity_description: '', premise_id: '' });
                     setIsModalOpen(true);
                 }}
             >
@@ -164,6 +177,24 @@ export default function EntityManagement() {
                                     required
                                 />
                             </div>
+                            <div className="mb-4">
+                                <label htmlFor="premise_id" className="block text-gray-700 text-sm font-bold mb-2">Sede:</label>
+                                <select
+                                    id="premise_id"
+                                    name="premise_id"
+                                    value={form.premise_id}
+                                    onChange={handleChange}
+                                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                    required
+                                >
+                                    <option value="">Selecciona una sede</option>
+                                    {premises.map(premise => (
+                                        <option key={premise.premise_id} value={premise.premise_id}>
+                                            {premise.premise_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                             <div className="flex justify-end">
                                 <button
                                     type="button"
@@ -186,13 +217,10 @@ export default function EntityManagement() {
 
             <div className="overflow-x-auto">
                 <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
-                    <thead className="bg-gray-800 text-white">
-                        <tr>
-                            <th className="py-3 px-4 text-left">ID</th>
-                            <th className="py-3 px-4 text-left">Nombre</th>
-                            <th className="py-3 px-4 text-left">Descripción</th>
-                            <th className="py-3 px-4 text-left">Acciones</th>
-                        </tr>
+                <thead className="bg-gray-800 text-white">
+                    <tr>
+                        <th className="py-3 px-4 text-left">ID</th><th className="py-3 px-4 text-left">Nombre</th><th className="py-3 px-4 text-left">Descripción</th><th className="py-3 px-4 text-left">Sede</th><th className="py-3 px-4 text-left">Acciones</th>
+                    </tr>
                     </thead>
                     <tbody>
                         {entities.map((entity) => (
@@ -200,6 +228,7 @@ export default function EntityManagement() {
                                 <td className="py-3 px-4">{entity.entity_id}</td>
                                 <td className="py-3 px-4">{entity.entity_name}</td>
                                 <td className="py-3 px-4">{entity.entity_description}</td>
+                                <td className="py-3 px-4">{entity.premise?.premise_name || 'N/A'}</td>
                                 <td className="py-3 px-4">
                                     <button
                                         className="bg-yellow-500 text-white px-3 py-1 rounded-md mr-2 hover:bg-yellow-600 transition-colors"
