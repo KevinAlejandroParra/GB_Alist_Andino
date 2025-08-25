@@ -38,7 +38,7 @@ const AttractionModel = require("./attraction.js");
 const FamilyModel = require("./family.js");
 const EntityModel = require("./entity.js");
 const AuditModel = require("./audit.js");
-const AttractionDeviceModel = require("./attraction_device.js"); 
+// const AttractionDeviceModel = require("./attraction_device.js"); // Eliminar importación del modelo intermedio
 
 // Inicializar modelos
 const User = UserModel(connection, DataTypes);
@@ -61,7 +61,7 @@ const Attraction = AttractionModel(connection, DataTypes);
 const Family = FamilyModel(connection, DataTypes);
 const Entity = EntityModel(connection, DataTypes);
 const Audit = AuditModel(connection, DataTypes);
-const AttractionDevice = AttractionDeviceModel(connection, DataTypes); 
+// const AttractionDevice = AttractionDeviceModel(connection, DataTypes); // Eliminar inicialización del modelo intermedio
 
 // Asociaciones
 
@@ -177,19 +177,7 @@ Family.hasMany(Device, { as: "devices", foreignKey: "family_id" });
 
 // 16. Asociaciones de Attraction y Device (a través de tabla intermedia AttractionDevice)
 // Una Attraction puede tener muchos Devices relacionados
-Attraction.belongsToMany(Device, {
-    through: AttractionDevice,
-    as: 'relatedDevices',
-    foreignKey: 'attraction_id',
-    otherKey: 'device_id'
-});
-// Un Device puede pertenecer a muchas Attractions
-Device.belongsToMany(Attraction, {
-    through: AttractionDevice,
-    as: 'relatedAttractions',
-    foreignKey: 'device_id',
-    otherKey: 'attraction_id'
-});
+// Eliminadas las asociaciones belongsToMany entre Attraction y Device
 
 // Asociaciones de Audit
 Audit.belongsTo(User, { as: "user", foreignKey: "user_id" });
@@ -219,6 +207,6 @@ module.exports = {
     Family,
     Entity,
     Audit,
-    AttractionDevice, 
+    // AttractionDevice, // Eliminar exportación del modelo intermedio
     connection,
 };

@@ -7,13 +7,22 @@ module.exports = {
             ins_id: {
                 type: DataTypes.INTEGER,
                 primaryKey: true,
-                autoIncrement: true,
                 allowNull: false,
                 unique: true,
+                references: {
+                    model: 'inspectables',
+                    key: 'ins_id',
+                },
+                onDelete: 'CASCADE',
             },
             family_id: {
                 type: Sequelize.INTEGER,
                 allowNull: false,
+                references: {
+                    model: 'families',
+                    key: 'family_id',
+                },
+                onDelete: 'CASCADE',
             },
             public_flag: {
                 type: Sequelize.STRING,
