@@ -38,7 +38,7 @@ const AttractionModel = require("./attraction.js");
 const FamilyModel = require("./family.js");
 const EntityModel = require("./entity.js");
 const AuditModel = require("./audit.js");
-
+const AttractionDeviceModel = require("./attraction_device.js"); 
 
 // Inicializar modelos
 const User = UserModel(connection, DataTypes);
@@ -61,8 +61,34 @@ const Attraction = AttractionModel(connection, DataTypes);
 const Family = FamilyModel(connection, DataTypes);
 const Entity = EntityModel(connection, DataTypes);
 const Audit = AuditModel(connection, DataTypes);
+const AttractionDevice = AttractionDeviceModel(connection, DataTypes); 
 
 // Asociaciones
+
+// Jerarquía: Premise → Inspectable (Superclase) → Device / Attraction
+// Un Premise puede tener muchos Inspectables (Device o Attraction)
+Premise.hasMany(Inspectable, { as: "inspectables", foreignKey: "premise_id" });
+Inspectable.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
+
+// Herencia de Inspectable (Single Table Inheritance)
+// Device y Attraction heredan de Inspectable a través de type_code
+// Se usa `constraints: false` y `scope` para manejar la herencia
+Device.belongsTo(Inspectable, {
+    as: "inspectable",
+    foreignKey: "ins_id", // ins_id es la clave primaria de Inspectable
+    constraints: false,
+    scope: {
+        type_code: 'device'
+    }
+});
+Attraction.belongsTo(Inspectable, {
+    as: "inspectable",
+    foreignKey: "ins_id", // ins_id es la clave primaria de Inspectable
+    constraints: false,
+    scope: {
+        type_code: 'attraction'
+    }
+});
 
 // 1. Asociaciones de User
 User.belongsTo(Role, { as: "role", foreignKey: "role_id" });
@@ -85,7 +111,6 @@ Premise.hasMany(User, { as: "users", foreignKey: "premise_id" });
 Premise.hasMany(Entity, { as: 'entities', foreignKey: 'premise_id' });
 Premise.hasMany(Checklist, { as: "checklists", foreignKey: "premise_id" });
 Premise.hasMany(Inventory, { as: "inventories", foreignKey: "location_id" });
-Premise.hasMany(Inspectable, { as: "inspectables", foreignKey: "premise_id" });
 
 // 4. Asociaciones de ChecklistType
 ChecklistType.belongsTo(Role, { as: "role", foreignKey: "role_id" });
@@ -143,30 +168,34 @@ ChecklistSignature.belongsTo(User, { as: "user", foreignKey: "user_id" });
 
 // 14. Asociaciones de Entity
 Entity.belongsTo(Premise, { as: 'premise', foreignKey: 'premise_id' });
+
+// 15. Asociaciones de Device y Family
+// Un Device pertenece a una Family
+Device.belongsTo(Family, { as: "family", foreignKey: "family_id" });
+// Una Family puede tener muchos Devices
+Family.hasMany(Device, { as: "devices", foreignKey: "family_id" });
+
+// 16. Asociaciones de Attraction y Device (a través de tabla intermedia AttractionDevice)
+// Una Attraction puede tener muchos Devices relacionados
+Attraction.belongsToMany(Device, {
+    through: AttractionDevice,
+    as: 'relatedDevices',
+    foreignKey: 'attraction_id',
+    otherKey: 'device_id'
+});
+// Un Device puede pertenecer a muchas Attractions
+Device.belongsToMany(Attraction, {
+    through: AttractionDevice,
+    as: 'relatedAttractions',
+    foreignKey: 'device_id',
+    otherKey: 'attraction_id'
+});
+
 // Asociaciones de Audit
 Audit.belongsTo(User, { as: "user", foreignKey: "user_id" });
 Audit.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
 User.hasMany(Audit, { as: "audits", foreignKey: "user_id" });
 Premise.hasMany(Audit, { as: "audits", foreignKey: "premise_id" });
-
-// Herencia de Inspectable
-Inspectable.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
-Device.belongsTo(Inspectable, { 
-    as: "inspectable", 
-    foreignKey: "inspectable_id",
-    constraints: false,
-    scope: {
-        type_code: 'DEVICE'
-    }
-});
-Attraction.belongsTo(Inspectable, { 
-    as: "inspectable", 
-    foreignKey: "inspectable_id",
-    constraints: false,
-    scope: {
-        type_code: 'ATTRACTION'
-    }
-});
 
 // Exportar modelos
 module.exports = {
@@ -190,5 +219,6 @@ module.exports = {
     Family,
     Entity,
     Audit,
+    AttractionDevice, 
     connection,
 };
