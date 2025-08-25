@@ -7,7 +7,7 @@ module.exports = (sequelize, DataTypes) => {
         {
             family_id: {
                 type: DataTypes.INTEGER,
-                defaultValue: DataTypes.INTEGER,
+                autoIncrement: true,
                 primaryKey: true,
             },
             family_name: {
@@ -27,6 +27,11 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.DATE,
                 defaultValue: DataTypes.NOW,
                 onUpdate: DataTypes.NOW,
+                allowNull: false,
+            },
+            is_deleted: {
+                type: DataTypes.BOOLEAN,
+                defaultValue: false,
                 allowNull: false,
             },
         },
