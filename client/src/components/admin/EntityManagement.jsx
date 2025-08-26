@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 
 export default function EntityManagement() {
     const [entities, setEntities] = useState([]);
-    const [premises, setPremises] = useState([]); // Nuevo estado para almacenar las sedes
+    const [premises, setPremises] = useState([]); 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -11,13 +11,13 @@ export default function EntityManagement() {
     const [form, setForm] = useState({
         entity_name: '',
         entity_description: '',
-        premise_id: '', // Añadir premise_id al formulario
+        premise_id: '', 
     });
 
     const URL_API = `${process.env.NEXT_PUBLIC_API}`; 
 
     useEffect(() => {
-        fetchEntitiesAndPremises(); // Cambiar a una función que traiga ambos
+        fetchEntitiesAndPremises(); 
     }, []);
 
     const fetchEntitiesAndPremises = async () => {
@@ -100,7 +100,7 @@ export default function EntityManagement() {
         setForm({
             entity_name: entity.entity_name,
             entity_description: entity.entity_description,
-            premise_id: entity.premise_id || '', // Asignar premise_id al formulario
+            premise_id: entity.premise_id || '', 
         });
         setIsModalOpen(true);
     };
