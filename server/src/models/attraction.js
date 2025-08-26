@@ -7,8 +7,8 @@ module.exports = (sequelize, DataTypes) => {
         {
             ins_id: {
                 type: DataTypes.INTEGER,
-                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
+                allowNull: false,
             },
             public_flag: {
                 type: DataTypes.STRING,
