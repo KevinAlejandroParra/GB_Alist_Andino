@@ -38,7 +38,6 @@ const AttractionModel = require("./attraction.js");
 const FamilyModel = require("./family.js");
 const EntityModel = require("./entity.js");
 const AuditModel = require("./audit.js");
-// const AttractionDeviceModel = require("./attraction_device.js"); // Eliminar importación del modelo intermedio
 
 // Inicializar modelos
 const User = UserModel(connection, DataTypes);
@@ -61,7 +60,6 @@ const Attraction = AttractionModel(connection, DataTypes);
 const Family = FamilyModel(connection, DataTypes);
 const Entity = EntityModel(connection, DataTypes);
 const Audit = AuditModel(connection, DataTypes);
-// const AttractionDevice = AttractionDeviceModel(connection, DataTypes); // Eliminar inicialización del modelo intermedio
 
 // Asociaciones
 
@@ -73,6 +71,12 @@ Inspectable.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
 // Herencia de Inspectable (Single Table Inheritance)
 // Device y Attraction heredan de Inspectable a través de type_code
 // Se usa `constraints: false` y `scope` para manejar la herencia
+
+Inspectable.hasOne(Device, {
+    as: "deviceData", 
+    foreignKey: "ins_id",
+    constraints: false,
+});
 Device.belongsTo(Inspectable, {
     as: "inspectable",
     foreignKey: "ins_id", // ins_id es la clave primaria de Inspectable
@@ -80,6 +84,12 @@ Device.belongsTo(Inspectable, {
     scope: {
         type_code: 'device'
     }
+});
+
+Inspectable.hasOne(Attraction, {
+    as: "attractionData", 
+    foreignKey: "ins_id",
+    constraints: false,
 });
 Attraction.belongsTo(Inspectable, {
     as: "inspectable",
@@ -175,10 +185,6 @@ Device.belongsTo(Family, { as: "family", foreignKey: "family_id" });
 // Una Family puede tener muchos Devices
 Family.hasMany(Device, { as: "devices", foreignKey: "family_id" });
 
-// 16. Asociaciones de Attraction y Device (a través de tabla intermedia AttractionDevice)
-// Una Attraction puede tener muchos Devices relacionados
-// Eliminadas las asociaciones belongsToMany entre Attraction y Device
-
 // Asociaciones de Audit
 Audit.belongsTo(User, { as: "user", foreignKey: "user_id" });
 Audit.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
@@ -207,6 +213,5 @@ module.exports = {
     Family,
     Entity,
     Audit,
-    // AttractionDevice, // Eliminar exportación del modelo intermedio
     connection,
 };
