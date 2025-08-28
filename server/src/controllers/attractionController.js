@@ -37,7 +37,8 @@ const attractionController = {
     // Crear una nueva atracción
     async createAttraction(req, res) {
         try {
-            const { name, description, premise_id, public_flag, capacity } = req.body;
+            const { name, description, premise_id, public_flag, capacity } = req.body; 
+            const photo_url = req.file ? `/media/${req.file.filename}` : req.body.photo_url; // Obtener la URL de la foto
 
             // Crear primero el Inspectable
             const inspectable = await Inspectable.create({
@@ -45,6 +46,7 @@ const attractionController = {
                 description,
                 type_code: 'attraction',
                 premise_id,
+                photo_url, 
             });
 
             // Crear la Attraction, vinculándola al Inspectable
@@ -66,6 +68,10 @@ const attractionController = {
         try {
             const attractionId = req.params.id;
             const { name, description, premise_id, public_flag, capacity } = req.body;
+            let photo_url = req.body.photo_url; // photo_url puede venir del body si es una URL directa
+            if (req.file) {
+                photo_url = `/media/${req.file.filename}`; // Si se sube un nuevo archivo, usar su ruta
+            }
 
             const attraction = await Attraction.findByPk(attractionId);
             if (!attraction) {
@@ -74,7 +80,7 @@ const attractionController = {
 
             // Actualizar el Inspectable asociado
             await Inspectable.update(
-                { name, description, premise_id, type_code: 'attraction' }, 
+                { name, description, premise_id, type_code: 'attraction', photo_url }, 
                 { where: { ins_id: attraction.ins_id } }
             );
 
