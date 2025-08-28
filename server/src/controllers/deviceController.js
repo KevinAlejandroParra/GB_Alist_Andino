@@ -42,7 +42,8 @@ const deviceController = {
     // Crear un nuevo dispositivo (con validación de familia existente)
     async createDevice(req, res) {
         try {
-            const { family_id, name, description, premise_id, public_flag, arrival_date, brand } = req.body;
+            const { family_id, name, description, premise_id, public_flag, arrival_date, brand } = req.body; 
+            const photo_url = req.file ? `/media/${req.file.filename}` : req.body.photo_url; // Obtener la URL de la foto
 
             // Validar que la familia exista
             const family = await Family.findByPk(family_id);
@@ -56,6 +57,7 @@ const deviceController = {
                 description,
                 type_code: 'device',
                 premise_id,
+                photo_url, 
             });
 
             // Crear el Device, vinculándolo al Inspectable y a la Family
@@ -78,7 +80,11 @@ const deviceController = {
     async updateDevice(req, res) {
         try {
             const deviceId = req.params.id;
-            const { family_id, name, description, premise_id, public_flag, arrival_date, brand } = req.body;
+            const { family_id, name, description, premise_id, public_flag, arrival_date, brand } = req.body; 
+            let photo_url = req.body.photo_url; // photo_url puede venir del body si es una URL directa
+            if (req.file) {
+                photo_url = `/media/${req.file.filename}`; // Si se sube un nuevo archivo, usar su ruta
+            }
 
             const device = await Device.findByPk(deviceId);
             if (!device) {
@@ -95,7 +101,7 @@ const deviceController = {
 
             // Actualizar el Inspectable asociado
             await Inspectable.update(
-                { name, description, premise_id, type_code: 'device' }, 
+                { name, description, premise_id, type_code: 'device', photo_url }, 
                 { where: { ins_id: device.ins_id } }
             );
 
