@@ -1,0 +1,53 @@
+[
+    {
+        "family_id": 1,
+        "public_flag": "Sí",
+        "arrival_date": "2025-08-11T00:00:00.000Z",
+        "brand": "Microsoft",
+            "name": "fruit ninja",
+            "description": "videojuego tipo arcade",
+            "type_code": "device",
+            "premise_id": 2,
+    },
+    {
+        "family_id": 1,
+        "public_flag": "Sí",
+        "arrival_date": "2025-08-25T20:29:51.000Z",
+        "brand": "sacoa",
+            "name": "test 2",
+            "description": "5847684",
+            "type_code": "device",
+            "premise_id": 2,
+    },
+    {
+        "family_id": 1,
+        "public_flag": "Sí",
+        "arrival_date": "2025-08-25T20:29:51.000Z",
+        "brand": "raw trills",
+            "name": "typhoon",
+            "description": "5847684",
+            "type_code": "device",
+            "premise_id": 2,
+    },
+    {
+        "family_id": 2,
+        "public_flag": "No",
+        "arrival_date": "2022-09-15T00:00:00.000Z",
+        "brand": "Medower",
+            "name": "Happy Bus",
+            "description": "simulador de autobus interactivo para dos pasajeros",
+            "type_code": "device",
+            "premise_id": 2,
+    },
+    {
+        "family_id": 3,
+        "public_flag": "Sí",
+        "arrival_date": "2025-01-08T00:00:00.000Z",
+        "brand": "Raw Trills",
+            "name": "Fast And Furious",
+            "description": "Arcade multijugador con movimientos interactivos",
+            "type_code": "device",
+            "premise_id": 2,
+    }
+
+]
