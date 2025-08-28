@@ -16,7 +16,9 @@ const DeviceManagement = () => {
         arrival_date: '',
         brand: '',
     });
+    const [newDevicePhoto, setNewDevicePhoto] = useState(null);
     const [editingDevice, setEditingDevice] = useState(null);
+    const [editingDevicePhoto, setEditingDevicePhoto] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -57,7 +59,19 @@ const DeviceManagement = () => {
     const handleCreateDevice = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post(`${API_BASE_URL}/api/devices`, newDevice);
+            const formData = new FormData();
+            for (const key in newDevice) {
+                formData.append(key, newDevice[key]);
+            }
+            if (newDevicePhoto) {
+                formData.append('photo', newDevicePhoto);
+            }
+
+            const response = await axios.post(`${API_BASE_URL}/api/devices`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             setDevices([...devices, response.data]);
             setNewDevice({
                 family_id: '',
@@ -68,8 +82,9 @@ const DeviceManagement = () => {
                 arrival_date: '',
                 brand: '',
             });
+            setNewDevicePhoto(null);
             setError(null);
-            fetchData(); 
+            fetchData();
         } catch (err) {
             console.error("Error creating device:", err);
             setError("Error al crear el dispositivo.");
@@ -82,24 +97,42 @@ const DeviceManagement = () => {
             name: device.inspectable?.name || '',
             description: device.inspectable?.description || '',
             premise_id: device.inspectable?.premise_id || '',
+            photo_url: device.inspectable?.photo_url ? `${API_BASE_URL}${device.inspectable.photo_url}` : '', 
         });
+        setEditingDevicePhoto(null); 
     };
 
     const handleUpdateDevice = async (e) => {
         e.preventDefault();
         try {
-            const { name, description, premise_id, ...deviceData } = editingDevice;
-            const payload = {
-                ...deviceData,
-                name: name,
-                description: description,
-                premise_id: premise_id,
-            };
-            const response = await axios.put(`${API_BASE_URL}/api/devices/${editingDevice.ins_id}`, payload);
+            const formData = new FormData();
+            for (const key in editingDevice) {
+                if (key === 'photo_url' && editingDevicePhoto) {
+                    continue; 
+                }
+                if (key !== 'inspectable' && key !== 'family' && key !== 'relatedAttractions' && key !== 'name' && key !== 'description' && key !== 'premise_id') {
+                    formData.append(key, editingDevice[key]);
+                }
+            }
+
+            formData.append('name', editingDevice.name);
+            formData.append('description', editingDevice.description);
+            formData.append('premise_id', editingDevice.premise_id);
+
+            if (editingDevicePhoto) {
+                formData.append('photo', editingDevicePhoto);
+            }
+
+            const response = await axios.put(`${API_BASE_URL}/api/devices/${editingDevice.ins_id}`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             setDevices(devices.map((dev) => (dev.ins_id === editingDevice.ins_id ? response.data.device : dev)));
             setEditingDevice(null);
+            setEditingDevicePhoto(null);
             setError(null);
-            fetchData(); 
+            fetchData();
         } catch (err) {
             console.error("Error updating device:", err);
             setError("Error al actualizar el dispositivo.");
@@ -223,6 +256,19 @@ const DeviceManagement = () => {
                             required
                         />
                     </div>
+                    <div> {/* Campo para la selección de archivo */}
+                        <label htmlFor="new_device_photo" className="block text-sm font-medium text-gray-700">Subir Foto</label>
+                        <input
+                            type="file"
+                            id="new_device_photo"
+                            className="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
+                            onChange={(e) => setNewDevicePhoto(e.target.files[0])}
+                            accept="image/*"
+                        />
+                        {newDevicePhoto && (
+                            <p className="text-sm text-gray-500 mt-1">Archivo seleccionado: {newDevicePhoto.name}</p>
+                        )}
+                    </div>
                     <button
                         type="submit"
                         className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700"
@@ -244,6 +290,9 @@ const DeviceManagement = () => {
                                 <p className="text-sm text-gray-600">Premisa: {getPremiseName(device.inspectable?.premise_id)}</p>
                                 <p className="text-sm text-gray-600">Público: {device.public_flag}</p>
                                 <p className="text-sm text-gray-600">Llegada: {new Date(device.arrival_date).toLocaleDateString()}</p>
+                                {device.inspectable?.photo_url && (
+                                    <img src={`${API_BASE_URL}${device.inspectable.photo_url}`} alt="Foto de identificación" className="w-20 h-20 object-cover mt-2 rounded" />
+                                )}
                             </div>
                             <div>
                                 <button
@@ -365,6 +414,25 @@ const DeviceManagement = () => {
                                     onChange={(e) => setEditingDevice({ ...editingDevice, brand: e.target.value })}
                                     required
                                 />
+                            </div>
+                            <div> {/* Campo para la selección de archivo y vista previa */}
+                                <label htmlFor="edit_device_photo" className="block text-sm font-medium text-gray-700">Cambiar Foto</label>
+                                <input
+                                    type="file"
+                                    id="edit_device_photo"
+                                    className="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
+                                    onChange={(e) => setEditingDevicePhoto(e.target.files[0])}
+                                    accept="image/*"
+                                />
+                                {editingDevicePhoto && (
+                                    <p className="text-sm text-gray-500 mt-1">Archivo seleccionado: {editingDevicePhoto.name}</p>
+                                )}
+                                {editingDevice.photo_url && !editingDevicePhoto && (
+                                    <div className="mt-2">
+                                        <p className="text-sm text-gray-600">Foto actual:</p>
+                                        <img src={editingDevice.photo_url} alt="Foto actual" className="w-20 h-20 object-cover rounded" />
+                                    </div>
+                                )}
                             </div>
                             <div className="flex justify-end space-x-2">
                                 <button

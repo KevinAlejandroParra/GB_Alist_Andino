@@ -13,7 +13,9 @@ const AttractionManagement = () => {
         public_flag: '',
         capacity: '',
     });
+    const [newAttractionPhoto, setNewAttractionPhoto] = useState(null);
     const [editingAttraction, setEditingAttraction] = useState(null);
+    const [editingAttractionPhoto, setEditingAttractionPhoto] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -47,7 +49,19 @@ const AttractionManagement = () => {
     const handleCreateAttraction = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post(`${API_BASE_URL}/api/attractions`, newAttraction);
+            const formData = new FormData();
+            for (const key in newAttraction) {
+                formData.append(key, newAttraction[key]);
+            }
+            if (newAttractionPhoto) {
+                formData.append('photo', newAttractionPhoto);
+            }
+
+            const response = await axios.post(`${API_BASE_URL}/api/attractions`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             setAttractions([...attractions, response.data]);
             setNewAttraction({
                 name: '',
@@ -56,8 +70,9 @@ const AttractionManagement = () => {
                 public_flag: '',
                 capacity: '',
             });
+            setNewAttractionPhoto(null);
             setError(null);
-            fetchData(); // Volver a cargar todos los datos para actualizar los nombres de premise
+            fetchData(); 
         } catch (err) {
             console.error("Error creating attraction:", err);
             setError("Error al crear la atracción.");
@@ -70,24 +85,43 @@ const AttractionManagement = () => {
             name: attraction.inspectable?.name || '',
             description: attraction.inspectable?.description || '',
             premise_id: attraction.inspectable?.premise_id || '',
+            photo_url: attraction.inspectable?.photo_url ? `${API_BASE_URL}${attraction.inspectable.photo_url}` : '', 
         });
+        setEditingAttractionPhoto(null); 
     };
 
     const handleUpdateAttraction = async (e) => {
         e.preventDefault();
         try {
-            const { name, description, premise_id, ...attractionData } = editingAttraction;
-            const payload = {
-                ...attractionData,
-                name: name, // Propiedades que van al Inspectable
-                description: description,
-                premise_id: premise_id,
-            };
-            const response = await axios.put(`${API_BASE_URL}/api/attractions/${editingAttraction.ins_id}`, payload);
+            const formData = new FormData();
+
+            for (const key in editingAttraction) {
+                if (key === 'photo_url' && editingAttractionPhoto) {
+                    continue; 
+                }
+                if (key !== 'inspectable' && key !== 'name' && key !== 'description' && key !== 'premise_id') {
+                    formData.append(key, editingAttraction[key]);
+                }
+            }
+
+            formData.append('name', editingAttraction.name);
+            formData.append('description', editingAttraction.description);
+            formData.append('premise_id', editingAttraction.premise_id);
+
+            if (editingAttractionPhoto) {
+                formData.append('photo', editingAttractionPhoto);
+            }
+
+            const response = await axios.put(`${API_BASE_URL}/api/attractions/${editingAttraction.ins_id}`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             setAttractions(attractions.map((attr) => (attr.ins_id === editingAttraction.ins_id ? response.data.attraction : attr)));
             setEditingAttraction(null);
+            setEditingAttractionPhoto(null);
             setError(null);
-            fetchData(); // Volver a cargar todos los datos para actualizar los nombres de premise
+            fetchData();
         } catch (err) {
             console.error("Error updating attraction:", err);
             setError("Error al actualizar la atracción.");
@@ -183,6 +217,19 @@ const AttractionManagement = () => {
                             required
                         />
                     </div>
+                    <div> 
+                        <label htmlFor="new_attraction_photo" className="block text-sm font-medium text-gray-700">Subir Foto</label>
+                        <input
+                            type="file"
+                            id="new_attraction_photo"
+                            className="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
+                            onChange={(e) => setNewAttractionPhoto(e.target.files[0])}
+                            accept="image/*"
+                        />
+                        {newAttractionPhoto && (
+                            <p className="text-sm text-gray-500 mt-1">Archivo seleccionado: {newAttractionPhoto.name}</p>
+                        )}
+                    </div>
                     <button
                         type="submit"
                         className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700"
@@ -203,6 +250,9 @@ const AttractionManagement = () => {
                                 <p className="text-sm text-gray-600">Premisa: {getPremiseName(attraction.inspectable?.premise_id)}</p>
                                 <p className="text-sm text-gray-600">Público: {attraction.public_flag}</p>
                                 <p className="text-sm text-gray-600">Capacidad: {attraction.capacity}</p>
+                                {attraction.inspectable?.photo_url && (
+                                    <img src={`${API_BASE_URL}${attraction.inspectable.photo_url}`} alt="Foto de identificación" className="w-20 h-20 object-cover mt-2 rounded" />
+                                )}
                             </div>
                             <div>
                                 <button
@@ -296,6 +346,25 @@ const AttractionManagement = () => {
                                     onChange={(e) => setEditingAttraction({ ...editingAttraction, capacity: e.target.value })}
                                     required
                                 />
+                            </div>
+                            <div> {/* Campo para la selección de archivo y vista previa */}
+                                <label htmlFor="edit_attraction_photo" className="block text-sm font-medium text-gray-700">Cambiar Foto</label>
+                                <input
+                                    type="file"
+                                    id="edit_attraction_photo"
+                                    className="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
+                                    onChange={(e) => setEditingAttractionPhoto(e.target.files[0])}
+                                    accept="image/*"
+                                />
+                                {editingAttractionPhoto && (
+                                    <p className="text-sm text-gray-500 mt-1">Archivo seleccionado: {editingAttractionPhoto.name}</p>
+                                )}
+                                {editingAttraction.photo_url && !editingAttractionPhoto && (
+                                    <div className="mt-2">
+                                        <p className="text-sm text-gray-600">Foto actual:</p>
+                                        <img src={editingAttraction.photo_url} alt="Foto actual" className="w-20 h-20 object-cover rounded" />
+                                    </div>
+                                )}
                             </div>
                             <div className="flex justify-end space-x-2">
                                 <button
