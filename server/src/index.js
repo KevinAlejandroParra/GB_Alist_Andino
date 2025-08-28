@@ -23,7 +23,6 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
-
 app.use(express.static(path.join(__dirname, "../public"), {
    setHeaders: (res, path) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -43,6 +42,8 @@ app.use(express.static(path.join(__dirname, "../public"), {
   }
 }));
 
+// Servir archivos estáticos desde el directorio de medios
+app.use('/media', express.static(path.join(__dirname, '../public/media')));
 
 app.use("/api/users", userRoutes);
 app.use("/api/premises", premiseRoutes);
@@ -52,6 +53,10 @@ app.use("/api/families", familyRoutes);
 app.use("/api/devices", deviceRoutes); 
 app.use("/api/attractions", attractionRoutes); 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
+
+module.exports = {
+    app,
+};
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor escuchando en http://0.0.0.0:${port}`);
