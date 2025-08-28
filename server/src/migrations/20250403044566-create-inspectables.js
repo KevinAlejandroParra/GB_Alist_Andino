@@ -18,6 +18,10 @@ module.exports = {
                 type: Sequelize.STRING,
                 allowNull: false,
             },
+            photo_url: {
+                type: Sequelize.STRING,
+                allowNull: true,
+            },
             type_code: {
                 type: Sequelize.ENUM("device", "attraction", "other"),
             },
