@@ -15,21 +15,35 @@ module.exports = {
                 type: Sequelize.INTEGER,
                 allowNull: false,
             },
-            checklist_id: {
-                type: Sequelize.INTEGER,
+            item_number: {
+                type: DataTypes.INTEGER,
                 allowNull: false,
             },
             question_text: {
                 type: Sequelize.STRING,
                 allowNull: false,
             },
+            guidance_text: {
+                type: Sequelize.TEXT,
+                allowNull: true,
+            },
             input_type: {
                 type: Sequelize.STRING,
                 allowNull: false,
             },
-            responded_by: {
-                type: Sequelize.INTEGER,
+            allow_comment: {
+                type: Sequelize.BOOLEAN,
+                defaultValue: false,
                 allowNull: false,
+            },
+            role_id: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                references: {
+                    model: 'roles',
+                    key: 'role_id',
+                },
+                onDelete: 'SET NULL',
             },
             createdAt: {
                 type: Sequelize.DATE,
@@ -42,6 +56,11 @@ module.exports = {
                 onUpdate: Sequelize.NOW,
                 allowNull: false,
             },
+        });
+        await queryInterface.addConstraint('checklist_items', {
+            fields: ['checklist_type_id', 'item_number'],
+            type: 'unique',
+            name: 'unique_checklist_item_per_type_and_number'
         });
     },
     async down(queryInterface, Sequelize) {
