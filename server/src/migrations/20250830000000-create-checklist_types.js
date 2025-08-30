@@ -20,6 +20,19 @@ module.exports = {
             frequency: {
                 type: Sequelize.STRING,
             },
+            version_label: {
+                type: Sequelize.STRING,
+                allowNull: true,
+            },
+            attraction_id: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+                references: {
+                    model: 'attractions',
+                    key: 'ins_id',
+                },
+                onDelete: 'CASCADE',
+            },
             role_id: {
                 type: Sequelize.INTEGER,
                 allowNull: false,
