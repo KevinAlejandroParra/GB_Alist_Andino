@@ -7,32 +7,48 @@ module.exports = (sequelize, DataTypes) => {
         {
             failure_id: {
                 type: DataTypes.INTEGER,
-                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             response_id: {
                 type: DataTypes.INTEGER,
-                allowNull: false,
+                allowNull: true,
             },
             description: {
                 type: DataTypes.STRING,
+                allowNull: true,
+            },
+            work_order_code: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
+            solution_text: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+            },
+            responsible_area: {
+                type: DataTypes.ENUM('Técnico', 'Operación', 'Mixto'),
+                allowNull: true,
+            },
+            status: {
+                type: DataTypes.ENUM('pendiente', 'en_proceso', 'resuelto'),
+                defaultValue: 'pendiente',
                 allowNull: false,
             },
             severity: {
                 type: DataTypes.STRING,
-                allowNull: false,
+                allowNull: true,
             },
             reported_at: {
                 type: DataTypes.DATE,
-                allowNull: false,
+                allowNull: true,
             },
-            resolved_at: {
+            closed_at: {
                 type: DataTypes.DATE,
-                allowNull: false,
+                allowNull: true,
             },
             responded_by: {
                 type: DataTypes.INTEGER,
-                allowNull: false,
+                allowNull: true,
             },
             createdAt: {
                 type: DataTypes.DATE,
