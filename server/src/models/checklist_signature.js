@@ -7,7 +7,6 @@ module.exports = (sequelize, DataTypes) => {
         {
             signature_id: {
                 type: DataTypes.INTEGER,
-                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             user_id: {
@@ -28,7 +27,7 @@ module.exports = (sequelize, DataTypes) => {
             },
             digital_token: {
                 type: DataTypes.STRING,
-                allowNull: false,
+                allowNull: true,
             },
             createdAt: {
                 type: DataTypes.DATE,

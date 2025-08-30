@@ -14,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.INTEGER,
                 allowNull: false,
             },
-            checklist_id: {
+            item_number: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
             },
@@ -22,12 +22,27 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.STRING,
                 allowNull: false,
             },
+            guidance_text: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
             input_type: {
                 type: DataTypes.STRING,
-            },
-            responded_by: {
-                type: DataTypes.INTEGER,
                 allowNull: false,
+            },
+            allow_comment: {
+                type: DataTypes.BOOLEAN,
+                defaultValue: false,
+                allowNull: false,
+            },
+            role_id: {
+                type: DataTypes.INTEGER,
+                allowNull: true, 
+                references: {
+                    model: 'roles',
+                    key: 'role_id',
+                },
+                onDelete: 'SET NULL',
             },
             createdAt: {
                 type: DataTypes.DATE,

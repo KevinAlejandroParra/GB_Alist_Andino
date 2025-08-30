@@ -7,7 +7,6 @@ module.exports = (sequelize, DataTypes) => {
         {
             response_id: {
                 type: DataTypes.INTEGER,
-                defaultValue: DataTypes.INTEGER,
                 primaryKey: true,
             },
             checklist_id: {
@@ -19,7 +18,8 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: false,
             },
             value: {
-                type: DataTypes.STRING,
+                type: DataTypes.BOOLEAN,
+                allowNull: false,
             },
             comment: {
                 type: DataTypes.STRING,
