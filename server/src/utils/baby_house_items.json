@@ -1,0 +1,240 @@
+[
+  {
+    "item_number": 1,
+    "question_text": "ENTORNO GENERAL.",
+    "guidance_text": "VERIFIQUE EL ESTADO Y TENSION DE LA MALLA DEL CERRAMIENTO TENIENDO EN CUENTA LA SEPARACION CON RESPECTO AL TUBO. VERIFIQUE ESTADO DE LAS PUERTAS DEL CERRAMIENTO VERIFIQUE EL ASEO Y ESTADO DE LAS COLCHONETAS Y TAPETE DEL PISO VERIFICAR EL ESTADO DEL LECTOR: FUNCIONAMIENTO Y CONEXIÓN DE RED, PASE LA TARJETA",
+    "raw_text": "1. ENTORNO GENERAL. VERIFIQUE EL ESTADO Y TENSION DE LA MALLA DEL CERRAMIENTO TENIENDO EN CUENTA LA SEPARACION CON RESPECTO AL TUBO. VERIFIQUE ESTADO DE LAS PUERTAS DEL CERRAMIENTO VERIFIQUE EL ASEO Y ESTADO DE LAS COLCHONETAS Y TAPETE DEL PISO VERIFICAR EL ESTADO DEL LECTOR: FUNCIONAMIENTO Y CONEXIÓN DE RED, PASE LA TARJETA",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 2,
+    "question_text": "CASA INTERACTIVA.",
+    "guidance_text": "INSPECCIONE EL ASEO Y ESTADO DE LOS ESCALONES (TAPIZADO Y ESTRUCTURA) REVISE ASEO Y ESTADO DE LA RAMPA DE DESCENSO Y SUS LATERALES VERIFIQUE EL ESTADO Y TENSION DE LA MALLA DEL CERRAMIENTO TENIENDO EN CUENTA LA SEPARACION CON RESPECTO AL TUBO. VERIFIQUE ASEO Y ESTADO DE LAS COSTURAS DE LA ESCALERA DE REATA VERIFICAR DAÑO O DETERIORO DEL ACOLCHADO DE LOS FORROS EN LOS SITIOS MAS CRITICOS DE LA ATRACCION CAMA ELASTICA VERIFIQUE ASEO Y ESTADO DE LA ESTRUCTURA Y TORNILLERIA DE LA CASA.",
+    "raw_text": "2.CASA INTERACTIVA. INSPECCIONE EL ASEO Y ESTADO DE LOS ESCALONES (TAPIZADO Y ESTRUCTURA) REVISE ASEO Y ESTADO DE LA RAMPA DE DESCENSO Y SUS LATERALES VERIFIQUE EL ESTADO Y TENSION DE LA MALLA DEL CERRAMIENTO TENIENDO EN CUENTA LA SEPARACION CON RESPECTO AL TUBO. VERIFIQUE ASEO Y ESTADO DE LAS COSTURAS DE LA ESCALERA DE REATA VERIFICAR DAÑO O DETERIORO DEL ACOLCHADO DE LOS FORROS EN LOS SITIOS MAS CRITICOS DE LA ATRACCION CAMA ELASTICA VERIFIQUE ASEO Y ESTADO DE LA ESTRUCTURA Y TORNILLERIA DE LA CASA.",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 3,
+    "question_text": "CAMA ELASTICA",
+    "guidance_text": "REVISAR ESTADO DE LOS RESORTES(ENTRE LA LONA Y LA ESTRUCTURA) REVISAR EL ESTADO DE LA LONA DEL SALTARÍN Y AJUSTARLA SI ES NECESARIO VERIFICAR EL PERFECTO ACOLCHADO ALREDEDOR DE LOS RESORTES",
+    "raw_text": "3. CAMA ELASTICA REVISAR ESTADO DE LOS RESORTES(ENTRE LA LONA Y LA ESTRUCTURA) REVISAR EL ESTADO DE LA LONA DEL SALTARÍN Y AJUSTARLA SI ES NECESARIO VERIFICAR EL PERFECTO ACOLCHADO ALREDEDOR DE LOS RESORTES",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 4,
+    "question_text": "CARRUSEL DE PONYS.",
+    "guidance_text": "VERIFICAR EL ASEO Y ESTADO DE LOS PONY ́S (Manilares,Ojos,SillasyPonis) VERIFICAR EL ASEO Y ESTADO DEL PISO DEL CARRUSEL Y BOTON DE START VERIFICAR LA OPERACIÓN DEL CARRUSEL (Sonido, LucesyMovimiento)",
+    "raw_text": "4. CARRUSEL DE PONYS. VERIFICAR EL ASEO Y ESTADO DE LOS PONY ́S (Manilares,Ojos,SillasyPonis) VERIFICAR EL ASEO Y ESTADO DEL PISO DEL CARRUSEL Y BOTON DE START VERIFICAR LA OPERACIÓN DEL CARRUSEL (Sonido, LucesyMovimiento)",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 5,
+    "question_text": "FICHAS EN FOMY ARMATODO",
+    "guidance_text": "VERIFICAR EL ASEO Y ESTADO DE CADA FICHA ORGANIZAR FICHAS EN EL LUDAR DESIGNADO",
+    "raw_text": "5. FICHAS EN FOMY ARMATODO VERIFICAR EL ASEO Y ESTADO DE CADA FICHA ORGANIZAR FICHAS EN EL LUDAR DESIGNADO",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 6,
+    "question_text": "LEON Y ACCESORIOS",
+    "guidance_text": "VERIFICAR EL ASEO Y ESTADO DEL ACOLCHADO Y PEGUES DEL DISPOSITIVO VERIFICAR AJUSTE DE DIENTES ,COLA,OREJAS,MELENA Y OJOS VERIFICAR LIMPIEZA Y ESTADO DE LOS ACCESORIOS DEL LEON",
+    "raw_text": "6. LEON Y ACCESORIOS VERIFICAR EL ASEO Y ESTADO DEL ACOLCHADO Y PEGUES DEL DISPOSITIVO VERIFICAR AJUSTE DE DIENTES ,COLA,OREJAS,MELENA Y OJOS VERIFICAR LIMPIEZA Y ESTADO DE LOS ACCESORIOS DEL LEON",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 7,
+    "question_text": "VOLCAN",
+    "guidance_text": "VERIFICAR FUNCIONAMIENTO DEL BOTON Y BLOWER DEL VOLCAN",
+    "raw_text": "7. VOLCAN VERIFICAR FUNCIONAMIENTO DEL BOTON Y BLOWER DEL VOLCAN",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 8,
+    "question_text": "JUEGO INTERACTIVO GUITARRA Y BANDA TRANSPORTADORA",
+    "guidance_text": "VERIFIQUE EL ESTADO Y FUNCIONAMIEBTO DE CADA UNO DE LOS ELEMENTOS DEL JUEGO VERIFIQUE EL ASEO Y ESTADO DE PELOTAS Y ATRACCION VERIFICAR EL FUNCIONAMIENTO Y ASEO DE LA BANDA TRANSPORTADORA",
+    "raw_text": "8. JUEGO INTERACTIVO GUITARRA Y BANDA TRANSPORTADORA VERIFIQUE EL ESTADO Y FUNCIONAMIEBTO DE CADA UNO DE LOS ELEMENTOS DEL JUEGO VERIFIQUE EL ASEO Y ESTADO DE PELOTAS Y ATRACCION VERIFICAR EL FUNCIONAMIENTO Y ASEO DE LA BANDA TRANSPORTADORA",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 9,
+    "question_text": "ARBOL CON OJOS EN MOVIMEINTO Y PAJARO QQ",
+    "guidance_text": "VERIFICAR ASEO,SONIDO Y FUNCCIONAMIENTO DE LOS OJOS(OPRIMIENDO EL BOTON) VERIFICAR ASEO, SONIDO Y FUNCCIONAMIENTO DEL PAJARO QQ(OPRIMIENDO EL BOTON)",
+    "raw_text": "9. ARBOL CON OJOS EN MOVIMEINTO Y PAJARO QQ VERIFICAR ASEO,SONIDO Y FUNCCIONAMIENTO DE LOS OJOS(OPRIMIENDO EL BOTON) VERIFICAR ASEO, SONIDO Y FUNCCIONAMIENTO DEL PAJARO QQ(OPRIMIENDO EL BOTON)",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 10,
+    "question_text": "OSITO AVIADOR",
+    "guidance_text": "VERIFIQUE FIJACION GENERAL Y ASEO DE L ATRACCION VERIFICAR QUE SE ESTE REALIZANDO EL MOVIMIENTO GIRATORIO DE LA ATRACCION",
+    "raw_text": "10. OSITO AVIADOR VERIFIQUE FIJACION GENERAL Y ASEO DE L ATRACCION VERIFICAR QUE SE ESTE REALIZANDO EL MOVIMIENTO GIRATORIO DE LA ATRACCION",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 11,
+    "question_text": "ARBOL TUCAN",
+    "guidance_text": "VERIFICAR ASEO, SONIDO Y FUNCCIONAMIENTO DEL TUCAN(OPRIMIENDO EL BOTON)",
+    "raw_text": "11. ARBOL TUCAN VERIFICAR ASEO, SONIDO Y FUNCCIONAMIENTO DEL TUCAN(OPRIMIENDO EL BOTON)",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 12,
+    "question_text": "ELEMENTOS INTERACTIVOS BOXEADORES",
+    "guidance_text": "VERIFIQUE FIJACION GENERAL,COSTURAS Y ESTADO DE CADA BOXEADOR",
+    "raw_text": "12. ELEMENTOS INTERACTIVOS BOXEADORES VERIFIQUE FIJACION GENERAL,COSTURAS Y ESTADO DE CADA BOXEADOR",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 13,
+    "question_text": "ELEMENTOS INTERACTIVOS PUFF",
+    "guidance_text": "VERIFICAR ESTADO DE PROTECTORES(COSTURAS Y DESGASTE) VERIFICAR EL DESGASTE DEL ACOPLE Y QUE SE ENCUENTRE BIEN CERRADO, HALANDO VERIFICAR LA COSTURA DE LA REATA CON RESPECTO A LA LONA VERIFICAR ESTADO, ASEO Y UBICACIÓN DE LOS PUFF (NO DEBE ESTAR CERCA A ELEMENTOS O ATRACCIONES QUE PUEDAN GENERAR UN ACCIDENTE SI LOS NIÑOS SALTAN DESDE ESTOS.)",
+    "raw_text": "13. ELEMENTOS INTERACTIVOS PUFF VERIFICAR ESTADO DE PROTECTORES(COSTURAS Y DESGASTE) VERIFICAR EL DESGASTE DEL ACOPLE Y QUE SE ENCUENTRE BIEN CERRADO, HALANDO VERIFICAR LA COSTURA DE LA REATA CON RESPECTO A LA LONA VERIFICAR ESTADO, ASEO Y UBICACIÓN DE LOS PUFF (NO DEBE ESTAR CERCA A ELEMENTOS O ATRACCIONES QUE PUEDAN GENERAR UN ACCIDENTE SI LOS NIÑOS SALTAN DESDE ESTOS.)",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 14,
+    "question_text": "JUEGO INTERACTIVO(VACA)",
+    "guidance_text": "VERIFICAR EL FUNCIONAMIENTO DE CADA UNO DE LOS ELEMENTOS INTERACTIVOS DE LA ATRACCION VERIFICAR FUNCIONAMIENTO DE SENSORES Y BLOWER DE CADA TOBO DE SUCION VERIFICAR ESTADO, ASEO Y FIRMESA DE LOS ACOLHACDOS DE LA PISCINA VERIFICAR FUNCIONAMIENTO DE SENSORES Y BLOWER DE CADA TOBO DE SUCION VERIFICAR EL FUNCIONAMIENTO DEL CRONÓMETRO PONGALO EN MARCHA Y VALIDE PULSADORES VERIFICAR EL SONIDO DEL TIMBRE (CALIDAD Y VOLUMEN) VERIFICAR EL ENCENDIDO DE LA ILUMINACIÓN DE ESTA ATRACCIÓN VERIFICAR EL ESTADO Y ASEO DEL ACOLCHADO DE PAREDES, PISO Y COLUMNAS",
+    "raw_text": "14. JUEGO INTERACTIVO(VACA) VERIFICAR EL FUNCIONAMIENTO DE CADA UNO DE LOS ELEMENTOS INTERACTIVOS DE LA ATRACCION VERIFICAR FUNCIONAMIENTO DE SENSORES Y BLOWER DE CADA TOBO DE SUCION VERIFICAR ESTADO, ASEO Y FIRMESA DE LOS ACOLHACDOS DE LA PISCINA VERIFICAR FUNCIONAMIENTO DE SENSORES Y BLOWER DE CADA TOBO DE SUCION VERIFICAR EL FUNCIONAMIENTO DEL CRONÓMETRO PONGALO EN MARCHA Y VALIDE PULSADORES VERIFICAR EL SONIDO DEL TIMBRE (CALIDAD Y VOLUMEN) VERIFICAR EL ENCENDIDO DE LA ILUMINACIÓN DE ESTA ATRACCIÓN VERIFICAR EL ESTADO Y ASEO DEL ACOLCHADO DE PAREDES, PISO Y COLUMNAS",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 15,
+    "question_text": "PIANO DE PISO",
+    "guidance_text": "VERIFICAR ASEO ,SONIDO Y FUNCCIONAMIENTO DE LAS TECLAS(OPRIMIENDOLAS)",
+    "raw_text": "15. PIANO DE PISO VERIFICAR ASEO ,SONIDO Y FUNCCIONAMIENTO DE LAS TECLAS(OPRIMIENDOLAS)",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 16,
+    "question_text": "OBSERVACIONES ADICIONALES QUE NO ESTAN EN ESTA LISTA DE CHEQUEO - IDENTIFICACION DE SITUACIONES DE RIESGO.",
+    "guidance_text": "VERIFICAR ESTADO Y AJUSTE DE LA ZAPATERA VERIFICAR FUNCIONAMIENTO Y ASEO DE LOS VENTILADORES VERIFICAR DAÑO O DETERIORO DEL ACOLCHADO DE LOS FORROS EN LOS SITIOS MAS CRITICOS DE LA ATRACCION (SI ES NECESARIO REALIZAR EL CAMBIO O INSTALAR UNO NUEVO SOBRE EL QUE YA EXISTE PARA MAYOR PROTECCION Y EVITAR INCIDENTES O ACCIEDENTES ) VERIFICAR EL ASEO DEL ENTORNO DE LA ATRACCION(CERRAMIENTO, PERSIANAS Y PAREDES)",
+    "raw_text": "OBSERVACIONES ADICIONALES QUE NO ESTAN EN ESTA LISTA DE CHEQUEO - IDENTIFICACION DE SITUACIONES DE RIESGO. VERIFICAR ESTADO Y AJUSTE DE LA ZAPATERA VERIFICAR FUNCIONAMIENTO Y ASEO DE LOS VENTILADORES VERIFICAR DAÑO O DETERIORO DEL ACOLCHADO DE LOS FORROS EN LOS SITIOS MAS CRITICOS DE LA ATRACCION (SI ES NECESARIO REALIZAR EL CAMBIO O INSTALAR UNO NUEVO SOBRE EL QUE YA EXISTE PARA MAYOR PROTECCION Y EVITAR INCIDENTES O ACCIEDENTES ) VERIFICAR EL ASEO DEL ENTORNO DE LA ATRACCION(CERRAMIENTO, PERSIANAS Y PAREDES)",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  },
+  {
+    "item_number": 17,
+    "question_text": "LISTO PARA ENTREGAR A OPERACIÓN?(SI-NO)",
+    "guidance_text": "ESTE JUEGO HA SIDO PROFUNDAMENTE INSPECCIONADO Y SE LE HA DADO ESPECIFICACIONES DE REVISION DIARIA DE ACUERDO A LAS RECOMENDACIONES DEL FABRICANTE Y A LAS CONDICIONES DE SERVICIO DE ACUERDO CON LAS DE OPERACIÓN DEL PARQUE.",
+    "raw_text": "17. LISTO PARA ENTREGAR A OPERACIÓN?(SI-NO) ESTE JUEGO HA SIDO PROFUNDAMENTE INSPECCIONADO Y SE LE HA DADO ESPECIFICACIONES DE REVISION DIARIA DE ACUERDO A LAS RECOMENDACIONES DEL FABRICANTE Y A LAS CONDICIONES DE SERVICIO DE ACUERDO CON LAS DE OPERACIÓN DEL PARQUE.",
+    "input_type": "boolean",
+    "allow_comment": true,
+    "checklist_type": {
+      "name": "Baby House",
+      "version_label": "V2 OCT 2018",
+      "frequency": "diario",
+      "checklist_type_slug": "baby_house_v2_oct_2018"
+    }
+  }
+]
