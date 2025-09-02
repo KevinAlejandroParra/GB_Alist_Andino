@@ -105,9 +105,8 @@ User.belongsTo(Role, { as: "role", foreignKey: "role_id" });
 User.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
 User.belongsTo(Entity, { as: "entity", foreignKey: "entity_id" });
 User.hasMany(Checklist, { as: "createdChecklists", foreignKey: "created_by" });
-User.hasMany(ChecklistItem, { as: "respondedItems", foreignKey: "responded_by" });
 User.hasMany(ChecklistResponse, { as: "responses", foreignKey: "responded_by" });
-User.hasMany(Failure, { as: "reportedFailures", foreignKey: "reported_by" });
+User.hasMany(Failure, { as: "reportedFailures", foreignKey: "responded_by" });
 User.hasMany(MaintenanceAction, { as: "completedActions", foreignKey: "completed_by" });
 User.hasMany(Requisition, { as: "requisitions", foreignKey: "requested_by" });
 User.hasMany(ChecklistSignature, { as: "signatures", foreignKey: "user_id" });
@@ -115,6 +114,7 @@ User.hasMany(ChecklistSignature, { as: "signatures", foreignKey: "user_id" });
 // 2. Asociaciones de Role
 Role.hasMany(User, { as: "users", foreignKey: "role_id" });
 Role.hasMany(ChecklistType, { as: "checklistTypes", foreignKey: "role_id" });
+Role.hasMany(ChecklistItem, { as: "checklistItems", foreignKey: "role_id" });
 
 // 3. Asociaciones de Premise
 Premise.hasMany(User, { as: "users", foreignKey: "premise_id" });
@@ -126,18 +126,21 @@ Premise.hasMany(Inventory, { as: "inventories", foreignKey: "location_id" });
 ChecklistType.belongsTo(Role, { as: "role", foreignKey: "role_id" });
 ChecklistType.hasMany(Checklist, { as: "checklists", foreignKey: "checklist_type_id" });
 ChecklistType.hasMany(ChecklistItem, { as: "items", foreignKey: "checklist_type_id" });
+ChecklistType.belongsTo(Attraction, { as: "attraction", foreignKey: "attraction_id" });
 
 // 5. Asociaciones de Checklist
 Checklist.belongsTo(ChecklistType, { as: "type", foreignKey: "checklist_type_id" });
 Checklist.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
+Checklist.belongsTo(Attraction, { as: "attraction", foreignKey: "attraction_id" });
 Checklist.belongsTo(User, { as: "creator", foreignKey: "created_by" });
 Checklist.belongsTo(User, { as: "signer", foreignKey: "signed_by" });
 Checklist.hasMany(ChecklistResponse, { as: "responses", foreignKey: "checklist_id" });
 Checklist.hasMany(ChecklistSignature, { as: "signatures", foreignKey: "checklist_id" });
+Checklist.hasMany(ChecklistItem, { as: "items", foreignKey: "checklist_type_id" }); 
 
 // 6. Asociaciones de ChecklistItem
 ChecklistItem.belongsTo(ChecklistType, { as: "type", foreignKey: "checklist_type_id" });
-ChecklistItem.belongsTo(User, { as: "respondedBy", foreignKey: "responded_by" });
+ChecklistItem.belongsTo(Role, { as: "role", foreignKey: "role_id" }); // Nueva asociación
 ChecklistItem.hasMany(ChecklistResponse, { as: "responses", foreignKey: "checklist_item_id" });
 
 // 7. Asociaciones de ChecklistResponse
@@ -148,7 +151,7 @@ ChecklistResponse.hasMany(Failure, { as: "failures", foreignKey: "response_id" }
 
 // 8. Asociaciones de Failure
 Failure.belongsTo(ChecklistResponse, { as: "response", foreignKey: "response_id" });
-Failure.belongsTo(User, { as: "reporter", foreignKey: "reported_by" });
+Failure.belongsTo(User, { as: "reporter", foreignKey: "responded_by" });
 Failure.hasMany(MaintenanceAction, { as: "actions", foreignKey: "failure_id" });
 Failure.hasMany(Requisition, { as: "requisitions", foreignKey: "failure_id" });
 
@@ -214,4 +217,5 @@ module.exports = {
     Entity,
     Audit,
     connection,
+    Sequelize, // Exportar el objeto Sequelize
 };
