@@ -21,6 +21,19 @@ module.exports = (sequelize, DataTypes) => {
             frequency: {
                 type: DataTypes.STRING,
             },
+            version_label: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
+            attraction_id: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+                references: {
+                    model: 'attractions',
+                    key: 'ins_id',
+                },
+                onDelete: 'CASCADE',
+            },
             role_id: {
                 type: DataTypes.INTEGER,
                 allowNull: false,

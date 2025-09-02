@@ -7,16 +7,36 @@ module.exports = (sequelize, DataTypes) => {
         {
             checklist_id: {
                 type: DataTypes.INTEGER,
-                defaultValue: DataTypes.INTEGER,
+                autoIncrement: true,
                 primaryKey: true,
             },
             premise_id: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
             },
+            attraction_id: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+            },
             checklist_type_id: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
+            },
+            version_label: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
+            date: {
+                type: DataTypes.DATEONLY,
+                allowNull: false,
+            },
+            created_by: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+            },
+            signed_by: {
+                type: DataTypes.INTEGER,
+                allowNull: true, 
             },
             createdAt: {
                 type: DataTypes.DATE,
