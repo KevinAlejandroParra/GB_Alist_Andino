@@ -13,26 +13,44 @@ module.exports = {
             },
             response_id: {
                 type: Sequelize.INTEGER,
-                allowNull: false,
+                allowNull: true,
             },
             description: {
                 type: Sequelize.STRING,
+                allowNull: true,
+            },
+            work_order_code: {
+                type: Sequelize.STRING,
+                allowNull: true,
+            },
+            solution_text: {
+                type: Sequelize.TEXT,
+                allowNull: true,
+            },
+            responsible_area: {
+                type: Sequelize.ENUM('Técnico', 'Operación', 'Mixto'),
+                allowNull: true,
+            },
+            status: {
+                type: Sequelize.ENUM('pendiente', 'en_proceso', 'resuelto'),
+                defaultValue: 'pendiente',
                 allowNull: false,
             },
             severity: {
                 type: Sequelize.STRING,
-                allowNull: false,
+                allowNull: true,
             },
             reported_at: {
                 type: Sequelize.DATE,
-                allowNull: false,
+                allowNull: true,
             },
-            resolved_at: {
+            closed_at: {
                 type: Sequelize.DATE,
+                allowNull: true,
             },
             responded_by: {
                 type: Sequelize.INTEGER,
-                allowNull: false,
+                allowNull: true,
             },
             createdAt: {
                 type: Sequelize.DATE,
