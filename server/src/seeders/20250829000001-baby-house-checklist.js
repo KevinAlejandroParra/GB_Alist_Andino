@@ -21,13 +21,11 @@ module.exports = {
         checklistTypeId = existingType.checklist_type_id;
       } else {
         console.log('Tipo de checklist no encontrado, creando uno nuevo...');
-        // Primero, obtener el ID de la atracción Baby House desde inspectables
-        // Usaremos premise_id = 3 para asegurarnos de obtener la Baby House correcta
         const [attraction] = await queryInterface.sequelize.query(
           `SELECT i.ins_id 
            FROM inspectables i 
            INNER JOIN attractions a ON i.ins_id = a.ins_id 
-           WHERE i.name = 'Baby House' AND i.premise_id = 3;`,
+           WHERE i.name = 'Baby House' AND i.premise_id = 2;`,
           { type: queryInterface.sequelize.QueryTypes.SELECT }
         );
 
