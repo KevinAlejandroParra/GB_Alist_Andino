@@ -1,5 +1,7 @@
+"use client";
 import ProtectedRoute from '../ProtectedRoute';
 import { useAuth } from '../AuthContext';
+import InspectablesList from './InspectablesList';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -9,7 +11,7 @@ export default function Dashboard() {
       <div className="min-h-screen bg-gray-100">
         <header className="bg-white shadow">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Dashboard Técnico</h1>
             <button
               onClick={logout}
               className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
@@ -20,7 +22,7 @@ export default function Dashboard() {
         </header>
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            {/* Contenido del dashboard */}
+            <InspectablesList />
           </div>
         </main>
       </div>

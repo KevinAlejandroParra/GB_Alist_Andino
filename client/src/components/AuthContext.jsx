@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from 'react';
+import { jwtDecode } from 'jwt-decode';
 
 const AuthContext = createContext();
 
@@ -11,7 +12,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     if (token) {
-      setUser({ token });
+      try {
+        const decodedToken = jwtDecode(token);
+        setUser({ token, user_id: decodedToken.user_id, role_id: decodedToken.role_id });
+      } catch (error) {
+        console.error("Error decoding token:", error);
+        localStorage.removeItem('authToken');
+      }
     }
     setIsLoading(false);
   }, []);
@@ -36,7 +43,8 @@ export function AuthProvider({ children }) {
       }
 
       localStorage.setItem('authToken', data.token);
-      setUser({ token: data.token });
+      const decodedToken = jwtDecode(data.token);
+      setUser({ token: data.token, user_id: decodedToken.user_id, role_id: decodedToken.role_id });
       return { success: true };
     } catch (error) {
       return { success: false, message: error.message };
@@ -46,7 +54,6 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('authToken');
     setUser(null);
-    // Eliminamos la redirección desde aquí
   };
 
   return (
