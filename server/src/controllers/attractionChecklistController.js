@@ -2,17 +2,17 @@ const attractionChecklistService = require('../services/attractionChecklistServi
 
 const ensureDailyInstance = async (req, res) => {
     try {
-        const { id: attraction_id } = req.params; // Obtener attraction_id de los parámetros de la URL
+        const { id: attraction_id } = req.params;
         const { premise_id, date } = req.body;
-        const user_id = req.user.id;
-        const role_id = req.user.role_id; // Asume que el middleware de autenticación añade el role_id
+        const user_id = req.user.user_id;
+        const role_id = req.user.role_id;
 
         const checklist = await attractionChecklistService.ensureDailyInstance({
             attraction_id: parseInt(attraction_id),
             premise_id,
             date,
             created_by: user_id,
-            role_id // Pasar el role_id al servicio
+            role_id
         });
         res.status(200).json(checklist);
     } catch (error) {
@@ -22,12 +22,11 @@ const ensureDailyInstance = async (req, res) => {
 
 const getDailyChecklist = async (req, res) => {
     try {
-        const { id: attraction_id } = req.params; // Obtener attraction_id de los parámetros de la URL
-        const { date, role_id } = req.query;
+        const { id: attraction_id } = req.params;
+        const { date } = req.query;
         const checklist = await attractionChecklistService.getDailyChecklist({
             attraction_id: parseInt(attraction_id),
-            date,
-            role_id: parseInt(role_id) // Pasar el role_id al servicio
+            date
         });
         res.status(200).json(checklist);
     } catch (error) {
@@ -37,13 +36,15 @@ const getDailyChecklist = async (req, res) => {
 
 const submitResponses = async (req, res) => {
     try {
-        const { id: checklist_id } = req.params; // Obtener checklist_id de los parámetros de la URL
+        const { id: checklist_id } = req.params;
         const { responses } = req.body;
-        const user_id = req.user.id;
+        const user_id = req.user.user_id;
+        const role_id = req.user.role_id;
         await attractionChecklistService.submitResponses({
             checklist_id: parseInt(checklist_id),
             responses,
-            responded_by: user_id
+            responded_by: user_id,
+            role_id
         });
         res.status(200).json({ message: 'Respuestas registradas exitosamente' });
     } catch (error) {
@@ -51,11 +52,11 @@ const submitResponses = async (req, res) => {
     }
 };
 
-const upsertObservation = async (req, res) => {
+const updateFailure = async (req, res) => {
     try {
-        const { id: failure_id } = req.params; // Obtener failure_id de los parámetros de la URL
+        const { id: failure_id } = req.params;
         const observationData = req.body;
-        const updatedFailure = await attractionChecklistService.upsertObservation({
+        const updatedFailure = await attractionChecklistService.updateFailure({
             failure_id: parseInt(failure_id),
             ...observationData
         });
@@ -81,17 +82,37 @@ const listObservations = async (req, res) => {
 
 const signChecklist = async (req, res) => {
     try {
-        const { checklist_id } = req.params;
-        const user_id = req.user.id;
-        const role = req.user.role; // Asume que el middleware de autenticación añade el rol
+        const { id: checklist_id } = req.params;
+        const user_id = req.user.user_id;
+        const role_id = req.user.role_id;
+        
         await attractionChecklistService.signChecklist({
-            checklist_id,
+            checklist_id: parseInt(checklist_id),
             user_id,
-            role
+            role_id
         });
+        
         res.status(200).json({ message: 'Checklist firmado exitosamente' });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        // Si el error contiene información de ítems incompletos, enviarla al cliente
+        if (error.incompleteItems) {
+            res.status(400).json({ 
+                error: error.message,
+                incompleteItems: error.incompleteItems,
+                incompleteCount: error.incompleteCount
+            });
+        } else {
+            res.status(400).json({ error: error.message });
+        }
+    }
+};
+const listChecklistsByAttraction = async (req, res) => {
+    try {
+        const { id: attraction_id } = req.params;
+        const checklists = await attractionChecklistService.listChecklistsByAttraction(parseInt(attraction_id));
+        res.status(200).json(checklists);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 };
 
@@ -99,7 +120,8 @@ module.exports = {
     ensureDailyInstance,
     getDailyChecklist,
     submitResponses,
-    upsertObservation,
+    updateFailure,
     listObservations,
-    signChecklist
+    signChecklist,
+    listChecklistsByAttraction
 };
