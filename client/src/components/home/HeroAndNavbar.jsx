@@ -92,12 +92,12 @@ const HeroandNavbar = () => {
         if (role_id === 1 || role_id === 2) {
           window.location.href = '/AdminDashboard';
         } else {
-          window.location.href = '/GeneralDashboard';
+          window.location.href = '/dashboard';
         }
       }
     } catch (error) {
       console.error('Error decoding token:', error);
-      window.location.href = '/GeneralDashboard';
+      window.location.href = '/dashboard';
     }
   };
   const navItems = [
