@@ -1,0 +1,5 @@
+npx sequelize-cli db:seed --seed 20250829000000-seed-attractions && npx sequelize-cli db:seed --seed seedRoles && npx sequelize-cli db:seed --seed seedChecklistTypes && npx sequelize-cli db:seed --seed 20250829000001-baby-house-checklist && npx sequelize-cli db:seed --seed seedChecklistItems
+npx sequelize-cli db:seed --seed seedUsers
+$ npx sequelize-cli db:seed --seed seedFamilies
+$ npx sequelize-cli db:seed --seed seedEntities
+$ npx sequelize-cli db:seed --seed seedPremise
