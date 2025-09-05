@@ -1,4 +1,5 @@
-import "./globals.css"
+import "./globals.css";
+import { AuthProvider } from '../components/AuthContext';
 
 export const metadata = {
   title: 'ALIST - Control y Mantenimiento de Máquinas',
@@ -8,7 +9,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }
