@@ -17,14 +17,6 @@ const Op = Sequelize.Op;
  * Asegura la existencia de una instancia diaria de checklist para una atracción y fecha dadas.
  * Si no existe, crea una nueva y sus respuestas iniciales.
  * Solo permite a técnicos de mantenimiento (role_id 7) crear o acceder a su instancia.
- * @param {object} params - Parámetros para asegurar la instancia del checklist.
- * @param {number} params.attraction_id - ID de la atracción.
- * @param {number} params.premise_id - ID de la sede.
- * @param {string} params.date - Fecha del checklist (YYYY-MM-DD).
- * @param {number} params.created_by - ID del usuario que crea el checklist.
- * @param {number} params.role_id - Rol del usuario que realiza la operación.
- * @returns {Promise<Checklist>} La instancia del checklist (existente o recién creada).
- * @throws {Error} Si el usuario no es técnico de mantenimiento o no se encuentra el tipo de checklist.
  */
 const ensureDailyInstance = async ({ attraction_id, premise_id, date, created_by, role_id }) => {
     let transaction = null;
@@ -99,10 +91,6 @@ const ensureDailyInstance = async ({ attraction_id, premise_id, date, created_by
 
 /**
  * Obtiene un checklist diario para una atracción y fecha específicas, incluyendo ítems, respuestas, firmas y fallas pendientes.
- * @param {object} params - Parámetros para obtener el checklist.
- * @param {number} params.attraction_id - ID de la atracción.
- * @param {string} params.date - Fecha del checklist (YYYY-MM-DD).
- * @returns {Promise<Checklist|null>} La instancia del checklist con sus asociaciones o null si no se encuentra.
  */
 const getDailyChecklist = async ({ attraction_id, date }) => {
     const checklist = await Checklist.findOne({
@@ -190,13 +178,7 @@ const getDailyChecklist = async ({ attraction_id, date }) => {
 
 /**
  * Registra las respuestas para un checklist específico, creando o actualizando las respuestas y gestionando las fallas.
- * Solo permite a técnicos de mantenimiento (role_id 7) enviar respuestas.
- * @param {object} params - Parámetros para enviar las respuestas.
- * @param {number} params.checklist_id - ID del checklist.
- * @param {Array<object>} params.responses - Array de objetos de respuesta.
- * @param {number} params.responded_by - ID del usuario que responde.
- * @param {number} params.role_id - Rol del usuario que realiza la operación.
- * @throws {Error} Si el usuario no es técnico de mantenimiento, el checklist no se encuentra o los ítems no son válidos.
+ * CAMBIO PRINCIPAL: Ahora maneja correctamente las actualizaciones usando response_id cuando existe.
  */
 const submitResponses = async ({ checklist_id, responses, responded_by, role_id }) => {
     const transaction = await connection.transaction();
@@ -224,19 +206,47 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
         }
 
         for (const response of responses) {
-            const { checklist_item_id, value, comment, evidence_url } = response;
+            const { checklist_item_id, value, comment, evidence_url, response_id } = response;
 
-            const [checklistResponse] = await ChecklistResponse.upsert({
-                checklist_id,
-                checklist_item_id,
-                value,
-                comment,
-                evidence_url,
-                responded_by
-            }, { transaction });
+            let checklistResponse;
 
-            // Crear una falla solo si el valor es 'false' (No Cumple)
+            // Si tiene response_id, actualizar la respuesta existente
+            if (response_id) {
+                checklistResponse = await ChecklistResponse.findByPk(response_id, { transaction });
+                
+                if (checklistResponse) {
+                    await checklistResponse.update({
+                        value,
+                        comment,
+                        evidence_url,
+                        responded_by
+                    }, { transaction });
+                } else {
+                    // Si no encuentra el response_id, crear uno nuevo
+                    checklistResponse = await ChecklistResponse.create({
+                        checklist_id,
+                        checklist_item_id,
+                        value,
+                        comment,
+                        evidence_url,
+                        responded_by
+                    }, { transaction });
+                }
+            } else {
+                // Si no tiene response_id, crear una nueva respuesta
+                checklistResponse = await ChecklistResponse.create({
+                    checklist_id,
+                    checklist_item_id,
+                    value,
+                    comment,
+                    evidence_url,
+                    responded_by
+                }, { transaction });
+            }
+
+            // Gestionar las fallas basado en el valor
             if (value === false) {
+                // Crear o actualizar falla para "No Cumple"
                 await Failure.upsert({
                     response_id: checklistResponse.response_id,
                     description: comment || 'Item no cumple los criterios',
@@ -245,20 +255,25 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
                     responded_by
                 }, { transaction });
             } else {
-                // Si el ítem cumple, asegurar que no haya una falla activa para esta respuesta
+                // Si el ítem cumple, eliminar fallas pendientes para esta respuesta
                 await Failure.destroy({
-                    where: { response_id: checklistResponse.response_id, status: 'pendiente' },
+                    where: { 
+                        response_id: checklistResponse.response_id, 
+                        status: 'pendiente' 
+                    },
                     transaction
                 });
             }
         }
 
+        // Crear firma del técnico si no existe
         const existingTechnicianSignature = await ChecklistSignature.findOne({
             where: {
                 checklist_id,
                 user_id: responded_by,
                 role_at_signature: 'Tecnico de mantenimiento'
-            }
+            },
+            transaction
         });
 
         if (!existingTechnicianSignature) {
@@ -279,11 +294,6 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
 
 /**
  * Actualiza una falla existente.
- * @param {object} params - Parámetros para actualizar la falla.
- * @param {number} params.failure_id - ID de la falla a actualizar.
- * @param {object} observationData - Datos a actualizar en la falla.
- * @returns {Promise<Failure>} La instancia de la falla actualizada.
- * @throws {Error} Si la falla no se encuentra.
  */
 const updateFailure = async ({ failure_id, ...observationData }) => {
     const transaction = await connection.transaction();
@@ -310,14 +320,7 @@ const updateFailure = async ({ failure_id, ...observationData }) => {
 /**
  * Registra la firma de un checklist por un usuario con un rol específico.
  * Solo permite al Jefe de Operaciones (role_id 4) firmar, y solo si el checklist está completo y el técnico ya firmó.
- * @param {object} params - Parámetros para firmar el checklist.
- * @param {number} params.checklist_id - ID del checklist a firmar.
- * @param {number} params.user_id - ID del usuario que firma.
- * @param {number} params.role_id - Rol del usuario que firma.
- * @throws {Error} Si el usuario no es Jefe de Operaciones, el checklist no se encuentra, el rol no es válido, el checklist no está completo o el técnico no ha firmado.
- * @returns {Promise<Object>} Información detallada en caso de error con ítems incompletos.
  */
-
 const signChecklist = async ({ checklist_id, user_id, role_id }) => {
     const transaction = await connection.transaction();
     try {
@@ -379,7 +382,8 @@ const signChecklist = async ({ checklist_id, user_id, role_id }) => {
                 where: {
                     checklist_id,
                     role_at_signature: 'Tecnico de mantenimiento'
-                }
+                },
+                transaction
             });
             
             if (!existingTechnicianSignature) {
@@ -405,11 +409,6 @@ const signChecklist = async ({ checklist_id, user_id, role_id }) => {
 
 /**
  * Lista las fallas (observaciones) filtradas por checklist, rango de fechas.
- * @param {object} params - Parámetros para listar las observaciones.
- * @param {number} [params.checklist_id] - ID opcional del checklist para filtrar.
- * @param {string} [params.start_date] - Fecha de inicio opcional para filtrar.
- * @param {string} [params.end_date] - Fecha de fin opcional para filtrar.
- * @returns {Promise<Array<Failure>>} Un array de fallas con sus asociaciones.
  */
 const listObservations = async ({ checklist_id, start_date, end_date }) => {
     const whereClause = {};
@@ -447,8 +446,6 @@ const listObservations = async ({ checklist_id, start_date, end_date }) => {
 
 /**
  * Lista todos los checklists asociados a una atracción específica.
- * @param {number} attraction_id - ID de la atracción.
- * @returns {Promise<Array<Checklist>>} Un array de checklists con sus tipos, creadores y firmas.
  */
 const listChecklistsByAttraction = async (attraction_id) => {
     const checklists = await Checklist.findAll({
