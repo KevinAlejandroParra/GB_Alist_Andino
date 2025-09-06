@@ -1,5 +1,5 @@
 "use strict";
-const { DataTypes } = require("sequelize"); 
+const { DataTypes } = require("sequelize");
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
     async up(queryInterface, Sequelize) {
@@ -11,12 +11,21 @@ module.exports = {
                 allowNull: false,
                 unique: true,
             },
+            parent_item_id: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                references: {
+                    model: 'checklist_items',
+                    key: 'checklist_item_id',
+                },
+                onDelete: 'CASCADE',
+            },
             checklist_type_id: {
                 type: Sequelize.INTEGER,
                 allowNull: false,
             },
             item_number: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.STRING, 
                 allowNull: false,
             },
             question_text: {
@@ -56,11 +65,6 @@ module.exports = {
                 onUpdate: Sequelize.NOW,
                 allowNull: false,
             },
-        });
-        await queryInterface.addConstraint('checklist_items', {
-            fields: ['checklist_type_id', 'item_number'],
-            type: 'unique',
-            name: 'unique_checklist_item_per_type_and_number'
         });
     },
     async down(queryInterface, Sequelize) {
