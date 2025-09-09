@@ -61,6 +61,22 @@ const Family = FamilyModel(connection, DataTypes);
 const Entity = EntityModel(connection, DataTypes);
 const Audit = AuditModel(connection, DataTypes);
 
+// Se crea un objeto 'models' para que las funciones 'associate' internas de los modelos puedan referenciarse entre sí.
+const models = {
+    User, Role, Premise, ChecklistType, Checklist, ChecklistItem, ChecklistResponse,
+    ChecklistSignature, Failure, MaintenanceAction, Requisition, RequisitionItem,
+    Part, Inventory, Inspectable, Device, Attraction, Family, Entity, Audit
+};
+
+// Se llama al método 'associate' para cada modelo que lo tenga definido.
+// Esto es crucial para registrar las relaciones que se definen DENTRO de los archivos de modelo,
+// como la relación jerárquica (padre/hijo) en ChecklistItem.
+Object.values(models).forEach(model => {
+    if (model.associate) {
+        model.associate(models);
+    }
+});
+
 // Asociaciones
 
 // Jerarquía: Premise → Inspectable (Superclase) → Device / Attraction
@@ -139,13 +155,13 @@ Checklist.hasMany(ChecklistSignature, { as: "signatures", foreignKey: "checklist
 Checklist.hasMany(ChecklistItem, { as: "items", foreignKey: "checklist_type_id" }); 
 
 // 6. Asociaciones de ChecklistItem
+// La asociación hasMany con ChecklistResponse se define ahora dentro del modelo ChecklistItem.
 ChecklistItem.belongsTo(ChecklistType, { as: "type", foreignKey: "checklist_type_id" });
 ChecklistItem.belongsTo(Role, { as: "role", foreignKey: "role_id" }); // Nueva asociación
-ChecklistItem.hasMany(ChecklistResponse, { as: "responses", foreignKey: "checklist_item_id" });
 
 // 7. Asociaciones de ChecklistResponse
+// La asociación belongsTo con ChecklistItem (as: 'item') se define ahora dentro del modelo ChecklistResponse.
 ChecklistResponse.belongsTo(Checklist, { as: "checklist", foreignKey: "checklist_id" });
-ChecklistResponse.belongsTo(ChecklistItem, { as: "item", foreignKey: "checklist_item_id" });
 ChecklistResponse.belongsTo(User, { as: "respondedBy", foreignKey: "responded_by" });
 ChecklistResponse.hasMany(Failure, { as: "failures", foreignKey: "response_id" });
 
