@@ -1,90 +1,113 @@
 'use strict';
-const babyHouseItems = require("../utils/baby_house_items.json");
+const fs = require('fs');
+const path = require('path');
+
+const definitionsDir = path.join(__dirname, 'checklist-definitions');
+const checklistDefinitions = [];
+
+// Cargar todas las definiciones de checklist del directorio
+fs.readdirSync(definitionsDir).forEach(file => {
+  if (file.endsWith('.js')) {
+    checklistDefinitions.push(require(path.join(definitionsDir, file)));
+  }
+});
 
 module.exports = {
-    async up(queryInterface, Sequelize) {
-        console.log('Iniciando seeder de items de checklist...');
-        
-        try {
-            // Buscar el tipo de checklist
-            const [checklistType] = await queryInterface.sequelize.query(
-                `SELECT checklist_type_id FROM checklist_types WHERE name = 'Atracciones – Baby House (V2 OCT 2018)'`,
-                { type: Sequelize.QueryTypes.SELECT }
-            );
+  async up(queryInterface, Sequelize) {
+    if (checklistDefinitions.length === 0) {
+      console.log('No checklist definitions found, so no items to seed.');
+      return;
+    }
 
-            if (!checklistType) {
-                console.error(
-                    "ChecklistType 'Atracciones – Baby House (V2 OCT 2018)' not found. Please run the baby house checklist seeder first."
-                );
-                return;
-            }
+    try {
+      for (const definition of checklistDefinitions) {
+        // 1. Buscar el tipo de checklist por su nombre único
+        const [checklistType] = await queryInterface.sequelize.query(
+          `SELECT checklist_type_id FROM checklist_types WHERE name = :name LIMIT 1;`,
+          {
+            replacements: { name: definition.name },
+            type: Sequelize.QueryTypes.SELECT
+          }
+        );
 
-            const checklistTypeId = checklistType.checklist_type_id;
-            console.log('Tipo de checklist encontrado:', checklistTypeId);
-
-            // Eliminar items existentes para este tipo de checklist
-            console.log('Eliminando items existentes para el checklist type:', checklistTypeId);
-            await queryInterface.bulkDelete('checklist_items', { checklist_type_id: checklistTypeId });
-
-            const [technicalRole] = await queryInterface.sequelize.query(
-                `SELECT role_id FROM roles WHERE role_name = 'Tecnico de mantenimiento' LIMIT 1;`,
-                { type: Sequelize.QueryTypes.SELECT }
-            );
-            const [hostRole] = await queryInterface.sequelize.query(
-                `SELECT role_id FROM roles WHERE role_name = 'Anfitrión' LIMIT 1;`,
-                { type: Sequelize.QueryTypes.SELECT }
-            );
-
-            if (!technicalRole || !hostRole) {
-                console.error("Roles 'Tecnico de mantenimiento' or 'Anfitrión' not found. Please ensure they are seeded first.");
-                return;
-            }
-            const technicalRoleId = technicalRole.role_id;
-            const hostRoleId = hostRole.role_id;
-
-            // Usar los items del archivo JSON
-            console.log('Preparando items desde baby_house_items.json...');
-            const checklistItems = babyHouseItems.map(item => ({
-                checklist_type_id: checklistTypeId,
-                item_number: item.item_number,
-                question_text: item.question_text,
-                guidance_text: item.guidance_text,
-                input_type: item.input_type,
-                allow_comment: item.allow_comment,
-                role_id: item.item_number <= 16 ? technicalRoleId : hostRoleId, 
-                createdAt: new Date(),
-                updatedAt: new Date()
-            }));
-
-            console.log('Preparando para insertar', checklistItems.length, 'items');
-            
-            await queryInterface.bulkInsert("checklist_items", checklistItems, {});
-            console.log('Items insertados correctamente');
-
-        } catch (error) {
-            console.error('Error en el seeder:', error);
-            throw error;
+        if (!checklistType) {
+          console.error(`ChecklistType '${definition.name}' not found. Run the types seeder first. Skipping items for this type.`);
+          continue;
         }
-    },
+        const checklistTypeId = checklistType.checklist_type_id;
 
-    async down(queryInterface, Sequelize) {
-        try {
-            // Eliminar solo los ítems asociados a "Atracciones – Baby House (V2 OCT 2018)"
-            const [checklistType] = await queryInterface.sequelize.query(
-                `SELECT checklist_type_id FROM checklist_types WHERE name = 'Atracciones – Baby House (V2 OCT 2018)'`,
-                { type: Sequelize.QueryTypes.SELECT }
-            );
+        // 2. Limpiar items existentes para este tipo de checklist para evitar duplicados
+        await queryInterface.bulkDelete('checklist_items', { checklist_type_id: checklistTypeId }, {});
 
-            if (checklistType) {
-                console.log('Eliminando items del checklist...');
-                await queryInterface.bulkDelete("checklist_items", {
-                    checklist_type_id: checklistType.checklist_type_id,
-                }, {});
-                console.log('Items eliminados correctamente');
+        // 3. Procesar y crear los ítems de forma jerárquica
+        for (const parentItemDef of definition.items) {
+          // Crear el ítem padre (sección)
+          await queryInterface.bulkInsert('checklist_items', [{
+            item_number: parentItemDef.item_number,
+            question_text: parentItemDef.question_text,
+            input_type: 'section',
+            allow_comment: false,
+            checklist_type_id: checklistTypeId,
+            parent_item_id: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }], { returning: true });
+          
+          // bulkInsert con MySQL no devuelve el ID, así que lo buscamos
+          const [insertedParent] = await queryInterface.sequelize.query(
+            `SELECT checklist_item_id FROM checklist_items WHERE item_number = :item_number AND checklist_type_id = :checklist_type_id LIMIT 1;`,
+            {
+              replacements: { item_number: parentItemDef.item_number, checklist_type_id: checklistTypeId },
+              type: Sequelize.QueryTypes.SELECT
             }
-        } catch (error) {
-            console.error('Error en el rollback:', error);
-            throw error;
+          );
+
+          if (!insertedParent) {
+            console.error(`Failed to retrieve parent item ${parentItemDef.item_number}.`);
+            continue;
+          }
+          const parentItemId = insertedParent.checklist_item_id;
+
+          // Preparar los ítems hijos (preguntas)
+          if (parentItemDef.children && parentItemDef.children.length > 0) {
+            const childItems = parentItemDef.children.map(childDef => ({
+              ...childDef,
+              checklist_type_id: checklistTypeId,
+              parent_item_id: parentItemId,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }));
+            // Insertar los ítems hijos
+            await queryInterface.bulkInsert('checklist_items', childItems, {});
+          }
+        }
+      }
+      console.log('Checklist items seeded successfully.');
+    } catch (error) {
+      console.error('Error seeding checklist items:', error);
+      throw error;
+    }
+  },
+
+  async down(queryInterface, Sequelize) {
+    // Eliminar todos los ítems de los checklists definidos
+    const typeNames = checklistDefinitions.map(def => def.name);
+    if (typeNames.length > 0) {
+        const checklistTypes = await queryInterface.sequelize.query(
+            `SELECT checklist_type_id FROM checklist_types WHERE name IN (:typeNames);`,
+            {
+                replacements: { typeNames },
+                type: Sequelize.QueryTypes.SELECT
+            }
+        );
+        const typeIds = checklistTypes.map(t => t.checklist_type_id);
+        if (typeIds.length > 0) {
+            await queryInterface.bulkDelete('checklist_items', {
+                checklist_type_id: {
+                    [Sequelize.Op.in]: typeIds
+                }
+            }, {});
         }
     }
+  }
 };
