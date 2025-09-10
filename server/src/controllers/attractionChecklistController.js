@@ -55,13 +55,28 @@ const submitResponses = async (req, res) => {
 const updateFailure = async (req, res) => {
     try {
         const { id: failure_id } = req.params;
-        const observationData = req.body;
-        const updatedFailure = await attractionChecklistService.updateFailure({
+        console.log('updateFailure Controller: Received failure_id:', failure_id);
+        const { description, solution_text, responsible_area, status, severity, reported_at, closed_at, responded_by, closed_by } = req.body;
+        console.log('updateFailure Controller: Received body:', req.body);
+
+        const updateData = {
             failure_id: parseInt(failure_id),
-            ...observationData
-        });
+            description,
+            solution_text,
+            responsible_area,
+            status,
+            severity,
+            reported_at,
+            closed_at,
+            responded_by,
+            closed_by 
+        };
+        console.log('updateFailure Controller: Data sent to service:', updateData);
+
+        const updatedFailure = await attractionChecklistService.updateFailure(updateData);
         res.status(200).json(updatedFailure);
     } catch (error) {
+        console.error('updateFailure Controller: Error:', error.message);
         res.status(400).json({ error: error.message });
     }
 };

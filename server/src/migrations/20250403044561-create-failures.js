@@ -28,12 +28,12 @@ module.exports = {
                 allowNull: true,
             },
             status: {
-                type: Sequelize.ENUM('pendiente', 'en_proceso', 'resuelto'),
+                type: Sequelize.ENUM('pendiente', 'resuelto'),
                 defaultValue: 'pendiente',
                 allowNull: false,
             },
             severity: {
-                type: Sequelize.STRING,
+                type: Sequelize.ENUM('leve', 'crítica'),
                 allowNull: true,
             },
             reported_at: {

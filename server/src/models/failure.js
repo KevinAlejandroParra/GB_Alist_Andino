@@ -28,12 +28,12 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: true,
             },
             status: {
-                type: DataTypes.ENUM('pendiente', 'en_proceso', 'resuelto'),
+                type: DataTypes.ENUM('pendiente', 'resuelto'),
                 defaultValue: 'pendiente',
                 allowNull: false,
             },
             severity: {
-                type: DataTypes.STRING,
+                type: DataTypes.ENUM('leve', 'crítica'),
                 allowNull: true,
             },
             reported_at: {
