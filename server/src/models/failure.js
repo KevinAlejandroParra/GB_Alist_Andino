@@ -2,7 +2,9 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Failure extends Model {}
+    class Failure extends Model {
+        
+    }
     Failure.init(
         {
             failure_id: {
@@ -14,10 +16,6 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: true,
             },
             description: {
-                type: DataTypes.STRING,
-                allowNull: true,
-            },
-            work_order_code: {
                 type: DataTypes.STRING,
                 allowNull: true,
             },

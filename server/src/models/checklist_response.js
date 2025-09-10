@@ -3,22 +3,7 @@ const { Model } = require('sequelize');
 
 module.exports = (sequelize, DataTypes) => {
   class ChecklistResponse extends Model {
-    static associate(models) {
-      // Una respuesta pertenece a un elemento específico de la lista de comprobación.
-      ChecklistResponse.belongsTo(models.ChecklistItem, {
-        foreignKey: 'checklist_item_id',
-        as: 'item',
-      });
-      // Una respuesta forma parte de una instancia de lista de comprobación mayor.
-      ChecklistResponse.belongsTo(models.Checklist, {
-        foreignKey: 'checklist_id',
-      });
-      // Una respuesta puede tener un fallo asociado si el valor es “no cumple” o tiene un comentario.
-      ChecklistResponse.hasOne(models.Failure, {
-        foreignKey: 'response_id',
-        as: 'failure',
-      });
-    }
+    
   }
   ChecklistResponse.init(
     {

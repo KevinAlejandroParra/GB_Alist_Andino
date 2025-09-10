@@ -19,10 +19,6 @@ module.exports = {
                 type: Sequelize.STRING,
                 allowNull: true,
             },
-            work_order_code: {
-                type: Sequelize.STRING,
-                allowNull: true,
-            },
             solution_text: {
                 type: Sequelize.TEXT,
                 allowNull: true,
