@@ -160,16 +160,35 @@ ChecklistItem.belongsTo(ChecklistType, { as: "type", foreignKey: "checklist_type
 ChecklistItem.belongsTo(Role, { as: "role", foreignKey: "role_id" }); // Nueva asociación
 
 // 7. Asociaciones de ChecklistResponse
-// La asociación belongsTo con ChecklistItem (as: 'item') se define ahora dentro del modelo ChecklistResponse.
-ChecklistResponse.belongsTo(Checklist, { as: "checklist", foreignKey: "checklist_id" });
-ChecklistResponse.belongsTo(User, { as: "respondedBy", foreignKey: "responded_by" });
-ChecklistResponse.hasMany(Failure, { as: "failures", foreignKey: "response_id" });
+// Una respuesta pertenece a un elemento específico de la lista de comprobación.
+ChecklistResponse.belongsTo(ChecklistItem, {
+    foreignKey: 'checklist_item_id',
+    as: 'item',
+});
+// Una respuesta forma parte de una instancia de lista de comprobación mayor.
+ChecklistResponse.belongsTo(Checklist, {
+    foreignKey: 'checklist_id',
+    as: 'checklist',
+});
+ChecklistResponse.belongsTo(User, {
+    foreignKey: 'responded_by',
+    as: 'respondedBy',
+});
+// Una respuesta puede tener un fallo asociado si el valor es “no cumple” o tiene un comentario.
+ChecklistResponse.hasOne(Failure, {
+    foreignKey: 'response_id',
+    as: 'failure',
+});
 
 // 8. Asociaciones de Failure
-Failure.belongsTo(ChecklistResponse, { as: "response", foreignKey: "response_id" });
-Failure.belongsTo(User, { as: "reporter", foreignKey: "responded_by" });
-Failure.hasMany(MaintenanceAction, { as: "actions", foreignKey: "failure_id" });
-Failure.hasMany(Requisition, { as: "requisitions", foreignKey: "failure_id" });
+Failure.belongsTo(ChecklistResponse, {
+    foreignKey: "response_id",
+    as: "response",
+});
+Failure.belongsTo(User, {
+    foreignKey: "responded_by",
+    as: "reporter",
+});
 
 // 9. Asociaciones de MaintenanceAction
 MaintenanceAction.belongsTo(Failure, { as: "failure", foreignKey: "failure_id" });
