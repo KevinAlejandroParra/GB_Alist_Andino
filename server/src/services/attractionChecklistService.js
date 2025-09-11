@@ -12,6 +12,20 @@ const {
 } = require("../models")
 const Op = Sequelize.Op
 
+// Helper function for natural sort
+const naturalSort = (a, b) => {
+  const parse = (s) => s.split(".").map(Number);
+  const aa = parse(a.item_number);
+  const bb = parse(b.item_number);
+
+  for (let i = 0; i < Math.max(aa.length, bb.length); i++) {
+    if (aa[i] !== bb[i]) {
+      return (aa[i] || 0) - (bb[i] || 0);
+    }
+  }
+  return 0;
+};
+
 /**
  * Asegura que la instancia de la lista de comprobación diaria existe para una atracción y fecha dadas.
  * Si no existe, crea una nueva junto con respuestas iniciales (vacías) para todos los ítems contestables.
@@ -91,7 +105,25 @@ const getDailyChecklist = async ({ attraction_id, date }) => {
             as: "responses",
             where: { checklist_id: checklist.checklist_id },
             required: false,
-            include: [{ model: Failure, as: "failure", required: false }],
+            include: [
+              {
+                model: Failure,
+                as: "failure",
+                required: false,
+                attributes: [
+                  "failure_id",
+                  "description",
+                  "status",
+                  "severity",
+                  "solution_text",
+                  "responsible_area",
+                  "closed_at",
+                ],
+                include: [
+                  { model: User, as: "closedByUser", attributes: ["user_id", "user_name"] },
+                ],
+              },
+            ],
           },
         ],
         order: [["item_number", "ASC"]],
@@ -99,6 +131,16 @@ const getDailyChecklist = async ({ attraction_id, date }) => {
     ],
     order: [["item_number", "ASC"]],
   })
+
+  // Aplicar orden natural a los sub-ítems después de la carga
+  items.forEach(item => {
+    if (item.subItems && item.subItems.length > 0) {
+      item.subItems.sort(naturalSort);
+    }
+  });
+
+  // Aplicar orden natural a los ítems de nivel superior
+  items.sort(naturalSort);
 
   const signatures = await ChecklistSignature.findAll({ where: { checklist_id: checklist.checklist_id } })
 
