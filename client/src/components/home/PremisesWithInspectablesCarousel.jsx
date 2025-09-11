@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { EffectCoverflow, Pagination, Navigation } from 'swiper/modules';
-import { motion } from 'framer-motion'; // Importar motion
+import { motion } from 'framer-motion'; 
 
 // Importa los estilos de Swiper
 import 'swiper/css';
