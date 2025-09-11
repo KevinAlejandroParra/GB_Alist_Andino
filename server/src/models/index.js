@@ -189,6 +189,10 @@ Failure.belongsTo(User, {
     foreignKey: "responded_by",
     as: "reporter",
 });
+Failure.belongsTo(User, { 
+    foreignKey: "responded_by",
+    as: "closedByUser",
+});
 
 // 9. Asociaciones de MaintenanceAction
 MaintenanceAction.belongsTo(Failure, { as: "failure", foreignKey: "failure_id" });
