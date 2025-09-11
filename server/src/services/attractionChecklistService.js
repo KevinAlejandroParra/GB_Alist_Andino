@@ -1,16 +1,16 @@
 const {
-    Checklist, 
-    ChecklistItem, 
-    ChecklistResponse, 
-    ChecklistSignature, 
-    Failure, 
-    connection, 
-    Role,
-    ChecklistType, 
-    User,
-    Sequelize 
-} = require('../models');
-const Op = Sequelize.Op;
+  Checklist,
+  ChecklistItem,
+  ChecklistResponse,
+  ChecklistSignature,
+  Failure,
+  connection,
+  Role,
+  ChecklistType,
+  User,
+  Sequelize,
+} = require("../models")
+const Op = Sequelize.Op
 
 /**
  * Asegura que la instancia de la lista de comprobación diaria existe para una atracción y fecha dadas.
@@ -18,338 +18,389 @@ const Op = Sequelize.Op;
  * Esta función está restringida a los técnicos de mantenimiento (role_id 7).
  */
 const ensureDailyInstance = async ({ attraction_id, premise_id, date, created_by, role_id }) => {
-    let transaction;
-    try {
-        transaction = await connection.transaction();
+  let transaction
+  try {
+    transaction = await connection.transaction()
 
-        if (role_id !== 7) {
-            throw new Error('Solo el técnico de mantenimiento puede crear o acceder a su checklist diario.');
-        }
-        
-        let checklist = await Checklist.findOne({ where: { attraction_id, date, created_by }, transaction });
-
-        if (checklist) {
-            await transaction.commit();
-            return getDailyChecklist({ attraction_id, date }); 
-        }
-
-        const checklistType = await ChecklistType.findOne({ where: { attraction_id, role_id: 7, frequency: 'diario' }, transaction });
-
-        if (!checklistType) {
-            throw new Error(`Tipo de checklist diario para atracción ${attraction_id} y rol de técnico no encontrado.`);
-        }
-
-        const newChecklist = await Checklist.create({
-            checklist_type_id: checklistType.checklist_type_id,
-            premise_id,
-            attraction_id,
-            date,
-            created_by,
-            version_label: checklistType.version_label
-        }, { transaction });
-
-        // Las respuestas se crearán a través de la función submitResponses (con upsert) 
-        // la primera vez que el técnico las envíe. No es necesario pre-crear respuestas vacías.
-        await transaction.commit();
-        
-        // Return checklist 
-        return getDailyChecklist({ attraction_id, date });
-    } catch (error) {
-        if (transaction) await transaction.rollback();
-        throw error;
+    if (role_id !== 7) {
+      throw new Error("Solo el técnico de mantenimiento puede crear o acceder a su checklist diario.")
     }
-};
+
+    const checklist = await Checklist.findOne({ where: { attraction_id, date, created_by }, transaction })
+
+    if (checklist) {
+      await transaction.commit()
+      return getDailyChecklist({ attraction_id, date })
+    }
+
+    const checklistType = await ChecklistType.findOne({
+      where: { attraction_id, role_id: 7, frequency: "diario" },
+      transaction,
+    })
+
+    if (!checklistType) {
+      throw new Error(`Tipo de checklist diario para atracción ${attraction_id} y rol de técnico no encontrado.`)
+    }
+
+    const newChecklist = await Checklist.create(
+      {
+        checklist_type_id: checklistType.checklist_type_id,
+        premise_id,
+        attraction_id,
+        date,
+        created_by,
+        version_label: checklistType.version_label,
+      },
+      { transaction },
+    )
+
+    // Las respuestas se crearán a través de la función submitResponses (con upsert)
+    // la primera vez que el técnico las envíe. No es necesario pre-crear respuestas vacías.
+    await transaction.commit()
+
+    // Return checklist
+    return getDailyChecklist({ attraction_id, date })
+  } catch (error) {
+    if (transaction) await transaction.rollback()
+    throw error
+  }
+}
 
 /**
  * Recupera una lista de comprobación diaria para una atracción y fecha concretas, estructurada jerárquicamente.
  * Incluye ítems, subítems, respuestas, firmas y cualquier fallo pendiente de listas de control anteriores.
  */
 const getDailyChecklist = async ({ attraction_id, date }) => {
-    const checklist = await Checklist.findOne({ where: { attraction_id, date } });
+  const checklist = await Checklist.findOne({ where: { attraction_id, date } })
 
-    if (!checklist) return null;
-    // Obtener elementos jerárquicamente: los elementos raíz incluyen sus subelementos, que incluyen sus respuestas.
-    const items = await ChecklistItem.findAll({
-        where: {
-            checklist_type_id: checklist.checklist_type_id,
-            parent_item_id: null 
-        },
-        include: [{
-            model: ChecklistItem,
-            as: 'subItems',
-            separate: true, // Necesario para la correcta ordenación y los límites de los includes anidados
-            include: [{
-                model: ChecklistResponse,
-                as: 'responses',
-                where: { checklist_id: checklist.checklist_id },
-                required: false,
-                include: [{ model: Failure, as: 'failure', required: false }]
-            }],
-            order: [['item_number', 'ASC']]
-        }],
-        order: [['item_number', 'ASC']]
-    });
+  if (!checklist) return null
+  // Obtener elementos jerárquicamente: los elementos raíz incluyen sus subelementos, que incluyen sus respuestas.
+  const items = await ChecklistItem.findAll({
+    where: {
+      checklist_type_id: checklist.checklist_type_id,
+      parent_item_id: null,
+    },
+    include: [
+      {
+        model: ChecklistItem,
+        as: "subItems",
+        separate: true, 
+        include: [
+          {
+            model: ChecklistResponse,
+            as: "responses",
+            where: { checklist_id: checklist.checklist_id },
+            required: false,
+            include: [{ model: Failure, as: "failure", required: false }],
+          },
+        ],
+        order: [["item_number", "ASC"]],
+      },
+    ],
+    order: [["item_number", "ASC"]],
+  })
 
-    const signatures = await ChecklistSignature.findAll({ where: { checklist_id: checklist.checklist_id } });
+  const signatures = await ChecklistSignature.findAll({ where: { checklist_id: checklist.checklist_id } })
 
-    const previousChecklists = await Checklist.findAll({ where: { attraction_id, date: { [Op.lt]: date } }, attributes: ['checklist_id'] });
-    const previousChecklistIds = previousChecklists.map(c => c.checklist_id);
-    let pendingFailures = [];
+  const previousChecklists = await Checklist.findAll({
+    where: { attraction_id, date: { [Op.lt]: date } },
+    attributes: ["checklist_id"],
+  })
+  const previousChecklistIds = previousChecklists.map((c) => c.checklist_id)
+  let pendingFailures = []
 
-    if (previousChecklistIds.length > 0) {
-        const previousResponses = await ChecklistResponse.findAll({ where: { checklist_id: { [Op.in]: previousChecklistIds } }, attributes: ['response_id'] });
-        const previousResponseIds = previousResponses.map(r => r.response_id);
+  if (previousChecklistIds.length > 0) {
+    const previousResponses = await ChecklistResponse.findAll({
+      where: { checklist_id: { [Op.in]: previousChecklistIds } },
+      attributes: ["response_id"],
+    })
+    const previousResponseIds = previousResponses.map((r) => r.response_id)
 
-        if (previousResponseIds.length > 0) {
-            pendingFailures = await Failure.findAll({
-                where: { status: 'pendiente', response_id: { [Op.in]: previousResponseIds } },
-                include: [
-                    { model: ChecklistResponse, as: 'response', include: [{ model: Checklist, as: 'checklist' }, { model: ChecklistItem, as: 'item' }] },
-                    { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] }
-                ]
-            });
-        }
+    if (previousResponseIds.length > 0) {
+      pendingFailures = await Failure.findAll({
+        where: { status: "pendiente", response_id: { [Op.in]: previousResponseIds } },
+        include: [
+          {
+            model: ChecklistResponse,
+            as: "response",
+            include: [
+              { model: Checklist, as: "checklist" },
+              { model: ChecklistItem, as: "item" },
+              { model: User, as: "respondedBy", attributes: ["user_id", "user_name"] },
+            ],
+          },
+          {
+            model: User,
+            as: "closedByUser", 
+            attributes: ["user_id", "user_name"],
+          },
+        ],
+      })
     }
+  }
 
-    return {
-        ...checklist.toJSON(),
-        items,
-        signatures,
-        pending_failures: pendingFailures
-    };
-};
+  return {
+    ...checklist.toJSON(),
+    items,
+    signatures,
+    pending_failures: pendingFailures,
+  }
+}
 
-/**
- * Submits responses for a specific checklist.
- * It validates that responses are only for sub-items and creates/updates failures accordingly.
- */
+
 const submitResponses = async ({ checklist_id, responses, responded_by, role_id }) => {
-    const transaction = await connection.transaction();
-    try {
-        if (role_id !== 7) {
-            throw new Error('Only maintenance technicians can fill out the checklist.');
-        }
-
-        const checklist = await Checklist.findByPk(checklist_id, { transaction });
-        if (!checklist) throw new Error('Checklist not found');
-
-        for (const response of responses) {
-            const { checklist_item_id, value, comment, evidence_url } = response;
-
-            const item = await ChecklistItem.findByPk(checklist_item_id, { transaction });
-            if (!item || item.checklist_type_id !== checklist.checklist_type_id) {
-                throw new Error(`Item with ID ${checklist_item_id} is not valid for this checklist.`);
-            }
-            // Validation: Ensure responses are only for sub-items (those with a parent).
-            if (item.parent_item_id === null) {
-                throw new Error(`Responses cannot be submitted for parent items. Item ID: ${checklist_item_id}`);
-            }
-
-            const [checklistResponse] = await ChecklistResponse.upsert({
-                checklist_id,
-                checklist_item_id,
-                value,
-                comment,
-                evidence_url,
-                responded_by
-            }, { returning: true, transaction });
-
-            // Create/update a failure if the item 'no cumple' or has a comment.
-            const hasFailure = value === 'no cumple' || (comment && comment.trim() !== '');
-
-            if (hasFailure) {
-                await Failure.upsert({
-                    response_id: checklistResponse.response_id,
-                    description: comment || 'Item does not meet criteria',
-                    status: 'pendiente',
-                    reported_at: new Date(),
-                    reported_by: responded_by
-                }, { transaction });
-            } else {
-                // If the item is compliant and has no comment, resolve any pending failure for this specific response.
-                await Failure.destroy({ where: { response_id: checklistResponse.response_id, status: 'pendiente' }, transaction });
-            }
-        }
-
-        // Create technician signature if it doesn't exist
-        await ChecklistSignature.findOrCreate({
-            where: { checklist_id, user_id: responded_by, role_at_signature: 'Tecnico de mantenimiento' },
-            defaults: { signed_at: new Date() },
-            transaction
-        });
-
-        await transaction.commit();
-    } catch (error) {
-        await transaction.rollback();
-        throw error;
+  const transaction = await connection.transaction()
+  try {
+    if (role_id !== 7) {
+      throw new Error("Only maintenance technicians can fill out the checklist.")
     }
-};
 
-/**
- * Signs a checklist, with validation to ensure it is fully completed.
- * Restricted to Head of Operations (role_id 4).
- */
+    const checklist = await Checklist.findByPk(checklist_id, { transaction })
+    if (!checklist) throw new Error("Checklist not found")
+
+    for (const response of responses) {
+      const { checklist_item_id, value, comment, evidence_url } = response
+
+      const item = await ChecklistItem.findByPk(checklist_item_id, { transaction })
+      if (!item || item.checklist_type_id !== checklist.checklist_type_id) {
+        throw new Error(`Item with ID ${checklist_item_id} is not valid for this checklist.`)
+      }
+      if (item.parent_item_id === null) {
+        throw new Error(`Responses cannot be submitted for parent items. Item ID: ${checklist_item_id}`)
+      }
+
+      const [checklistResponse] = await ChecklistResponse.upsert(
+        {
+          checklist_id,
+          checklist_item_id,
+          value,
+          comment,
+          evidence_url,
+          responded_by,
+        },
+        { returning: true, transaction },
+      )
+
+      const hasFailure = value === 0 || (comment && comment.trim() !== "")
+
+      if (hasFailure) {
+        let severity = "leve" 
+        if (value === 0) {
+          severity = "critica"
+        }
+
+        await Failure.upsert(
+          {
+            response_id: checklistResponse.response_id,
+            description: comment || "Item does not meet criteria",
+            status: "pendiente",
+            reported_at: new Date(),
+            responded_by: responded_by,
+            severity: severity, 
+          },
+          { transaction },
+        )
+      } else {
+        await Failure.destroy({
+          where: { response_id: checklistResponse.response_id, status: "pendiente" },
+          transaction,
+        })
+      }
+    }
+
+    await ChecklistSignature.findOrCreate({
+      where: { checklist_id, user_id: responded_by, role_at_signature: "Tecnico de mantenimiento" },
+      defaults: { signed_at: new Date() },
+      transaction,
+    })
+
+    await transaction.commit()
+  } catch (error) {
+    await transaction.rollback()
+    throw error
+  }
+}
+
+
 const signChecklist = async ({ checklist_id, user_id, role_id }) => {
-    const transaction = await connection.transaction();
-    try {
-        if (role_id !== 4) {
-            throw new Error(`Only the Head of Operations can sign. Current role: ${role_id}`);
-        }
-
-        const checklist = await Checklist.findByPk(checklist_id, { transaction });
-        if (!checklist) throw new Error('Checklist not found');
-
-        // Get all answerable items for this checklist type
-        const answerableItems = await ChecklistItem.findAll({
-            where: { checklist_type_id: checklist.checklist_type_id, parent_item_id: { [Op.ne]: null } },
-            attributes: ['checklist_item_id'],
-            transaction
-        });
-        const answerableItemIds = answerableItems.map(item => item.checklist_item_id);
-
-        // Get all responses for these items
-        const responses = await ChecklistResponse.findAll({
-            where: { checklist_id, checklist_item_id: { [Op.in]: answerableItemIds } },
-            transaction
-        });
-
-        // Find which items are incomplete
-        const respondedItemIds = new Set(responses.map(r => r.checklist_item_id));
-        const incompleteItemIds = answerableItemIds.filter(id => !respondedItemIds.has(id));
-        
-        const incompleteResponses = responses.filter(r => r.value === null || r.value === undefined);
-        const trulyIncompleteIds = new Set([...incompleteItemIds, ...incompleteResponses.map(r => r.checklist_item_id)]);
-
-        if (trulyIncompleteIds.size > 0) {
-            const incompleteItemsDetails = await ChecklistItem.findAll({
-                where: { checklist_item_id: { [Op.in]: [...trulyIncompleteIds] } },
-                attributes: ['checklist_item_id', 'question_text', 'item_number'],
-                order: [['item_number', 'ASC']],
-                transaction
-            });
-            const error = new Error('The checklist must be fully completed before the Head of Operations can sign.');
-            error.incompleteItems = incompleteItemsDetails;
-            error.incompleteCount = incompleteItemsDetails.length;
-            throw error;
-        }
-
-        const technicianSignature = await ChecklistSignature.findOne({ where: { checklist_id, role_at_signature: 'Tecnico de mantenimiento' }, transaction });
-        if (!technicianSignature) {
-            throw new Error('The maintenance technician must sign first.');
-        }
-
-        const userRole = await Role.findByPk(role_id, { transaction });
-        if (!userRole) throw new Error('Invalid user role.');
-
-        await ChecklistSignature.create({ checklist_id, user_id, role_at_signature: userRole.role_name, signed_at: new Date() }, { transaction });
-
-        await transaction.commit();
-        return { success: true, message: 'Checklist signed successfully' };
-    } catch (error) {
-        await transaction.rollback();
-        throw error;
+  const transaction = await connection.transaction()
+  try {
+    if (role_id !== 4) {
+      throw new Error(`Only the Head of Operations can sign. Current role: ${role_id}`)
     }
-};
+
+    const checklist = await Checklist.findByPk(checklist_id, { transaction })
+    if (!checklist) throw new Error("Checklist not found")
+
+    const answerableItems = await ChecklistItem.findAll({
+      where: { checklist_type_id: checklist.checklist_type_id, parent_item_id: { [Op.ne]: null } },
+      attributes: ["checklist_item_id"],
+      transaction,
+    })
+    const answerableItemIds = answerableItems.map((item) => item.checklist_item_id)
+
+    const responses = await ChecklistResponse.findAll({
+      where: { checklist_id, checklist_item_id: { [Op.in]: answerableItemIds } },
+      transaction,
+    })
+
+    const respondedItemIds = new Set(responses.map((r) => r.checklist_item_id))
+    const incompleteItemIds = answerableItemIds.filter((id) => !respondedItemIds.has(id))
+
+    const incompleteResponses = responses.filter((r) => r.value === null || r.value === undefined)
+    const trulyIncompleteIds = new Set([...incompleteItemIds, ...incompleteResponses.map((r) => r.checklist_item_id)])
+
+    if (trulyIncompleteIds.size > 0) {
+      const incompleteItemsDetails = await ChecklistItem.findAll({
+        where: { checklist_item_id: { [Op.in]: [...trulyIncompleteIds] } },
+        attributes: ["checklist_item_id", "question_text", "item_number"],
+        order: [["item_number", "ASC"]],
+        transaction,
+      })
+      const error = new Error("The checklist must be fully completed before the Head of Operations can sign.")
+      error.incompleteItems = incompleteItemsDetails
+      error.incompleteCount = incompleteItemsDetails.length
+      throw error
+    }
+
+    const technicianSignature = await ChecklistSignature.findOne({
+      where: { checklist_id, role_at_signature: "Tecnico de mantenimiento" },
+      transaction,
+    })
+    if (!technicianSignature) {
+      throw new Error("The maintenance technician must sign first.")
+    }
+
+    const userRole = await Role.findByPk(role_id, { transaction })
+    if (!userRole) throw new Error("Invalid user role.")
+
+    await ChecklistSignature.create(
+      { checklist_id, user_id, role_at_signature: userRole.role_name, signed_at: new Date() },
+      { transaction },
+    )
+
+    await transaction.commit()
+    return { success: true, message: "Checklist signed successfully" }
+  } catch (error) {
+    await transaction.rollback()
+    throw error
+  }
+}
 
 // Other functions (updateFailure, listObservations, listChecklistsByAttraction) remain unchanged as they are not directly affected by the hierarchy.
 
 /**
  * Updates an existing failure.
+ * @param {object} params 
+ * @param {number} params.failure_id 
+ * @param {string} [params.solution_text] 
+ * @param {string} [params.responsible_area] 
+ * @param {number} [params.closed_by] 
+ * @param {string} [params.status] 
  */
-const updateFailure = async ({ failure_id, ...observationData }) => {
-    const transaction = await connection.transaction();
-    try {
-        const failure = await Failure.findByPk(failure_id);
+const updateFailure = async ({ failure_id, solution_text, responsible_area, closed_by, status }) => {
+  const transaction = await connection.transaction()
+  try {
+    const failure = await Failure.findByPk(failure_id, { transaction })
 
-        if (!failure) {
-            throw new Error('Falla no encontrada');
-        }
-
-        await failure.update({
-            ...observationData,
-            closed_at: observationData.status === 'resuelto' && !observationData.closed_at ? new Date() : observationData.closed_at
-        }, { transaction });
-
-        await transaction.commit();
-        return failure;
-    } catch (error) {
-        await transaction.rollback();
-        throw error;
+    if (!failure) {
+      throw new Error("Falla no encontrada")
     }
-};
 
-/**
- * Lists failures (observations) filtered by checklist, date range.
- */
+    const updateData = {
+      solution_text,
+      responsible_area,
+      status,
+    }
+
+    if (status === "resuelto" && failure.status !== "resuelto") {
+      updateData.closed_at = new Date()
+      updateData.closed_by = closed_by
+    } else if (status !== "resuelto") {
+      updateData.closed_at = null
+      updateData.closed_by = null
+    }
+
+    await failure.update(updateData, { transaction })
+
+    await transaction.commit()
+    return failure.reload()
+  } catch (error) {
+    if (transaction) await transaction.rollback()
+    console.error("updateFailure Service: Error:", error.message)
+    throw error
+  }
+}
+
+
 const listObservations = async ({ checklist_id, start_date, end_date }) => {
-    const whereClause = {};
+  const whereClause = {}
 
-    if (checklist_id) {
-        whereClause['$ChecklistResponse.checklist_id$'] = checklist_id;
+  if (checklist_id) {
+    whereClause["$ChecklistResponse.checklist_id$"] = checklist_id
+  }
+
+  if (start_date && end_date) {
+    whereClause.reported_at = {
+      [Op.between]: [new Date(start_date), new Date(end_date)],
     }
+  } else if (start_date) {
+    whereClause.reported_at = { [Op.gte]: new Date(start_date) }
+  } else if (end_date) {
+    whereClause.reported_at = { [Op.lte]: new Date(end_date) }
+  }
 
-    if (start_date && end_date) {
-        whereClause.reported_at = {
-            [Op.between]: [new Date(start_date), new Date(end_date)],
-        };
-    } else if (start_date) {
-        whereClause.reported_at = { [Op.gte]: new Date(start_date) };
-    } else if (end_date) {
-        whereClause.reported_at = { [Op.lte]: new Date(end_date) };
-    }
-
-    const observations = await Failure.findAll({
-        where: whereClause,
+  const observations = await Failure.findAll({
+    where: whereClause,
+    include: [
+      {
+        model: ChecklistResponse,
+        as: "response",
         include: [
-            {
-                model: ChecklistResponse, as: 'response',
-                include: [
-                    { model: Checklist, as: 'checklist' },
-                    { model: ChecklistItem, as: 'item' },
-                ]
-            },
-            { model: User, as: 'reporter', attributes: ['user_id', 'user_email', 'user_name'] }, 
+          { model: Checklist, as: "checklist" },
+          { model: ChecklistItem, as: "item" },
         ],
-    });
+      },
+      { model: User, as: "reporter", attributes: ["user_id", "user_email", "user_name"] },
+    ],
+  })
 
-    return observations;
-};
+  return observations
+}
 
-/**
- * Lists all checklists associated with a specific attraction.
- */
+
 const listChecklistsByAttraction = async (attraction_id) => {
-    const checklists = await Checklist.findAll({
-        where: { attraction_id },
-        include: [
-            {
-                model: ChecklistType,
-                as: 'type',
-                attributes: ['name', 'description']
-            },
-            {
-                model: User,
-                as: 'creator',
-                attributes: ['user_name']
-            },
-            {
-                model: ChecklistSignature,
-                as: 'signatures',
-                attributes: ['role_at_signature', 'signed_at'],
-                include: [{ model: User, as: 'user', attributes: ['user_name'] }]
-            }
-        ],
-        order: [['date', 'DESC']]
-    });
-    return checklists;
-};
+  const checklists = await Checklist.findAll({
+    where: { attraction_id },
+    include: [
+      {
+        model: ChecklistType,
+        as: "type",
+        attributes: ["name", "description"],
+      },
+      {
+        model: User,
+        as: "creator",
+        attributes: ["user_name"],
+      },
+      {
+        model: ChecklistSignature,
+        as: "signatures",
+        attributes: ["role_at_signature", "signed_at"],
+        include: [{ model: User, as: "user", attributes: ["user_name"] }],
+      },
+    ],
+    order: [["date", "DESC"]],
+  })
+  return checklists
+}
 
 module.exports = {
-    ensureDailyInstance,
-    getDailyChecklist,
-    submitResponses,
-    updateFailure,
-    listObservations,
-    signChecklist,
-    listChecklistsByAttraction
-};
+  ensureDailyInstance,
+  getDailyChecklist,
+  submitResponses,
+  updateFailure,
+  listObservations,
+  signChecklist,
+  listChecklistsByAttraction,
+}
