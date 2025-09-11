@@ -1,6 +1,76 @@
 "use client"
 import { formatLocalDate, formatLocalDateTime } from "../../utils/dateUtils"
+import { useState } from "react"
 
+// Modal para cerrar fallas con formulario completo
+const CloseFailureModal = ({ show, onClose, onSubmit, failure }) => {
+  const [solutionText, setSolutionText] = useState("")
+  const [responsibleArea, setResponsibleArea] = useState("")
+
+  if (!show) return null
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSubmit(failure.failure_id, solutionText, responsibleArea)
+    setSolutionText("")
+    setResponsibleArea("")
+  }
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
+      <div className="relative p-8 border w-96 shadow-lg rounded-md bg-white">
+        <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Cerrar Falla</h3>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label htmlFor="solutionText" className="block text-sm font-medium text-gray-700">
+              Solución:
+            </label>
+            <textarea
+              id="solutionText"
+              rows="3"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              value={solutionText}
+              onChange={(e) => setSolutionText(e.target.value)}
+              required
+            ></textarea>
+          </div>
+          <div className="mb-4">
+            <label htmlFor="responsibleArea" className="block text-sm font-medium text-gray-700">
+              Área Responsable:
+            </label>
+            <select
+              id="responsibleArea"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              value={responsibleArea}
+              onChange={(e) => setResponsibleArea(e.target.value)}
+              required
+            >
+              <option value="">Seleccione un área</option>
+              <option value="Técnico">Técnico</option>
+              <option value="Operación">Operación</option>
+              <option value="Mixto">Mixto</option>
+            </select>
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Cerrar Falla
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 export default function DailyChecklistSection({
   checklist,
@@ -10,48 +80,103 @@ export default function DailyChecklistSection({
   setIsChecklistCollapsed,
   handleResponseChange,
   handleResponseTypeChange,
-  handleUpdateFailure,
   handleSubmitResponses,
   handleSignChecklist,
   handleCreateDailyChecklist,
   handleFileUpload,
   user,
-  hasExistingResponses,
   inspectableId,
   premiseId,
   error,
+  onFailureClosed, // Nueva prop para notificar cuando se cierra una falla
 }) {
+  const [showCloseFailureModal, setShowCloseFailureModal] = useState(false)
+  const [selectedFailure, setSelectedFailure] = useState(null)
+
+  const handleOpenCloseFailureModal = (failure) => {
+    setSelectedFailure(failure)
+    setShowCloseFailureModal(true)
+  }
+
+  const handleCloseFailureModal = () => {
+    setShowCloseFailureModal(false)
+    setSelectedFailure(null)
+  }
+
+  const handleCloseFailureSubmit = async (failureId, solutionText, responsibleArea) => {
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+      const response = await fetch(`${API_BASE_URL}/api/att-check/failures/${failureId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({
+          solution_text: solutionText,
+          responsible_area: responsibleArea,
+          status: "resuelto",
+          closed_by: user.user_id,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Error response:", errorText)
+        throw new Error(`Error ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log("Falla cerrada exitosamente:", result)
+
+      // Notificar al componente padre para refrescar los datos
+      if (onFailureClosed) {
+        onFailureClosed(failureId)
+      }
+      handleCloseFailureModal()
+    } catch (error) {
+      console.error("Error cerrando falla:", error)
+      alert(`Error al cerrar la falla: ${error.message}`)
+    }
+  }
+
   // Determinar el texto y estilo del botón
-const getButtonConfig = () => {
+  const getButtonConfig = () => {
     if (modifiedResponses.size === 0) {
       return {
         text: "Sin Cambios",
         disabled: true,
-        className: "bg-gray-400 text-gray-600 cursor-not-allowed"
+        className: "bg-gray-400 text-gray-600 cursor-not-allowed",
       }
     }
-    
+
+    const hasExistingResponses = checklist?.items?.some(
+      (item) => item.responses?.[0] && (item.responses[0].value !== null || item.responses[0].comment),
+    )
+
     if (hasExistingResponses) {
       return {
         text: "Actualizar Respuestas",
         disabled: false,
-        className: "bg-orange-600 text-white hover:bg-orange-700"
+        className: "bg-orange-600 text-white hover:bg-orange-700",
       }
     }
-    
+
     return {
       text: "Guardar Respuestas",
       disabled: false,
-      className: "bg-blue-600 text-white hover:bg-blue-700"
+      className: "bg-blue-600 text-white hover:bg-blue-700",
     }
   }
-  
-//configuracion de la url de la evidencia
+
   const getEvidenceUrl = (evidenceUrl) => {
     if (!evidenceUrl) return null
+    // Si ya es una URL completa, devolverla tal como está
     if (evidenceUrl.startsWith("http")) return evidenceUrl
-    const apiBase = process.env.NEXT_PUBLIC_API
-    return `${apiBase}${evidenceUrl}`
+    // Construir URL usando la API base + public/ + evidence_url
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+    return `${apiBase}/public/${evidenceUrl}`
   }
 
   // Si hay error, mostrar opción de crear checklist
@@ -113,19 +238,44 @@ const getButtonConfig = () => {
                       {formatLocalDate(failure.response.checklist.date)}
                     </p>
                     <p>
-                      <span className="font-semibold">Reportado por:</span> {failure.reporter.user_name}
+                      <span className="font-semibold">Reportado por:</span>{" "}
+                      {failure.response.respondedBy ? failure.response.respondedBy.user_name : "No disponible"}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Severidad:</span> {failure.severity}
                     </p>
                   </div>
 
-                  <select
-                    className="p-2 border border-gray-300 rounded-md text-sm bg-white"
-                    value={failure.status}
-                    onChange={(e) => handleUpdateFailure(failure.failure_id, e.target.value)}
-                  >
-                    <option value="pendiente">Pendiente</option>
-                    <option value="en_proceso">En Proceso</option>
-                    <option value="resuelto">Resuelto</option>
-                  </select>
+                  {failure.status === "pendiente" && (
+                    <button
+                      onClick={() => handleOpenCloseFailureModal(failure)}
+                      className="px-4 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700 transition-colors text-sm"
+                    >
+                      Cerrar Falla
+                    </button>
+                  )}
+                  {failure.status !== "pendiente" && (
+                    <div className="text-sm text-gray-700 mt-2">
+                      <p>
+                        <span className="font-semibold">Estado:</span> {failure.status}
+                      </p>
+                      {failure.solution_text && (
+                        <p>
+                          <span className="font-semibold">Solución:</span> {failure.solution_text}
+                        </p>
+                      )}
+                      {failure.responsible_area && (
+                        <p>
+                          <span className="font-semibold">Área Responsable:</span> {failure.responsible_area}
+                        </p>
+                      )}
+                      {failure.closed_at && (
+                        <p>
+                          <span className="font-semibold">Cerrado el:</span> {formatLocalDateTime(failure.closed_at)}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -265,6 +415,7 @@ const getButtonConfig = () => {
                                 <img
                                   src={
                                     getEvidenceUrl(itemResponses[item.checklist_item_id].evidence_url) ||
+                                    "/placeholder.svg" ||
                                     "/placeholder.svg"
                                   }
                                   alt="Vista previa de evidencia"
@@ -333,6 +484,15 @@ const getButtonConfig = () => {
             )}
           </div>
         </div>
+      )}
+
+      {showCloseFailureModal && selectedFailure && (
+        <CloseFailureModal
+          show={showCloseFailureModal}
+          onClose={handleCloseFailureModal}
+          onSubmit={handleCloseFailureSubmit}
+          failure={selectedFailure}
+        />
       )}
     </div>
   )
