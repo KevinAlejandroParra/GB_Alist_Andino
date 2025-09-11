@@ -27,15 +27,15 @@ export default function InspectableDetailPage({ params: initialParams }) {
   const [hasExistingResponses, setHasExistingResponses] = useState(false) 
 
   const fetchDailyChecklist = useCallback(async () => {
-    if (!user || authLoading || !inspectableId) return
+    if (!user || authLoading || !inspectableId) return;
 
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
     try {
-      const today = new Date()
-      const dateString = today.toISOString().split("T")[0]
-      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
+      const today = new Date();
+      const dateString = today.toISOString().split("T")[0];
+      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
 
       const response = await axios.get(
         `${API_URL}/api/att-check/${inspectableId}/checklist/daily?date=${dateString}&role_id=${user.role_id}`,
@@ -43,22 +43,22 @@ export default function InspectableDetailPage({ params: initialParams }) {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
-        },
-      )
-      setChecklist(response.data)
+        }
+      );
+      setChecklist(response.data);
 
-      const initialResponses = {}
-            let hasResponses = false 
+      const initialResponses = {};
+      let hasResponses = false;
+      const allAnswerableItems = [];
 
-      if (response.data && response.data.items) {
-        response.data.items.forEach((item) => {
-          const existingResponse = item.responses?.[0]
-
-           //verificar si existen respuestas con contenido
+      const processItems = (items) => {
+        if (!items) return;
+        items.forEach((item) => {
+          // Initialize responses for the item
+          const existingResponse = item.responses?.[0];
           if (existingResponse && (existingResponse.value !== null || existingResponse.comment)) {
-            hasResponses = true
+            hasResponses = true;
           }
-
           initialResponses[item.checklist_item_id] = {
             response_id: existingResponse?.response_id || null,
             value: existingResponse?.value ?? null,
@@ -69,30 +69,53 @@ export default function InspectableDetailPage({ params: initialParams }) {
               existingResponse?.value === true
                 ? "cumple"
                 : existingResponse?.value === false
-                  ? "no_cumple"
-                  : existingResponse?.comment
-                    ? "observaciones"
-                    : null,
+                ? "no_cumple"
+                : existingResponse?.comment
+                ? "observaciones"
+                : null,
+          };
+
+          // If it's a leaf node (an actual question), add to our list for completion check
+          if ((!item.subItems || item.subItems.length === 0) && item.input_type !== 'section') {
+            allAnswerableItems.push(item);
           }
-        })
-      }
-      setHasExistingResponses(hasResponses)
-      setItemResponses(initialResponses)
+
+          // Recursively process sub-items
+          if (item.subItems && item.subItems.length > 0) {
+            processItems(item.subItems);
+          }
+        });
+      };
 
       if (response.data && response.data.items) {
-        const allAnswered = response.data.items.every(
-          (item) => item.responses && item.responses.length > 0 && item.responses[0].value !== null,
-        )
-        setIsChecklistCollapsed(allAnswered)
+        processItems(response.data.items);
       }
+
+      setHasExistingResponses(hasResponses);
+      setItemResponses(initialResponses);
+
+      // Check if all answerable items have been answered to collapse the section
+      if (allAnswerableItems.length > 0) {
+        const allAnswered = allAnswerableItems.every(
+          (item) => {
+            const res = initialResponses[item.checklist_item_id];
+            // An item is considered answered if it has a non-null value
+            return res && res.value !== null;
+          }
+        );
+        setIsChecklistCollapsed(allAnswered);
+      } else {
+        setIsChecklistCollapsed(false);
+      }
+
     } catch (err) {
-      console.error("Error fetching daily checklist:", err)
-      setError(err.message || "Failed to fetch daily checklist.")
-      Swal.fire("Error", err.message || "Error al cargar el checklist diario", "error")
+      console.error("Error fetching daily checklist:", err);
+      setError(err.message || "Failed to fetch daily checklist.");
+      Swal.fire("Error", err.message || "Error al cargar el checklist diario", "error");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [inspectableId, user, authLoading])
+  }, [inspectableId, user, authLoading]);
 
   const fetchHistoricalChecklists = useCallback(async () => {
     if (!user || authLoading || !inspectableId) return
@@ -186,27 +209,39 @@ export default function InspectableDetailPage({ params: initialParams }) {
   }
 
  const handleSubmitResponses = async () => {
-    if (!user || !checklist) return
+    if (!user || !checklist) return;
 
-    const modifiedResponsesArray = Array.from(modifiedResponses)
+    const modifiedResponsesArray = Array.from(modifiedResponses);
     if (modifiedResponsesArray.length === 0) {
-      Swal.fire("Info", "No hay cambios para guardar", "info")
-      return
+      Swal.fire("Info", "No hay cambios para guardar", "info");
+      return;
     }
 
-    const actionText = hasExistingResponses ? "Actualizando" : "Guardando"
-    
-    Swal.fire({
-      title: `${actionText} Respuestas...`,
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading()
-      },
-    })
+    // Construir un mapa de todos los ítems por ID para una búsqueda fácil
+    const allItems = new Map();
+    const collectItems = (items) => {
+      if (!items) return;
+      items.forEach(item => {
+        allItems.set(item.checklist_item_id, item);
+        if (item.subItems) {
+          collectItems(item.subItems);
+        }
+      });
+    };
+    collectItems(checklist.items);
 
-    try {
-      const formattedResponses = modifiedResponsesArray.map((itemId) => {
-        const response = itemResponses[itemId]
+    // Filtrar las respuestas para enviar solo las que no son de ítems padre
+    const formattedResponses = modifiedResponsesArray
+      .map((itemId) => {
+        const item = allItems.get(itemId);
+        
+        // Salvaguarda: No incluir ítems que son padres (no tienen parent_item_id)
+        if (!item || item.parent_item_id === null) {
+          console.warn(`Se intentó enviar una respuesta para un ítem padre (ID: ${itemId}). Omitiendo.`);
+          return null;
+        }
+
+        const response = itemResponses[itemId];
         return {
           checklist_id: checklist.checklist_id,
           checklist_item_id: response.checklist_item_id,
@@ -214,12 +249,30 @@ export default function InspectableDetailPage({ params: initialParams }) {
           value: response.value,
           comment: response.comment || null,
           evidence_url: response.evidence_url || null,
-        }
+        };
       })
+      .filter(Boolean); // Eliminar los nulos (ítems padre omitidos)
 
-      console.log("[v0] Enviando respuestas:", formattedResponses)
+    if (formattedResponses.length === 0) {
+      Swal.fire("Info", "No hay cambios válidos para guardar (solo se modificaron ítems de sección)", "info");
+      setModifiedResponses(new Set()); // Limpiar el set de modificados
+      return;
+    }
 
-      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
+    const actionText = hasExistingResponses ? "Actualizando" : "Guardando";
+    
+    Swal.fire({
+      title: `${actionText} Respuestas...`,
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+
+    try {
+      console.log("[v1] Enviando respuestas filtradas:", formattedResponses);
+
+      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
       await axios.post(
         `${API_URL}/api/att-check/checklists/${checklist.checklist_id}/responses`,
         { responses: formattedResponses },
@@ -227,17 +280,17 @@ export default function InspectableDetailPage({ params: initialParams }) {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
-        },
-      )
+        }
+      );
 
-      const successText = hasExistingResponses ? "actualizadas" : "guardadas"
-      Swal.fire("¡Éxito!", `Respuestas ${successText} exitosamente`, "success")
-      setModifiedResponses(new Set())
-      setHasExistingResponses(true) 
-      await fetchDailyChecklist()
+      const successText = hasExistingResponses ? "actualizadas" : "guardadas";
+      Swal.fire("¡Éxito!", `Respuestas ${successText} exitosamente`, "success");
+      setModifiedResponses(new Set());
+      setHasExistingResponses(true);
+      await fetchDailyChecklist();
     } catch (err) {
-      console.error("Error submitting responses:", err)
-      Swal.fire("Error", err.response?.data?.error || "Error al guardar respuestas", "error")
+      console.error("Error submitting responses:", err);
+      Swal.fire("Error", err.response?.data?.error || "Error al guardar respuestas", "error");
     }
   }
 
