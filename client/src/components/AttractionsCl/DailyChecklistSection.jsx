@@ -345,9 +345,8 @@ export default function DailyChecklistSection({
     if (!evidenceUrl) return null
     // Si ya es una URL completa, devolverla tal como está
     if (evidenceUrl.startsWith("http")) return evidenceUrl
-    // Construir URL usando la API base + public/ + evidence_url
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
-    return `${apiBase}/public/${evidenceUrl}`
+    const apiBase = process.env.NEXT_PUBLIC_API || "http://localhost:3000"
+    return `${apiBase}${evidenceUrl}`
   }
 
   // Si hay error, mostrar opción de crear checklist
