@@ -48,6 +48,10 @@ module.exports = {
                 type: Sequelize.INTEGER,
                 allowNull: true,
             },
+              closed_by: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+            },
             createdAt: {
                 type: Sequelize.DATE,
                 defaultValue: Sequelize.NOW,

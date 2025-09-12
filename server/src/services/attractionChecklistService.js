@@ -94,11 +94,35 @@ const getDailyChecklist = async ({ attraction_id, date }) => {
       checklist_type_id: checklist.checklist_type_id,
       parent_item_id: null,
     },
+    attributes: [
+      "checklist_item_id",
+      "parent_item_id",
+      "checklist_type_id",
+      "item_number",
+      "question_text",
+      "guidance_text",
+      "input_type",
+      "allow_comment",
+      "createdAt",
+      "updatedAt",
+    ],
     include: [
       {
         model: ChecklistItem,
         as: "subItems",
-        separate: true, 
+        separate: true,
+        attributes: [
+          "checklist_item_id",
+          "parent_item_id",
+          "checklist_type_id",
+          "item_number",
+          "question_text",
+          "guidance_text",
+          "input_type",
+          "allow_comment",
+          "createdAt",
+          "updatedAt",
+        ],
         include: [
           {
             model: ChecklistResponse,
@@ -203,7 +227,21 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
     for (const response of responses) {
       const { checklist_item_id, value, comment, evidence_url } = response
 
-      const item = await ChecklistItem.findByPk(checklist_item_id, { transaction })
+      const item = await ChecklistItem.findByPk(checklist_item_id, {
+        transaction,
+        attributes: [
+          "checklist_item_id",
+          "parent_item_id",
+          "checklist_type_id",
+          "item_number",
+          "question_text",
+          "guidance_text",
+          "input_type",
+          "allow_comment",
+          "createdAt",
+          "updatedAt",
+        ],
+      })
       if (!item || item.checklist_type_id !== checklist.checklist_type_id) {
         throw new Error(`Item with ID ${checklist_item_id} is not valid for this checklist.`)
       }
