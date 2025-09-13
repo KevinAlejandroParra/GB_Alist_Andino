@@ -74,7 +74,7 @@ const CloseFailureModal = ({ show, onClose, onSubmit, failure }) => {
 
 // Modal para mostrar el guidance_text
 const GuidanceTextModal = ({ show, onClose, guidanceText }) => {
-  if (!show) return null;
+  if (!show) return null
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
@@ -92,21 +92,44 @@ const GuidanceTextModal = ({ show, onClose, guidanceText }) => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
 // Componente recursivo para renderizar ítems y sub-ítems
-const ChecklistItemRenderer = ({ item, level = 0, itemResponses, handleResponseChange, handleResponseTypeChange, handleFileUpload, getEvidenceUrl, user, }) => {
-  const isParent = item.input_type === "section" || item.subItems?.length > 0;
-  const marginLeft = level * 20; // Ajusta el sangrado según el nivel
-  const [showGuidanceModal, setShowGuidanceModal] = useState(false); // Estado para controlar la visibilidad del modal
-  
+const ChecklistItemRenderer = ({
+  item,
+  level = 0,
+  itemResponses,
+  handleResponseChange,
+  handleResponseTypeChange,
+  handleFileUpload,
+  getEvidenceUrl,
+  user,
+  parentItem,
+  parentChildren,
+  handleMarkAllSiblings,
+}) => {
+  const isParent = item.input_type === "section" || item.subItems?.length > 0
+  const marginLeft = level * 20 // Ajusta el sangrado según el nivel
+  const [showGuidanceModal, setShowGuidanceModal] = useState(false) // Estado para controlar la visibilidad del modal
+
+  const isFirstChildOfParent = parentChildren && parentChildren[0]?.checklist_item_id === item.checklist_item_id
+  const currentResponse = itemResponses[item.checklist_item_id]
+
   return (
-    <div style={{ marginLeft: `${marginLeft}px` }} className={`mb-4 ${isParent ? "bg-gray-100 p-3 rounded-md" : "border border-gray-200 rounded-lg p-4"}`}> 
-      <div className={`flex items-center mb-2 ${isParent ? "text-lg font-bold text-gray-800" : "text-md font-medium text-gray-900"}`}>
+    <div
+      style={{ marginLeft: `${marginLeft}px` }}
+      className={`mb-4 ${isParent ? "bg-gray-100 p-3 rounded-md" : "border border-gray-200 rounded-lg p-4"}`}
+    >
+      <div
+        className={`flex items-center mb-2 ${isParent ? "text-lg font-bold text-gray-800" : "text-md font-medium text-gray-900"}`}
+      >
         {item.item_number}. {item.question_text}
         {item.guidance_text && (
-          <button onClick={() => setShowGuidanceModal(true)} className="ml-2 text-blue-500 hover:text-blue-700 focus:outline-none">
+          <button
+            onClick={() => setShowGuidanceModal(true)}
+            className="ml-2 text-blue-500 hover:text-blue-700 focus:outline-none"
+          >
             ℹ️
           </button>
         )}
@@ -121,7 +144,17 @@ const ChecklistItemRenderer = ({ item, level = 0, itemResponses, handleResponseC
 
       {!isParent && (
         <div className="border-t border-gray-200 pt-4 mt-2">
-          <p className="text-sm font-medium text-gray-700 mb-3">Registrar/Actualizar Respuesta:</p>
+          {isFirstChildOfParent &&
+            currentResponse && ( // Muestra el botón solo si es el primer hijo y tiene una respuesta seleccionada
+              <div className="mb-4">
+                <button
+                  onClick={() => handleMarkAllSiblings(parentItem, parentChildren, currentResponse.response_type)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm"
+                >
+                  Marcar todos los hermanos como "{currentResponse.response_type}"
+                </button>
+              </div>
+            )}
 
           <div className="grid grid-cols-3 gap-2 mb-4">
             <label className="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-green-50 transition-colors">
@@ -167,10 +200,7 @@ const ChecklistItemRenderer = ({ item, level = 0, itemResponses, handleResponseC
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Comentario{" "}
-                  {itemResponses[item.checklist_item_id]?.response_type === "no_cumple"
-                    ? "(requerido)"
-                    : "(opcional)"}
-                  :
+                  {itemResponses[item.checklist_item_id]?.response_type === "no_cumple" ? "(requerido)" : "(opcional)"}:
                 </label>
                 <textarea
                   className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -235,6 +265,9 @@ const ChecklistItemRenderer = ({ item, level = 0, itemResponses, handleResponseC
               handleFileUpload={handleFileUpload}
               getEvidenceUrl={getEvidenceUrl}
               user={user}
+              parentItem={item}
+              parentChildren={item.subItems}
+              handleMarkAllSiblings={handleMarkAllSiblings}
             />
           ))}
         </div>
@@ -263,6 +296,12 @@ export default function DailyChecklistSection({
 }) {
   const [showCloseFailureModal, setShowCloseFailureModal] = useState(false)
   const [selectedFailure, setSelectedFailure] = useState(null)
+
+  const handleMarkAllSiblings = (parent, siblings, responseType) => {
+    siblings.forEach((sibling) => {
+      handleResponseTypeChange(sibling.checklist_item_id, responseType)
+    })
+  }
 
   const handleOpenCloseFailureModal = (failure) => {
     setSelectedFailure(failure)
@@ -465,6 +504,9 @@ export default function DailyChecklistSection({
                   handleFileUpload={handleFileUpload}
                   getEvidenceUrl={getEvidenceUrl}
                   user={user}
+                  parentItem={null}
+                  parentChildren={checklist.items}
+                  handleMarkAllSiblings={handleMarkAllSiblings}
                 />
               ))
             ) : (
