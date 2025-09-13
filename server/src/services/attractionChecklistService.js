@@ -83,11 +83,17 @@ const ensureDailyInstance = async ({ attraction_id, premise_id, date, created_by
 /**
  * Recupera una lista de comprobación diaria para una atracción y fecha concretas, estructurada jerárquicamente.
  * Incluye ítems, subítems, respuestas, firmas y cualquier fallo pendiente de listas de control anteriores.
+ * MODIFICADO: Ahora busca el checklist independientemente del role_id para que todos puedan verlo
  */
 const getDailyChecklist = async ({ attraction_id, date }) => {
-  const checklist = await Checklist.findOne({ where: { attraction_id, date } })
+  // Buscar el checklist sin filtrar por created_by para que todos los roles puedan verlo
+  const checklist = await Checklist.findOne({ 
+    where: { attraction_id, date },
+    order: [['createdAt', 'ASC']] // En caso de múltiples, tomar el primero
+  })
 
   if (!checklist) return null
+
   // Obtener elementos jerárquicamente: los elementos raíz incluyen sus subelementos, que incluyen sus respuestas.
   const items = await ChecklistItem.findAll({
     where: {
@@ -131,6 +137,12 @@ const getDailyChecklist = async ({ attraction_id, date }) => {
             required: false,
             include: [
               {
+                model: User,
+                as: "respondedBy",
+                attributes: ["user_id", "user_name"],
+                required: false
+              },
+              {
                 model: Failure,
                 as: "failure",
                 required: false,
@@ -152,9 +164,63 @@ const getDailyChecklist = async ({ attraction_id, date }) => {
         ],
         order: [["item_number", "ASC"]],
       },
+      {
+        model: ChecklistResponse,
+        as: "responses",
+        where: { checklist_id: checklist.checklist_id },
+        required: false,
+        include: [
+          {
+            model: User,
+            as: "respondedBy",
+            attributes: ["user_id", "user_name"],
+            required: false
+          },
+          {
+            model: Failure,
+            as: "failure",
+            required: false,
+            attributes: [
+              "failure_id",
+              "description",
+              "status",
+              "severity",
+              "solution_text",
+              "responsible_area",
+              "closed_at",
+            ],
+            include: [
+              { model: User, as: "closedByUser", attributes: ["user_id", "user_name"] },
+            ],
+          },
+        ],
+      },
     ],
     order: [["item_number", "ASC"]],
   })
+
+  // Convertir valores de respuesta de la DB (boolean) a string para el frontend
+  const convertResponseValues = (item) => {
+    if (item.responses && item.responses.length > 0) {
+      item.responses.forEach(response => {
+        if (response.value === false) { // 0 en la DB
+          response.value = 'no cumple';
+        } else if (response.value === true) { // 1 en la DB
+          if (response.comment && response.comment.trim() !== '') {
+            response.value = 'observación';
+          } else {
+            response.value = 'cumple';
+          }
+        }
+      });
+    }
+
+    if (item.subItems && item.subItems.length > 0) {
+      item.subItems.forEach(convertResponseValues);
+    }
+  };
+
+  items.forEach(convertResponseValues);
 
   // Aplicar orden natural a los sub-ítems después de la carga
   items.forEach(item => {
@@ -166,7 +232,17 @@ const getDailyChecklist = async ({ attraction_id, date }) => {
   // Aplicar orden natural a los ítems de nivel superior
   items.sort(naturalSort);
 
-  const signatures = await ChecklistSignature.findAll({ where: { checklist_id: checklist.checklist_id } })
+  // Incluir información del usuario que respondió en las firmas
+  const signatures = await ChecklistSignature.findAll({ 
+    where: { checklist_id: checklist.checklist_id },
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: ["user_id", "user_name"]
+      }
+    ]
+  })
 
   const previousChecklists = await Checklist.findAll({
     where: { attraction_id, date: { [Op.lt]: date } },
@@ -191,7 +267,11 @@ const getDailyChecklist = async ({ attraction_id, date }) => {
             as: "response",
             include: [
               { model: Checklist, as: "checklist" },
-              { model: ChecklistItem, as: "item" },
+              { 
+                model: ChecklistItem, 
+                as: "item",
+                attributes: ["question_text"] // Especificar atributos para evitar carga de asociaciones no deseadas
+              },
               { model: User, as: "respondedBy", attributes: ["user_id", "user_name"] },
             ],
           },
@@ -213,7 +293,6 @@ const getDailyChecklist = async ({ attraction_id, date }) => {
   }
 }
 
-
 const submitResponses = async ({ checklist_id, responses, responded_by, role_id }) => {
   const transaction = await connection.transaction()
   try {
@@ -224,8 +303,10 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
     const checklist = await Checklist.findByPk(checklist_id, { transaction })
     if (!checklist) throw new Error("Checklist not found")
 
+    const responsePromises = []
+
     for (const response of responses) {
-      const { checklist_item_id, value, comment, evidence_url } = response
+      const { checklist_item_id, value, comment, evidence_url, response_id } = response
 
       const item = await ChecklistItem.findByPk(checklist_item_id, {
         transaction,
@@ -249,44 +330,59 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
         throw new Error(`Responses cannot be submitted for parent items. Item ID: ${checklist_item_id}`)
       }
 
-      const [checklistResponse] = await ChecklistResponse.upsert(
+      // Convert frontend string value to database boolean value (0 or 1)
+      const dbValue = value === 'no cumple' ? 0 : 1;
+
+      const responsePromise = ChecklistResponse.upsert(
         {
+          response_id: response_id || undefined,
           checklist_id,
           checklist_item_id,
-          value,
-          comment,
-          evidence_url,
+          value: dbValue, // Use the boolean value for DB
+          comment: comment || null,
+          evidence_url: evidence_url || null,
           responded_by,
+          responded_at: new Date(),
         },
-        { returning: true, transaction },
-      )
+        { 
+          returning: true, 
+          transaction,
+          conflictFields: ['checklist_id', 'checklist_item_id']
+        },
+      ).then(async ([checklistResponse, created]) => {
+        // Use the original string `value` from the frontend for failure logic
+        const hasFailure = value === "no cumple" || value === "observación";
 
-      const hasFailure = value === 0 || (comment && comment.trim() !== "")
+        if (hasFailure) {
+          // 'observación' -> 'leve', 'no cumple' -> 'crítica'
+          const severity = value === "no cumple" ? "crítica" : "leve";
 
-      if (hasFailure) {
-        let severity = "leve" 
-        if (value === 0) {
-          severity = "critica"
+          await Failure.upsert(
+            {
+              response_id: checklistResponse.response_id,
+              description: comment || "Item does not meet criteria",
+              status: "pendiente",
+              reported_at: new Date(),
+              responded_by: responded_by,
+              severity: severity, 
+            },
+            { transaction },
+          )
+        } else {
+          // If the response is now "cumple", remove any existing pending failure
+          await Failure.destroy({
+            where: { response_id: checklistResponse.response_id, status: "pendiente" },
+            transaction,
+          })
         }
 
-        await Failure.upsert(
-          {
-            response_id: checklistResponse.response_id,
-            description: comment || "Item does not meet criteria",
-            status: "pendiente",
-            reported_at: new Date(),
-            responded_by: responded_by,
-            severity: severity, 
-          },
-          { transaction },
-        )
-      } else {
-        await Failure.destroy({
-          where: { response_id: checklistResponse.response_id, status: "pendiente" },
-          transaction,
-        })
-      }
+        return checklistResponse
+      })
+
+      responsePromises.push(responsePromise)
     }
+
+    await Promise.all(responsePromises)
 
     await ChecklistSignature.findOrCreate({
       where: { checklist_id, user_id: responded_by, role_at_signature: "Tecnico de mantenimiento" },
@@ -295,12 +391,12 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
     })
 
     await transaction.commit()
+    return { success: true, message: "Respuestas guardadas exitosamente" }
   } catch (error) {
     await transaction.rollback()
     throw error
   }
 }
-
 
 const signChecklist = async ({ checklist_id, user_id, role_id }) => {
   const transaction = await connection.transaction()
@@ -367,8 +463,6 @@ const signChecklist = async ({ checklist_id, user_id, role_id }) => {
   }
 }
 
-// Other functions (updateFailure, listObservations, listChecklistsByAttraction) remain unchanged as they are not directly affected by the hierarchy.
-
 /**
  * Updates an existing failure.
  * @param {object} params 
@@ -412,7 +506,6 @@ const updateFailure = async ({ failure_id, solution_text, responsible_area, clos
   }
 }
 
-
 const listObservations = async ({ checklist_id, start_date, end_date }) => {
   const whereClause = {}
 
@@ -447,7 +540,6 @@ const listObservations = async ({ checklist_id, start_date, end_date }) => {
 
   return observations
 }
-
 
 const listChecklistsByAttraction = async (attraction_id) => {
   const checklists = await Checklist.findAll({
