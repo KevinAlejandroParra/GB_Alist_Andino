@@ -21,7 +21,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       value: {
-        type: DataTypes.ENUM('cumple', 'no cumple', 'observación'),
+        type: DataTypes.BOOLEAN,
         allowNull: true, // Inicialmente nulo hasta que se envíe una respuesta
       },
       comment: {
