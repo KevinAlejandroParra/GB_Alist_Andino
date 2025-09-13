@@ -24,18 +24,18 @@ export default function InspectableDetailPage({ params: initialParams }) {
   const [modifiedResponses, setModifiedResponses] = useState(new Set())
   const [isChecklistCollapsed, setIsChecklistCollapsed] = useState(false)
   const [expandedHistoricalChecklists, setExpandedHistoricalChecklists] = useState({})
-  const [hasExistingResponses, setHasExistingResponses] = useState(false) 
+  const [hasExistingResponses, setHasExistingResponses] = useState(false)
 
   const fetchDailyChecklist = useCallback(async () => {
-    if (!user || authLoading || !inspectableId) return;
+    if (!user || authLoading || !inspectableId) return
 
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
 
     try {
-      const today = new Date();
-      const dateString = today.toISOString().split("T")[0];
-      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
+      const today = new Date()
+      const dateString = today.toISOString().split("T")[0]
+      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
 
       const response = await axios.get(
         `${API_URL}/api/att-check/${inspectableId}/checklist/daily?date=${dateString}&role_id=${user.role_id}`,
@@ -43,44 +43,48 @@ export default function InspectableDetailPage({ params: initialParams }) {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
-        }
-      );
-      setChecklist(response.data);
+        },
+      )
 
-      const initialResponses = {};
-      let hasResponses = false;
-      const allAnswerableItems = [];
+      setChecklist(response.data)
 
+      const initialResponses = {}
+      let hasResponses = false
+      const allAnswerableItems = []
+
+      // Procesar ítems de forma recursiva para inicializar respuestas
       const processItems = (items) => {
         if (!items) return;
         items.forEach((item) => {
-          // Initialize responses for the item
-          const existingResponse = item.responses?.[0];
-          if (existingResponse && (existingResponse.value !== null || existingResponse.comment)) {
-            hasResponses = true;
-          }
-          initialResponses[item.checklist_item_id] = {
-            response_id: existingResponse?.response_id || null,
-            value: existingResponse?.value ?? null,
-            comment: existingResponse?.comment ?? "",
-            evidence_url: existingResponse?.evidence_url ?? "",
-            checklist_item_id: item.checklist_item_id,
-            response_type:
-              existingResponse?.value === true
-                ? "cumple"
-                : existingResponse?.value === false
-                ? "no_cumple"
-                : existingResponse?.comment
-                ? "observaciones"
-                : null,
-          };
+          // Si el ítem es contestable (no es una sección), procesar su respuesta.
+          if (item.input_type !== "section") {
+            const existingResponse = item.responses?.[0];
 
-          // If it's a leaf node (an actual question), add to our list for completion check
-          if ((!item.subItems || item.subItems.length === 0) && item.input_type !== 'section') {
+            if (existingResponse && (existingResponse.value !== null || existingResponse.comment)) {
+              hasResponses = true;
+            }
+
+            let response_type = null;
+            if (existingResponse?.value === "cumple") {
+              response_type = "cumple";
+            } else if (existingResponse?.value === "no cumple") {
+              response_type = "no_cumple";
+            } else if (existingResponse?.value === "observación") {
+              response_type = "observaciones";
+            }
+
+            initialResponses[item.checklist_item_id] = {
+              response_id: existingResponse?.response_id || null,
+              value: existingResponse?.value ?? null,
+              comment: existingResponse?.comment ?? "",
+              evidence_url: existingResponse?.evidence_url ?? "",
+              checklist_item_id: item.checklist_item_id,
+              response_type: response_type,
+            };
             allAnswerableItems.push(item);
           }
 
-          // Recursively process sub-items
+          // Si el ítem tiene sub-ítems, procesarlos recursivamente.
           if (item.subItems && item.subItems.length > 0) {
             processItems(item.subItems);
           }
@@ -88,34 +92,27 @@ export default function InspectableDetailPage({ params: initialParams }) {
       };
 
       if (response.data && response.data.items) {
-        processItems(response.data.items);
+        processItems(response.data.items)
       }
 
-      setHasExistingResponses(hasResponses);
-      setItemResponses(initialResponses);
+      setHasExistingResponses(hasResponses)
+      setItemResponses(initialResponses)
 
-      // Check if all answerable items have been answered to collapse the section
       if (allAnswerableItems.length > 0) {
-        const allAnswered = allAnswerableItems.every(
-          (item) => {
-            const res = initialResponses[item.checklist_item_id];
-            // An item is considered answered if it has a non-null value
-            return res && res.value !== null;
-          }
-        );
-        setIsChecklistCollapsed(allAnswered);
+        const allAnswered = allAnswerableItems.every((item) => {
+          const res = initialResponses[item.checklist_item_id]
+          return res && res.value !== null
+        })
+        setIsChecklistCollapsed(allAnswered)
       } else {
-        setIsChecklistCollapsed(false);
+        setIsChecklistCollapsed(false)
       }
-
     } catch (err) {
-      console.error("Error fetching daily checklist:", err);
-      setError(err.message || "Failed to fetch daily checklist.");
-      Swal.fire("Error", err.message || "Error al cargar el checklist diario", "error");
+      setError(err.message || "Failed to fetch daily checklist.")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [inspectableId, user, authLoading]);
+  }, [inspectableId, user, authLoading])
 
   const fetchHistoricalChecklists = useCallback(async () => {
     if (!user || authLoading || !inspectableId) return
@@ -156,13 +153,13 @@ export default function InspectableDetailPage({ params: initialParams }) {
 
       switch (responseType) {
         case "cumple":
-          newValue = true
+          newValue = "cumple"
           break
         case "no_cumple":
-          newValue = false
+          newValue = "no cumple"
           break
         case "observaciones":
-          newValue = true
+          newValue = "observación"
           break
         default:
           newValue = null
@@ -182,11 +179,61 @@ export default function InspectableDetailPage({ params: initialParams }) {
     setModifiedResponses((prev) => new Set(prev).add(itemId))
   }
 
-
   const handleFileUpload = async (itemId, file) => {
     if (!file) return
 
+    const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
+    const maxSize = 5 * 1024 * 1024 // 5MB
+
+    if (!allowedTypes.includes(file.type)) {
+      await Swal.fire({
+        title: "Tipo de archivo no válido",
+        text: "Solo se permiten archivos de imagen (JPEG, PNG, WebP)",
+        icon: "warning",
+        confirmButtonColor: "#7c3aed",
+        confirmButtonText: "Entendido",
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+          confirmButton: "rounded-xl font-semibold px-6 py-3",
+        },
+      })
+      return
+    }
+
+    if (file.size > maxSize) {
+      await Swal.fire({
+        title: "Archivo muy grande",
+        text: "El archivo no debe superar los 5MB",
+        icon: "warning",
+        confirmButtonColor: "#7c3aed",
+        confirmButtonText: "Entendido",
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+          confirmButton: "rounded-xl font-semibold px-6 py-3",
+        },
+      })
+      return
+    }
+
     try {
+      Swal.fire({
+        title: "Subiendo archivo...",
+        text: "Por favor espera mientras se sube la imagen",
+        allowOutsideClick: false,
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+        },
+        didOpen: () => {
+          Swal.showLoading()
+        },
+      })
+
       const formData = new FormData()
       formData.append("evidence", file)
 
@@ -198,50 +245,98 @@ export default function InspectableDetailPage({ params: initialParams }) {
         },
       })
 
-      // Actualizar la URL de evidencia con la ruta del archivo subido
       handleResponseChange(itemId, "evidence_url", response.data.filePath)
 
-      Swal.fire("¡Éxito!", "Archivo subido correctamente", "success")
+      await Swal.fire({
+        title: "¡Éxito!",
+        text: "Archivo subido correctamente",
+        icon: "success",
+        confirmButtonColor: "#7c3aed",
+        timer: 2000,
+        showConfirmButton: false,
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+        },
+      })
     } catch (err) {
-      console.error("Error uploading file:", err)
-      Swal.fire("Error", "Error al subir el archivo", "error")
+      await Swal.fire({
+        title: "Error",
+        text: "Error al subir el archivo. Inténtalo de nuevo.",
+        icon: "error",
+        confirmButtonColor: "#7c3aed",
+        confirmButtonText: "Entendido",
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+          confirmButton: "rounded-xl font-semibold px-6 py-3",
+        },
+      })
     }
   }
 
- const handleSubmitResponses = async () => {
-    if (!user || !checklist) return;
+  const handleSubmitResponses = async () => {
+    if (!user || !checklist) return
 
-    const modifiedResponsesArray = Array.from(modifiedResponses);
+    const modifiedResponsesArray = Array.from(modifiedResponses)
     if (modifiedResponsesArray.length === 0) {
-      Swal.fire("Info", "No hay cambios para guardar", "info");
-      return;
+      await Swal.fire({
+        title: "Sin cambios",
+        text: "No hay cambios para guardar",
+        icon: "info",
+        confirmButtonColor: "#7c3aed",
+        confirmButtonText: "Entendido",
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+          confirmButton: "rounded-xl font-semibold px-6 py-3",
+        },
+      })
+      return
     }
 
-    // Construir un mapa de todos los ítems por ID para una búsqueda fácil
-    const allItems = new Map();
+    const allItems = new Map()
     const collectItems = (items) => {
-      if (!items) return;
-      items.forEach(item => {
-        allItems.set(item.checklist_item_id, item);
+      if (!items) return
+      items.forEach((item) => {
+        allItems.set(item.checklist_item_id, item)
         if (item.subItems) {
-          collectItems(item.subItems);
+          collectItems(item.subItems)
         }
-      });
-    };
-    collectItems(checklist.items);
+      })
+    }
+    collectItems(checklist.items)
 
-    // Filtrar las respuestas para enviar solo las que no son de ítems padre
     const formattedResponses = modifiedResponsesArray
       .map((itemId) => {
-        const item = allItems.get(itemId);
-        
-        // Salvaguarda: No incluir ítems que son padres (no tienen parent_item_id)
+        const item = allItems.get(itemId)
+
         if (!item || item.parent_item_id === null) {
-          console.warn(`Se intentó enviar una respuesta para un ítem padre (ID: ${itemId}). Omitiendo.`);
-          return null;
+          return null
         }
 
-        const response = itemResponses[itemId];
+        const response = itemResponses[itemId]
+
+        if (response.response_type === "no_cumple" && (!response.comment || response.comment.trim() === "")) {
+          Swal.fire({
+            title: "Comentario requerido",
+            text: `El ítem "${item.question_text}" marcado como "No Cumple" requiere un comentario explicativo.`,
+            icon: "warning",
+            confirmButtonColor: "#7c3aed",
+            confirmButtonText: "Entendido",
+            customClass: {
+              popup: "rounded-2xl shadow-2xl",
+              title: "text-slate-800 font-bold",
+              content: "text-slate-600",
+              confirmButton: "rounded-xl font-semibold px-6 py-3",
+            },
+          })
+          return false
+        }
+
         return {
           checklist_id: checklist.checklist_id,
           checklist_item_id: response.checklist_item_id,
@@ -249,30 +344,37 @@ export default function InspectableDetailPage({ params: initialParams }) {
           value: response.value,
           comment: response.comment || null,
           evidence_url: response.evidence_url || null,
-        };
+        }
       })
-      .filter(Boolean); // Eliminar los nulos (ítems padre omitidos)
+      .filter((response) => response !== null)
 
-    if (formattedResponses.length === 0) {
-      Swal.fire("Info", "No hay cambios válidos para guardar (solo se modificaron ítems de sección)", "info");
-      setModifiedResponses(new Set()); // Limpiar el set de modificados
-      return;
+    if (formattedResponses.includes(false)) {
+      return
     }
 
-    const actionText = hasExistingResponses ? "Actualizando" : "Guardando";
-    
+    if (formattedResponses.length === 0) {
+      setModifiedResponses(new Set())
+      return
+    }
+
+    const actionText = hasExistingResponses ? "Actualizando" : "Guardando"
+
     Swal.fire({
-      title: `${actionText} Respuestas...`,
+      title: `${actionText} respuestas...`,
+      text: "Por favor espera mientras se procesan las respuestas",
       allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading();
+      customClass: {
+        popup: "rounded-2xl shadow-2xl",
+        title: "text-slate-800 font-bold",
+        content: "text-slate-600",
       },
-    });
+      didOpen: () => {
+        Swal.showLoading()
+      },
+    })
 
     try {
-      console.log("[v1] Enviando respuestas filtradas:", formattedResponses);
-
-      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
+      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
       await axios.post(
         `${API_URL}/api/att-check/checklists/${checklist.checklist_id}/responses`,
         { responses: formattedResponses },
@@ -280,26 +382,76 @@ export default function InspectableDetailPage({ params: initialParams }) {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
-        }
-      );
+        },
+      )
 
-      const successText = hasExistingResponses ? "actualizadas" : "guardadas";
-      Swal.fire("¡Éxito!", `Respuestas ${successText} exitosamente`, "success");
-      setModifiedResponses(new Set());
-      setHasExistingResponses(true);
-      await fetchDailyChecklist();
+      const successText = hasExistingResponses ? "actualizadas" : "guardadas"
+      await Swal.fire({
+        title: "¡Éxito!",
+        text: `Respuestas ${successText} exitosamente`,
+        icon: "success",
+        confirmButtonColor: "#7c3aed",
+        timer: 2000,
+        showConfirmButton: false,
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+        },
+      })
+
+      setModifiedResponses(new Set())
+      setHasExistingResponses(true)
+      await fetchDailyChecklist()
     } catch (err) {
-      console.error("Error submitting responses:", err);
-      Swal.fire("Error", err.response?.data?.error || "Error al guardar respuestas", "error");
+      await Swal.fire({
+        title: "Error",
+        text: err.response?.data?.error || "Error al guardar respuestas",
+        icon: "error",
+        confirmButtonColor: "#7c3aed",
+        confirmButtonText: "Entendido",
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+          confirmButton: "rounded-xl font-semibold px-6 py-3",
+        },
+      })
     }
   }
 
   const handleCreateDailyChecklist = async () => {
     if (!user || !premiseId) return
 
+    const result = await Swal.fire({
+      title: "Crear Checklist Diario",
+      text: "¿Estás seguro de que deseas crear un nuevo checklist diario?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#7c3aed",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Sí, crear",
+      cancelButtonText: "Cancelar",
+      customClass: {
+        popup: "rounded-2xl shadow-2xl",
+        title: "text-slate-800 font-bold",
+        content: "text-slate-600",
+        confirmButton: "rounded-xl font-semibold px-6 py-3",
+        cancelButton: "rounded-xl font-semibold px-6 py-3",
+      },
+    })
+
+    if (!result.isConfirmed) return
+
     Swal.fire({
-      title: "Creando Checklist Diario...",
+      title: "Creando checklist...",
+      text: "Por favor espera mientras se crea el checklist diario",
       allowOutsideClick: false,
+      customClass: {
+        popup: "rounded-2xl shadow-2xl",
+        title: "text-slate-800 font-bold",
+        content: "text-slate-600",
+      },
       didOpen: () => {
         Swal.showLoading()
       },
@@ -320,52 +472,70 @@ export default function InspectableDetailPage({ params: initialParams }) {
         },
       )
 
-      Swal.fire("¡Éxito!", "Checklist diario creado exitosamente", "success")
+      await Swal.fire({
+        title: "¡Éxito!",
+        text: "Checklist diario creado exitosamente",
+        icon: "success",
+        confirmButtonColor: "#7c3aed",
+        timer: 2000,
+        showConfirmButton: false,
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+        },
+      })
+
       fetchDailyChecklist()
     } catch (err) {
-      console.error("Error creating daily checklist:", err)
-      Swal.fire("Error", err.response?.data?.error || "Error al crear checklist diario", "error")
+      await Swal.fire({
+        title: "Error",
+        text: err.response?.data?.error || "Error al crear checklist diario",
+        icon: "error",
+        confirmButtonColor: "#7c3aed",
+        confirmButtonText: "Entendido",
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+          confirmButton: "rounded-xl font-semibold px-6 py-3",
+        },
+      })
     }
   }
 
-  // Actualizar falla
-  const handleUpdateFailure = async (failureId, newStatus) => {
-    if (!user) return
+  const handleSignChecklist = async () => {
+    if (!user || !checklist) return
 
-    Swal.fire({
-      title: "Actualizando Falla...",
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading()
+    const result = await Swal.fire({
+      title: "Firmar Checklist",
+      text: "¿Estás seguro de que deseas firmar este checklist? Esta acción no se puede deshacer.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#7c3aed",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Sí, firmar",
+      cancelButtonText: "Cancelar",
+      customClass: {
+        popup: "rounded-2xl shadow-2xl",
+        title: "text-slate-800 font-bold",
+        content: "text-slate-600",
+        confirmButton: "rounded-xl font-semibold px-6 py-3",
+        cancelButton: "rounded-xl font-semibold px-6 py-3",
       },
     })
 
-    try {
-      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
-      await axios.put(
-        `${API_URL}/api/att-check/failures/${failureId}`,
-        { status: newStatus },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        },
-      )
-
-      Swal.fire("¡Éxito!", "Falla actualizada exitosamente", "success")
-      fetchDailyChecklist()
-      fetchHistoricalChecklists()
-    } catch (err) {
-      console.error("Error updating failure:", err)
-      Swal.fire("Error", err.response?.data?.error || "Error al actualizar falla", "error")
-    }
-  }
-const handleSignChecklist = async () => {
-    if (!user || !checklist) return
+    if (!result.isConfirmed) return
 
     Swal.fire({
-      title: "Firmando Checklist...",
+      title: "Firmando checklist...",
+      text: "Por favor espera mientras se procesa la firma",
       allowOutsideClick: false,
+      customClass: {
+        popup: "rounded-2xl shadow-2xl",
+        title: "text-slate-800 font-bold",
+        content: "text-slate-600",
+      },
       didOpen: () => {
         Swal.showLoading()
       },
@@ -383,32 +553,75 @@ const handleSignChecklist = async () => {
         },
       )
 
-      Swal.fire("¡Éxito!", "Checklist firmado exitosamente", "success")
+      await Swal.fire({
+        title: "¡Éxito!",
+        text: "Checklist firmado exitosamente",
+        icon: "success",
+        confirmButtonColor: "#7c3aed",
+        timer: 2000,
+        showConfirmButton: false,
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+        },
+      })
+
       fetchDailyChecklist()
     } catch (err) {
-      console.error("Error signing checklist:", err)
       if (err.response?.data?.incompleteItems) {
         const incompleteItems = err.response.data.incompleteItems
 
-        Swal.fire({
+        await Swal.fire({
           title: "Checklist Incompleto",
-          html: `<div style="text-align: left;">
-            <p>Los siguientes ${incompleteItems.length} ítems deben ser respondidos:</p>
-            <div style="max-height: 200px; overflow-y: auto; margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
-              ${incompleteItems
-                .map((item) => `<div style="margin-bottom: 5px;">• ${item.item_number}. ${item.question_text}</div>`)
-                .join("")}
+          html: `
+            <div style="text-align: left; max-height: 400px; overflow-y: auto;">
+              <p style="margin-bottom: 15px; color: #475569;">Los siguientes <strong>${incompleteItems.length}</strong> ítems deben ser respondidos antes de firmar:</p>
+              <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #7c3aed;">
+                ${incompleteItems
+                  .map(
+                    (item) => `
+                    <div style="margin-bottom: 12px; padding: 12px; background: white; border-radius: 8px; border: 2px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                      <strong style="color: #1e293b;">${item.item_number}.</strong> <span style="color: #475569;">${item.question_text}</span>
+                    </div>
+                  `,
+                  )
+                  .join("")}
+              </div>
             </div>
-          </div>`,
+          `,
           icon: "warning",
           confirmButtonText: "Entendido",
+          confirmButtonColor: "#7c3aed",
+          width: "700px",
+          customClass: {
+            popup: "rounded-2xl shadow-2xl",
+            title: "text-slate-800 font-bold",
+            confirmButton: "rounded-xl font-semibold px-6 py-3",
+          },
         })
       } else {
-        Swal.fire("Error", err.response?.data?.error || "Error al firmar checklist", "error")
+        await Swal.fire({
+          title: "Error",
+          text: err.response?.data?.error || "Error al firmar checklist",
+          icon: "error",
+          confirmButtonColor: "#7c3aed",
+          confirmButtonText: "Entendido",
+          customClass: {
+            popup: "rounded-2xl shadow-2xl",
+            title: "text-slate-800 font-bold",
+            content: "text-slate-600",
+            confirmButton: "rounded-xl font-semibold px-6 py-3",
+          },
+        })
       }
     }
   }
-  
+
+  const handleFailureClosed = (failureId) => {
+    fetchDailyChecklist()
+    fetchHistoricalChecklists()
+  }
 
   const toggleHistoricalChecklist = (checklistId) => {
     setExpandedHistoricalChecklists((prev) => ({
@@ -420,10 +633,13 @@ const handleSignChecklist = async () => {
   if (authLoading || loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50 p-6 flex justify-center items-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Cargando checklist...</p>
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex justify-center items-center p-6">
+          <div className="text-center max-w-md mx-auto">
+            <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+              <div className="animate-spin rounded-full h-10 w-10 border-4 border-white border-t-transparent"></div>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800 mb-4">Cargando Sistema de Checklists</h2>
+            <p className="text-slate-600 leading-relaxed">Por favor espera mientras cargamos tu información...</p>
           </div>
         </div>
       </ProtectedRoute>
@@ -432,9 +648,43 @@ const handleSignChecklist = async () => {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">Sistema de Checklists</h1>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-8">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold text-slate-800 text-balance">Sistema de Checklists</h1>
+                <p className="text-slate-600 text-lg">Inspectable ID: {inspectableId}</p>
+              </div>
+            </div>
+
+            <nav className="flex items-center space-x-3 text-sm bg-white px-4 py-3 rounded-xl border-2 border-slate-200 shadow-sm">
+              <button
+                onClick={() => (window.location.href = "/dashboard")}
+                className="text-slate-600 hover:text-purple-600 transition-colors duration-200 font-medium"
+              >
+                Dashboard
+              </button>
+              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-slate-600">Checklist Diario</span>
+              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-slate-800 font-semibold">Inspectable {inspectableId}</span>
+            </nav>
+          </div>
 
           <DailyChecklistSection
             checklist={checklist}
@@ -444,7 +694,6 @@ const handleSignChecklist = async () => {
             setIsChecklistCollapsed={setIsChecklistCollapsed}
             handleResponseChange={handleResponseChange}
             handleResponseTypeChange={handleResponseTypeChange}
-            handleUpdateFailure={handleUpdateFailure}
             handleSubmitResponses={handleSubmitResponses}
             handleSignChecklist={handleSignChecklist}
             handleCreateDailyChecklist={handleCreateDailyChecklist}
@@ -453,6 +702,7 @@ const handleSignChecklist = async () => {
             inspectableId={inspectableId}
             premiseId={premiseId}
             error={error}
+            onFailureClosed={handleFailureClosed}
           />
 
           <HistorySection
