@@ -107,4 +107,58 @@
             "updatedAt": "2025-08-28T17:16:43.000Z"
         }
     }
-]
+],
+    {
+        "ins_id": 10,
+        "family_id": 2,
+        "public_flag": "Sí",
+        "arrival_date": "2025-01-01T00:00:00.000Z",
+        "brand": "Genérica",
+        "createdAt": new Date(),
+        "updatedAt": new Date(),
+        "family": {
+            "family_id": 2,
+            "family_name": "Kiddies",
+            "family_description": "son aquellos dispositivos que ejecutan un movimiento mecanico",
+            "createdAt": new Date(),
+            "updatedAt": new Date(),
+            "is_deleted": true
+        },
+        "inspectable": {
+            "ins_id": 10,
+            "name": "CAPSULE MP5",
+            "description": "Kiddie ride CAPSULE",
+            "photo_url": "/media/default-kiddie.jpg",
+            "type_code": "device",
+            "premise_id": 2,
+            "createdAt": new Date(),
+            "updatedAt": new Date()
+        }
+    },
+    {
+        "ins_id": 11,
+        "family_id": 2,
+        "public_flag": "Sí",
+        "arrival_date": "2025-01-01T00:00:00.000Z",
+        "brand": "Genérica",
+        "createdAt": new Date(),        
+        "updatedAt": new Date(),
+        "family": {
+            "family_id": 2,
+            "family_name": "Kiddies",
+            "family_description": "son aquellos dispositivos que ejecutan un movimiento mecanico",
+            "createdAt": new Date(),
+            "updatedAt": new Date(),
+            "is_deleted": true
+        },
+        "inspectable": {
+            "ins_id": 11,
+            "name": "CARGO EXPRESS",
+            "description": "Kiddie ride CARGO EXPRESS",
+            "photo_url": "/media/default-kiddie.jpg",
+            "type_code": "device",
+            "premise_id": 2,
+            "createdAt": new Date(),
+            "updatedAt": new Date()
+        }
+    }

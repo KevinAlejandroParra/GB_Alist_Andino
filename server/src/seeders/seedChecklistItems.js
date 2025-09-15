@@ -39,46 +39,64 @@ module.exports = {
         // 2. Limpiar items existentes para este tipo de checklist para evitar duplicados
         await queryInterface.bulkDelete('checklist_items', { checklist_type_id: checklistTypeId }, {});
 
-        // 3. Procesar y crear los ítems de forma jerárquica
-        for (const parentItemDef of definition.items) {
-          // Crear el ítem padre (sección)
-          await queryInterface.bulkInsert('checklist_items', [{
-            item_number: parentItemDef.item_number,
-            question_text: parentItemDef.question_text,
-            input_type: 'section',
-            allow_comment: false,
+        // 3. Procesar y crear los ítems
+        if (definition.dynamic_items) {
+          // Para checklists dinámicos, los 'items' son plantillas para los sub-ítems.
+          const templateItems = definition.items.map(itemDef => ({
+            ...itemDef,
             checklist_type_id: checklistTypeId,
-            parent_item_id: null,
+            parent_item_id: null, // Se guardan como ítems raíz, son plantillas
+            input_type: 'radio', // Un tipo de input por defecto para ítems contestables
+            allow_comment: true,
             createdAt: new Date(),
             updatedAt: new Date()
-          }], { returning: true });
-          
-          // bulkInsert con MySQL no devuelve el ID, así que lo buscamos
-          const [insertedParent] = await queryInterface.sequelize.query(
-            `SELECT checklist_item_id FROM checklist_items WHERE item_number = :item_number AND checklist_type_id = :checklist_type_id LIMIT 1;`,
-            {
-              replacements: { item_number: parentItemDef.item_number, checklist_type_id: checklistTypeId },
-              type: Sequelize.QueryTypes.SELECT
-            }
-          );
-
-          if (!insertedParent) {
-            console.error(`Failed to retrieve parent item ${parentItemDef.item_number}.`);
-            continue;
+          }));
+          if (templateItems.length > 0) {
+            await queryInterface.bulkInsert('checklist_items', templateItems, {});
           }
-          const parentItemId = insertedParent.checklist_item_id;
-
-          // Preparar los ítems hijos (preguntas)
-          if (parentItemDef.children && parentItemDef.children.length > 0) {
-            const childItems = parentItemDef.children.map(childDef => ({
-              ...childDef,
+        } else {
+          // Para checklists estáticos, procesar la jerarquía
+          for (const parentItemDef of definition.items) {
+            // Crear el ítem padre (sección)
+            await queryInterface.bulkInsert('checklist_items', [{
+              item_number: parentItemDef.item_number,
+              question_text: parentItemDef.question_text,
+              input_type: 'section',
+              allow_comment: false,
               checklist_type_id: checklistTypeId,
-              parent_item_id: parentItemId,
+              parent_item_id: null,
               createdAt: new Date(),
               updatedAt: new Date()
-            }));
-            // Insertar los ítems hijos
-            await queryInterface.bulkInsert('checklist_items', childItems, {});
+            }], {});
+            
+            // Buscar el ID del padre insertado
+            const [insertedParent] = await queryInterface.sequelize.query(
+              `SELECT checklist_item_id FROM checklist_items WHERE item_number = :item_number AND checklist_type_id = :checklist_type_id AND parent_item_id IS NULL LIMIT 1;`,
+              {
+                replacements: { item_number: parentItemDef.item_number, checklist_type_id: checklistTypeId },
+                type: Sequelize.QueryTypes.SELECT
+              }
+            );
+
+            if (!insertedParent) {
+              console.error(`Failed to retrieve parent item ${parentItemDef.item_number}.`);
+              continue;
+            }
+            const parentItemId = insertedParent.checklist_item_id;
+
+            // Preparar e insertar los ítems hijos
+            if (parentItemDef.children && parentItemDef.children.length > 0) {
+              const childItems = parentItemDef.children.map(childDef => ({
+                ...childDef,
+                checklist_type_id: checklistTypeId,
+                parent_item_id: parentItemId,
+                input_type: childDef.input_type || 'radio', // Tipo de input por defecto
+                allow_comment: childDef.allow_comment !== undefined ? childDef.allow_comment : true,
+                createdAt: new Date(),
+                updatedAt: new Date()
+              }));
+              await queryInterface.bulkInsert('checklist_items', childItems, {});
+            }
           }
         }
       }
