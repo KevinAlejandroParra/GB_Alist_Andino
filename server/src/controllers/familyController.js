@@ -1,4 +1,4 @@
-const { Family, Device } = require("../models");
+const { Family, Device, ChecklistType, ChecklistItem, Inspectable } = require("../models");
 
 const familyController = {
     // Obtener todas las familias
@@ -28,6 +28,72 @@ const familyController = {
         } catch (error) {
             console.error("Error al obtener familia por ID:", error);
             res.status(500).json({ message: "Error interno del servidor al obtener familia." });
+        }
+    },
+
+    async getChecklistForFamily(req, res) {
+        try {
+            const familyId = req.params.id;
+    
+            // 1. Find the checklist type for this family
+            const checklistType = await ChecklistType.findOne({
+                where: { family_id: familyId }
+            });
+    
+            if (!checklistType) {
+                return res.status(404).json({ message: "No se encontró un tipo de checklist para esta familia." });
+            }
+
+            // 2. Find all devices in this family
+            const devices = await Device.findAll({
+                where: { family_id: familyId },
+                include: {
+                    model: Inspectable,
+                    as: 'inspectable',
+                    attributes: ['name']
+                }
+            });
+
+            if (!devices || devices.length === 0) {
+                return res.status(404).json({ message: "No se encontraron dispositivos en esta familia." });
+            }
+
+            // 3. Find the template items for this checklist type
+            const templateItems = await ChecklistItem.findAll({
+                where: {
+                    checklist_type_id: checklistType.checklist_type_id,
+                    parent_item_id: null // Templates are stored as root items
+                },
+                order: [['item_number', 'ASC']]
+            });
+
+            // 4. Dynamically construct the checklist items
+            const dynamicItems = devices.map((device, index) => {
+                return {
+                    // Mocking a parent checklist item structure
+                    checklist_item_id: `device-${device.ins_id}`, // A unique ID for the frontend
+                    item_number: `${index + 1}`,
+                    question_text: device.inspectable.name,
+                    input_type: 'section',
+                    subItems: templateItems.map(template => ({
+                        ...template.toJSON(),
+                        // Create a unique ID for each sub-item instance for the frontend key
+                        checklist_item_id: `template-${template.checklist_item_id}-for-${device.ins_id}`
+                    }))
+                };
+            });
+
+            // 5. Combine and return
+            const checklistData = {
+                ...checklistType.toJSON(),
+                items: dynamicItems
+            };
+
+            res.status(200).json(checklistData);
+    
+        } catch (error) {
+            console.error("Error al obtener el checklist de la familia:", error);
+            res.status(500).json({ message: "Error interno del servidor al obtener el checklist." });
         }
     },
 
