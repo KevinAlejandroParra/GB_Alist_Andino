@@ -20,7 +20,7 @@ module.exports = {
         description: "Playground para niños con estatura superior a 1.10",
         photo_url: "/media/photo-1756401894017-371731366.png",
         type_code: "attraction",
-        premise_id: 3,
+        premise_id: 2,
         createdAt: new Date("2025-08-28T16:50:53.000Z"),
         updatedAt: new Date("2025-08-28T17:24:54.000Z")
       },

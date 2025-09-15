@@ -26,6 +26,14 @@ module.exports = {
         "is_deleted": true,
         "createdAt": new Date(),
         "updatedAt": new Date()
+    },
+        {
+        "family_id": 4,
+        "family_name": "Apoyo",
+        "family_description": "son aquellos videojuegos que generalmente son multijugador y no entregan tickets y no se clasifican en las demas familias",
+        "is_deleted": true,
+        "createdAt": new Date(),
+        "updatedAt": new Date()
     }
 ]);
   },

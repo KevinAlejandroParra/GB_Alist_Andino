@@ -297,7 +297,7 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
   const transaction = await connection.transaction()
   try {
     if (role_id !== 7) {
-      throw new Error("Only maintenance technicians can fill out the checklist.")
+      throw new Error("Sólo los técnicos de mantenimiento pueden rellenar la lista de control.")
     }
 
     const checklist = await Checklist.findByPk(checklist_id, { transaction })

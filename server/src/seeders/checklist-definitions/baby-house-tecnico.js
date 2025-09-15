@@ -1,8 +1,8 @@
 module.exports = {
-  name: "Atracciones – Baby House (V2 OCT 2018)",
+  name: "Atracciones – Baby House (V1 SEP 2025  - BY: Alejandro Parra)",
   description: "Checklist diario de mantenimiento para la atracción Baby House",
   frequency: "diario",
-  version_label: "V2 OCT 2018",
+  version_label: "V1 SEP 2025 - BY: Alejandro Parra",
   role_id: 7, // Corresponde a "Tecnico de mantenimiento"
   attraction_name: "Baby House", // Nombre del inspectable para buscar su ID
   premise_id: 2, // ID del local al que pertenece la atracción
