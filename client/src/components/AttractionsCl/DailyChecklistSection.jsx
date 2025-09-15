@@ -1,6 +1,6 @@
 "use client"
 import { formatLocalDate, formatLocalDateTime } from "../../utils/dateUtils"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 // Modal para cerrar fallas con formulario completo
 const CloseFailureModal = ({ show, onClose, onSubmit, failure }) => {
@@ -296,6 +296,29 @@ export default function DailyChecklistSection({
 }) {
   const [showCloseFailureModal, setShowCloseFailureModal] = useState(false)
   const [selectedFailure, setSelectedFailure] = useState(null)
+  const [isSignedByAdmin, setIsSignedByAdmin] = useState(false)
+  const [isSigning, setIsSigning] = useState(false)
+
+  useEffect(() => {
+    if (user && checklist?.signatures) {
+      const hasSigned = checklist.signatures.some((sig) => sig.user_id === user.user_id)
+      setIsSignedByAdmin(hasSigned)
+    }
+  }, [checklist?.signatures, user])
+
+  const handleAdminSign = async () => {
+    setIsSigning(true)
+    try {
+      await handleSignChecklist() // Llama a la función original
+      setIsSignedByAdmin(true)
+      window.location.reload() // Recarga la página
+    } catch (error) {
+      console.error("Error al firmar el checklist:", error)
+      alert("Hubo un error al firmar el checklist.")
+    } finally {
+      setIsSigning(false)
+    }
+  }
 
   const handleMarkAllSiblings = (parent, siblings, responseType) => {
     siblings.forEach((sibling) => {
@@ -393,7 +416,7 @@ export default function DailyChecklistSection({
     return (
       <div className="bg-white rounded-lg shadow-md p-8 mb-8 text-center">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-          Checklist Diario para el Inspectable {inspectableId}
+          Checklist Diario para la Inspección # {inspectableId}
         </h2>
         <p className="text-gray-700 mb-6">No se encontró un checklist diario para hoy. Haz clic para crear uno.</p>
         <button
@@ -548,10 +571,15 @@ export default function DailyChecklistSection({
             </button>
             {user && user.role_id === 4 && (
               <button
-                onClick={handleSignChecklist}
-                className="px-6 py-2 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-colors"
+                onClick={handleAdminSign}
+                disabled={isSignedByAdmin || isSigning}
+                className={`px-6 py-2 font-medium rounded-md transition-colors ${
+                  isSignedByAdmin || isSigning
+                    ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                    : "bg-green-600 text-white hover:bg-green-700"
+                }`}
               >
-                Firmar Checklist
+                {isSignedByAdmin ? "Firmado" : isSigning ? "Firmando..." : "Firmar Checklist"}
               </button>
             )}
           </div>

@@ -664,7 +664,7 @@ export default function InspectableDetailPage({ params: initialParams }) {
               </div>
               <div>
                 <h1 className="text-4xl font-bold text-slate-800 text-balance">Sistema de Checklists</h1>
-                <p className="text-slate-600 text-lg">Inspectable ID: {inspectableId}</p>
+                <p className="text-slate-600 text-lg">Inspeccionable ID: {inspectableId}</p>
               </div>
             </div>
 
@@ -682,7 +682,7 @@ export default function InspectableDetailPage({ params: initialParams }) {
               <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-              <span className="text-slate-800 font-semibold">Inspectable {inspectableId}</span>
+              <span className="text-slate-800 font-semibold">Inspeccionable {inspectableId}</span>
             </nav>
           </div>
 
