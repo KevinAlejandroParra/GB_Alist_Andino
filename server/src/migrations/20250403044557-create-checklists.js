@@ -64,7 +64,6 @@ module.exports = {
         });
     },
     async down(queryInterface, Sequelize) {
-        await queryInterface.removeColumn('checklists', 'signed_by');
         await queryInterface.dropTable("checklists");
     },
 };
