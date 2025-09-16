@@ -1,25 +1,28 @@
 const express = require("express")
 const router = express.Router()
 const { verifyToken } = require("../middleware/authMiddleware")
-const upload = require("../config/multerConfig") 
+const upload = require("../config/multerConfig")
 const {
-  ensureDailyInstance,
-  getDailyChecklist,
+  ensureChecklistInstance,
+  getLatestChecklist,
   submitResponses,
   updateFailure,
   listObservations,
   signChecklist,
-  listChecklistsByAttraction,
-} = require("../controllers/attractionChecklistController")
+  getChecklistHistory,
+} = require("../controllers/checklistController")
 
-// Rutas existentes para el checklist de atracciones
-router.post("/:id/checklist/ensure", verifyToken, ensureDailyInstance)
-router.get("/:id/checklist/daily", verifyToken, getDailyChecklist)
-router.post("/checklists/:id/responses", verifyToken, submitResponses)
+// Rutas genéricas para checklists
+router.post("/:inspectableId/ensure", verifyToken, ensureChecklistInstance)
+router.get("/:inspectableId/latest", verifyToken, getLatestChecklist)
+router.get("/:inspectableId/history", verifyToken, getChecklistHistory)
+
+// Rutas para respuestas, fallas, etc. 
+router.post("/:id/responses", verifyToken, submitResponses)
 router.put("/failures/:id", verifyToken, updateFailure)
-router.get("/checklists/:id/observations", verifyToken, listObservations)
-router.post("/checklists/:id/sign", verifyToken, signChecklist)
-router.get("/:id/checklists/history", verifyToken, listChecklistsByAttraction)
+router.get("/:id/observations", verifyToken, listObservations)
+router.post("/:id/sign", verifyToken, signChecklist)
+
 
 router.post("/upload-evidence", verifyToken, upload.single("evidence"), (req, res) => {
   try {

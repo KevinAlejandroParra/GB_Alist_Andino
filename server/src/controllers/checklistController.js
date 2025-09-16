@@ -1,14 +1,14 @@
-const attractionChecklistService = require("../services/attractionChecklistService")
+const checklistService = require("../services/checklistService")
 
-const ensureDailyInstance = async (req, res) => {
+const ensureChecklistInstance = async (req, res) => {
   try {
-    const { id: attraction_id } = req.params
+    const { inspectableId } = req.params
     const { premise_id, date } = req.body
     const user_id = req.user.user_id
     const role_id = req.user.role_id
 
-    const checklist = await attractionChecklistService.ensureDailyInstance({
-      attraction_id: Number.parseInt(attraction_id),
+    const checklist = await checklistService.ensureChecklistInstance({
+      inspectableId: Number.parseInt(inspectableId),
       premise_id,
       date,
       created_by: user_id,
@@ -20,12 +20,12 @@ const ensureDailyInstance = async (req, res) => {
   }
 }
 
-const getDailyChecklist = async (req, res) => {
+const getLatestChecklist = async (req, res) => {
   try {
-    const { id: attraction_id } = req.params
+    const { inspectableId } = req.params
     const { date } = req.query
-    const checklist = await attractionChecklistService.getDailyChecklist({
-      attraction_id: Number.parseInt(attraction_id),
+    const checklist = await checklistService.getLatestChecklist({
+      inspectableId: Number.parseInt(inspectableId),
       date,
     })
     res.status(200).json(checklist)
@@ -40,7 +40,7 @@ const submitResponses = async (req, res) => {
     const { responses } = req.body
     const user_id = req.user.user_id
     const role_id = req.user.role_id
-    await attractionChecklistService.submitResponses({
+    await checklistService.submitResponses({
       checklist_id: Number.parseInt(checklist_id),
       responses,
       responded_by: user_id,
@@ -82,7 +82,7 @@ const updateFailure = async (req, res) => {
       closed_by,
     }
 
-    const updatedFailure = await attractionChecklistService.updateFailure(updateData)
+    const updatedFailure = await checklistService.updateFailure(updateData)
     res.status(200).json({
       success: true,
       message: "Falla actualizada exitosamente",
@@ -100,7 +100,7 @@ const updateFailure = async (req, res) => {
 const listObservations = async (req, res) => {
   try {
     const { checklist_id, start_date, end_date } = req.query
-    const observations = await attractionChecklistService.listObservations({
+    const observations = await checklistService.listObservations({
       checklist_id: checklist_id ? Number.parseInt(checklist_id) : undefined,
       start_date,
       end_date,
@@ -117,7 +117,7 @@ const signChecklist = async (req, res) => {
     const user_id = req.user.user_id
     const role_id = req.user.role_id
 
-    await attractionChecklistService.signChecklist({
+    await checklistService.signChecklist({
       checklist_id: Number.parseInt(checklist_id),
       user_id,
       role_id,
@@ -137,10 +137,10 @@ const signChecklist = async (req, res) => {
     }
   }
 }
-const listChecklistsByAttraction = async (req, res) => {
+const getChecklistHistory = async (req, res) => {
   try {
-    const { id: attraction_id } = req.params
-    const checklists = await attractionChecklistService.listChecklistsByAttraction(Number.parseInt(attraction_id))
+    const { inspectableId } = req.params
+    const checklists = await checklistService.getChecklistHistory(Number.parseInt(inspectableId))
     res.status(200).json(checklists)
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -148,11 +148,11 @@ const listChecklistsByAttraction = async (req, res) => {
 }
 
 module.exports = {
-  ensureDailyInstance,
-  getDailyChecklist,
+  ensureChecklistInstance,
+  getLatestChecklist,
   submitResponses,
   updateFailure,
   listObservations,
   signChecklist,
-  listChecklistsByAttraction,
+  getChecklistHistory,
 }
