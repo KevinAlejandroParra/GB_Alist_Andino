@@ -26,10 +26,19 @@ module.exports = {
             },
             attraction_id: {
                 type: DataTypes.INTEGER,
-                allowNull: false,
+                allowNull: true,
                 references: {
                     model: 'attractions',
                     key: 'ins_id',
+                },
+                onDelete: 'CASCADE',
+            },
+            family_id: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                references: {
+                    model: 'families',
+                    key: 'family_id',
                 },
                 onDelete: 'CASCADE',
             },

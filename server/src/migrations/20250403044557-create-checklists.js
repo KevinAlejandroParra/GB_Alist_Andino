@@ -15,9 +15,15 @@ module.exports = {
                 type: Sequelize.INTEGER,
                 allowNull: false,
             },
-            attraction_id: {
+            inspectable_id: {
                 type: Sequelize.INTEGER,
                 allowNull: false,
+                references: {
+                    model: 'inspectables',
+                    key: 'ins_id',
+                },
+                onUpdate: 'CASCADE',
+                onDelete: 'CASCADE',
             },
             checklist_type_id: {
                 type: Sequelize.INTEGER,
@@ -58,9 +64,9 @@ module.exports = {
             },
         });
         await queryInterface.addConstraint('checklists', {
-            fields: ['checklist_type_id', 'attraction_id', 'date'],
+            fields: ['checklist_type_id', 'inspectable_id', 'date'],
             type: 'unique',
-            name: 'unique_checklist_per_type_attraction_and_date'
+            name: 'unique_checklist_per_type_inspectable_and_date'
         });
     },
     async down(queryInterface, Sequelize) {
