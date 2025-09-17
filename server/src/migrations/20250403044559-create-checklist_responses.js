@@ -20,9 +20,9 @@ module.exports = {
                 allowNull: false,
             },
             value: {
-                type: Sequelize.BOOLEAN,
-                allowNull: false,
-            },
+                type: DataTypes.ENUM("cumple", "observación", "no cumple"),
+                allowNull: true, 
+              },
             comment: {
                 type: Sequelize.STRING,
             },
@@ -32,6 +32,16 @@ module.exports = {
             responded_by: {
                 type: Sequelize.INTEGER,
                 allowNull: false,
+            },
+            inspectable_id: {
+                type: Sequelize.INTEGER,
+                allowNull: true,
+                references: {
+                    model: 'inspectables',
+                    key: 'ins_id',
+                },
+                onUpdate: 'CASCADE',
+                onDelete: 'SET NULL',
             },
             createdAt: {
                 type: Sequelize.DATE,

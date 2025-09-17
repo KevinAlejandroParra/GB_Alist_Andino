@@ -21,8 +21,8 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       value: {
-        type: DataTypes.BOOLEAN,
-        allowNull: true, // Inicialmente nulo hasta que se envíe una respuesta
+        type: DataTypes.ENUM("cumple", "observación", "no cumple"),
+        allowNull: true, // Permitir nulo inicialmente si no hay respuesta
       },
       comment: {
         type: DataTypes.STRING,
@@ -33,6 +33,10 @@ module.exports = (sequelize, DataTypes) => {
       responded_by: {
         type: DataTypes.INTEGER,
         allowNull: false,
+      },
+      inspectable_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
       },
     },
     {
