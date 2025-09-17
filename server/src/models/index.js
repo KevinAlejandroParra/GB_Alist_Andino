@@ -83,6 +83,7 @@ Object.values(models).forEach(model => {
 // Un Premise puede tener muchos Inspectables (Device o Attraction)
 Premise.hasMany(Inspectable, { as: "inspectables", foreignKey: "premise_id" });
 Inspectable.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
+Inspectable.hasMany(Checklist, { as: "checklists", foreignKey: "inspectable_id" });
 
 // Herencia de Inspectable (Single Table Inheritance)
 // Device y Attraction heredan de Inspectable a través de type_code
@@ -130,7 +131,6 @@ User.hasMany(ChecklistSignature, { as: "signatures", foreignKey: "user_id" });
 // 2. Asociaciones de Role
 Role.hasMany(User, { as: "users", foreignKey: "role_id" });
 Role.hasMany(ChecklistType, { as: "checklistTypes", foreignKey: "role_id" });
-Role.hasMany(ChecklistItem, { as: "checklistItems", foreignKey: "role_id" });
 
 // 3. Asociaciones de Premise
 Premise.hasMany(User, { as: "users", foreignKey: "premise_id" });
@@ -143,21 +143,20 @@ ChecklistType.belongsTo(Role, { as: "role", foreignKey: "role_id" });
 ChecklistType.hasMany(Checklist, { as: "checklists", foreignKey: "checklist_type_id" });
 ChecklistType.hasMany(ChecklistItem, { as: "items", foreignKey: "checklist_type_id" });
 ChecklistType.belongsTo(Attraction, { as: "attraction", foreignKey: "attraction_id" });
+ChecklistType.belongsTo(Family, { as: "family", foreignKey: "family_id" });
 
 // 5. Asociaciones de Checklist
 Checklist.belongsTo(ChecklistType, { as: "type", foreignKey: "checklist_type_id" });
 Checklist.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
-Checklist.belongsTo(Attraction, { as: "attraction", foreignKey: "attraction_id" });
+Checklist.belongsTo(Inspectable, { as: "inspectable", foreignKey: "inspectable_id" });
 Checklist.belongsTo(User, { as: "creator", foreignKey: "created_by" });
 Checklist.belongsTo(User, { as: "signer", foreignKey: "signed_by" });
 Checklist.hasMany(ChecklistResponse, { as: "responses", foreignKey: "checklist_id" });
 Checklist.hasMany(ChecklistSignature, { as: "signatures", foreignKey: "checklist_id" });
-Checklist.hasMany(ChecklistItem, { as: "items", foreignKey: "checklist_type_id" }); 
 
 // 6. Asociaciones de ChecklistItem
 // La asociación hasMany con ChecklistResponse se define ahora dentro del modelo ChecklistItem.
 ChecklistItem.belongsTo(ChecklistType, { as: "type", foreignKey: "checklist_type_id" });
-ChecklistItem.belongsTo(Role, { as: "role", foreignKey: "role_id" }); // Nueva asociación
 
 // 7. Asociaciones de ChecklistResponse
 // Una respuesta pertenece a un elemento específico de la lista de comprobación.
@@ -179,6 +178,7 @@ ChecklistResponse.hasOne(Failure, {
     foreignKey: 'response_id',
     as: 'failure',
 });
+ChecklistResponse.belongsTo(Inspectable, { as: "inspectable", foreignKey: "inspectable_id" });
 
 // 8. Asociaciones de Failure
 Failure.belongsTo(ChecklistResponse, {
