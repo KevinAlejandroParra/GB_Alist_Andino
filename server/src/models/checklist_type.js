@@ -7,7 +7,7 @@ module.exports = (sequelize, DataTypes) => {
         {
             checklist_type_id: {
                 type: DataTypes.INTEGER,
-                defaultValue: DataTypes.INTEGER,
+                autoIncrement: true,
                 primaryKey: true,
             },
             name: {
@@ -27,10 +27,19 @@ module.exports = (sequelize, DataTypes) => {
             },
             attraction_id: {
                 type: DataTypes.INTEGER,
-                allowNull: false,
+                allowNull: true,
                 references: {
                     model: 'attractions',
                     key: 'ins_id',
+                },
+                onDelete: 'CASCADE',
+            },
+            family_id: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                references: {
+                    model: 'families',
+                    key: 'family_id',
                 },
                 onDelete: 'CASCADE',
             },
@@ -55,6 +64,16 @@ module.exports = (sequelize, DataTypes) => {
             modelName: "ChecklistType",
             timestamps: true,
             tableName: "checklist_types",
+            validate: {
+                eitherAttractionOrFamily() {
+                    if (this.attraction_id && this.family_id) {
+                        throw new Error('A checklist type cannot be associated with both an attraction and a family.');
+                    }
+                    if (!this.attraction_id && !this.family_id) {
+                        throw new Error('A checklist type must be associated with either an attraction or a family.');
+                    }
+                }
+            }
         }
     );
     return ChecklistType;
