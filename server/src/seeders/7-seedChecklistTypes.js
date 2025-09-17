@@ -21,33 +21,59 @@ module.exports = {
 
     try {
       for (const definition of checklistDefinitions) {
-        // Buscar la atracción por nombre y local para obtener su ID
-        const [attraction] = await queryInterface.sequelize.query(
-          `SELECT a.ins_id FROM attractions a 
-           INNER JOIN inspectables i ON a.ins_id = i.ins_id 
-           WHERE i.name = :attraction_name AND i.premise_id = :premise_id LIMIT 1;`,
-          {
-            replacements: { 
-              attraction_name: definition.attraction_name,
-              premise_id: definition.premise_id
-            },
-            type: Sequelize.QueryTypes.SELECT 
-          }
-        );
+        let association = {};
 
-        if (!attraction) {
-          console.error(`Attraction '${definition.attraction_name}' not found for premise ${definition.premise_id}. Skipping this checklist type.`);
-          continue; // Saltar al siguiente
+        if (definition.attraction_name && definition.premise_id) {
+          const [attraction] = await queryInterface.sequelize.query(
+            `SELECT a.ins_id FROM attractions a 
+             INNER JOIN inspectables i ON a.ins_id = i.ins_id 
+             WHERE i.name = :attraction_name AND i.premise_id = :premise_id LIMIT 1;`,
+            {
+              replacements: { 
+                attraction_name: definition.attraction_name,
+                premise_id: definition.premise_id
+              },
+              type: Sequelize.QueryTypes.SELECT 
+            }
+          );
+
+          if (!attraction) {
+            console.error(`Attraction '${definition.attraction_name}' not found for premise ${definition.premise_id}. Skipping this checklist type.`);
+            continue;
+          }
+          association.attraction_id = attraction.ins_id;
+
+        } else if (definition.family_name) {
+          const [family] = await queryInterface.sequelize.query(
+            `SELECT family_id FROM families WHERE family_name = :family_name LIMIT 1;`,
+            {
+              replacements: { family_name: definition.family_name },
+              type: Sequelize.QueryTypes.SELECT
+            }
+          );
+
+          if (!family) {
+            console.error(`Family '${definition.family_name}' not found. Skipping this checklist type.`);
+            continue;
+          }
+          association.family_id = family.family_id;
+
+        } else {
+          console.error(`Checklist definition '${definition.name}' has no association (attraction or family). Skipping.`);
+          continue;
         }
 
-        // Crear o actualizar el tipo de checklist
+        // Limpiar para evitar duplicados por nombre
+        await queryInterface.bulkDelete('checklist_types', { name: definition.name }, {});
+
+        // Crear el tipo de checklist
         await queryInterface.bulkInsert('checklist_types', [{
           name: definition.name,
           description: definition.description,
           frequency: definition.frequency,
           version_label: definition.version_label,
-          attraction_id: attraction.ins_id,
           role_id: definition.role_id,
+          ...association,
           createdAt: new Date(),
           updatedAt: new Date(),
         }], {});
@@ -60,7 +86,6 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    // Eliminar todos los tipos de checklist que están en las definiciones
     const typeNames = checklistDefinitions.map(def => def.name);
     if (typeNames.length > 0) {
       await queryInterface.bulkDelete('checklist_types', {
