@@ -107,7 +107,7 @@ const DeviceManagement = () => {
         try {
             const formData = new FormData();
             for (const key in editingDevice) {
-                if (key === 'photo_url' && editingDevicePhoto) {
+                if (key === 'photo_url') {
                     continue; 
                 }
                 if (key !== 'inspectable' && key !== 'family' && key !== 'relatedAttractions' && key !== 'name' && key !== 'description' && key !== 'premise_id') {
