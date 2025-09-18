@@ -57,7 +57,7 @@ const deviceData = [
         inspectable: {
             name: "CAPSULE MP5",
             description: "Kiddie ride CAPSULE",
-            photo_url: "/media/default-kiddie.jpg",
+            photo_url: "/images/resources/nf.jpg",
             premise_id: 2
         }
     },
@@ -69,7 +69,7 @@ const deviceData = [
         inspectable: {
             name: "CARGO EXPRESS",
             description: "Kiddie ride CARGO EXPRESS",
-            photo_url: "/media/default-kiddie.jpg",
+            photo_url: "/images/resources/nf.jpg",
             premise_id: 2
         }
     }

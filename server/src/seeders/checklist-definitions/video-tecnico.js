@@ -24,12 +24,12 @@ const subItemTemplates = [
 ];
 
 module.exports = {
-  name: 'Kiddies',
-  description: 'Checklist semanal de mantenimiento para la familia Kiddies',
+  name: 'Video',
+  description: 'Checklist semanal de mantenimiento para la familia Video',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
   role_id: 7, // Corresponde a "Tecnico de mantenimiento"
-  family_name: 'Kiddies',
+  family_name: 'Video',
   dynamic_items: 'device', 
   items: subItemTemplates, 
 };
