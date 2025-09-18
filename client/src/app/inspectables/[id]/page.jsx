@@ -1,17 +1,17 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
+import { formatLocalDate, formatLocalDateTime } from "../../../utils/dateUtils"
 import ProtectedRoute from "../../../components/ProtectedRoute"
 import { useAuth } from "../../../components/AuthContext"
-import DailyChecklistSection from "../../../components/AttractionsCl/DailyChecklistSection"
-import HistorySection from "../../../components/AttractionsCl/HistorySection"
+import DailyChecklistSection from "../../../components/checklist/DailyChecklistSection" // Updated path
+import HistorySection from "../../../components/checklist/HistorySection" // Updated path
 import axios from "axios"
 import Swal from "sweetalert2"
 import { useSearchParams } from "next/navigation"
 
-export default function InspectableDetailPage({ params: initialParams }) {
-  const params = React.use(initialParams)
-  const inspectableId = params.id
+export default function InspectableDetailPage({ params }) {
+  const inspectableId = React.use(params).id;
   const searchParams = useSearchParams()
   const premiseId = searchParams.get("premiseId")
 
@@ -38,7 +38,7 @@ export default function InspectableDetailPage({ params: initialParams }) {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
 
       const response = await axios.get(
-        `${API_URL}/api/att-check/${inspectableId}/checklist/daily?date=${dateString}&role_id=${user.role_id}`,
+        `${API_URL}/api/checklists/${inspectableId}/latest?date=${dateString}&role_id=${user.role_id}`, // Updated API endpoint
         {
           headers: {
             Authorization: `Bearer ${user.token}`,
@@ -119,7 +119,7 @@ export default function InspectableDetailPage({ params: initialParams }) {
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
-      const response = await axios.get(`${API_URL}/api/att-check/${inspectableId}/checklists/history`, {
+      const response = await axios.get(`${API_URL}/api/checklists/${inspectableId}/history`, { // Updated API endpoint
         headers: {
           Authorization: `Bearer ${user.token}`,
         },
@@ -238,7 +238,7 @@ export default function InspectableDetailPage({ params: initialParams }) {
       formData.append("evidence", file)
 
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
-      const response = await axios.post(`${API_URL}/api/att-check/upload-evidence`, formData, {
+      const response = await axios.post(`${API_URL}/api/checklists/upload-evidence`, formData, { // Updated API endpoint
         headers: {
           Authorization: `Bearer ${user.token}`,
           "Content-Type": "multipart/form-data",
@@ -376,7 +376,7 @@ export default function InspectableDetailPage({ params: initialParams }) {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
       await axios.post(
-        `${API_URL}/api/att-check/checklists/${checklist.checklist_id}/responses`,
+        `${API_URL}/api/checklists/${checklist.checklist_id}/responses`,
         { responses: formattedResponses },
         {
           headers: {
@@ -463,7 +463,7 @@ export default function InspectableDetailPage({ params: initialParams }) {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
 
       await axios.post(
-        `${API_URL}/api/att-check/${inspectableId}/checklist/ensure`,
+        `${API_URL}/api/checklists/${inspectableId}/ensure`,
         { premise_id: Number.parseInt(premiseId), date: dateString },
         {
           headers: {
@@ -544,7 +544,7 @@ export default function InspectableDetailPage({ params: initialParams }) {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
       await axios.post(
-        `${API_URL}/api/att-check/checklists/${checklist.checklist_id}/sign`,
+        `${API_URL}/api/checklists/${checklist.checklist_id}/sign`,
         {},
         {
           headers: {
@@ -618,7 +618,7 @@ export default function InspectableDetailPage({ params: initialParams }) {
     }
   }
 
-  const handleFailureClosed = (failureId) => {
+  const handleFailureClosed = () => { // Removed failureId param as it's not used here directly
     fetchDailyChecklist()
     fetchHistoricalChecklists()
   }
