@@ -14,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.INTEGER,
                 allowNull: false,
             },
-            attraction_id: {
+            inspectable_id: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
             },

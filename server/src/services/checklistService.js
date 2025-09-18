@@ -8,15 +8,14 @@ const {
   Role,
   ChecklistType,
   User,
-  Sequelize,
   Inspectable,
   Device,
   Attraction,
   Family,
 } = require("../models")
+const { Sequelize } = require("../models");
 const Op = Sequelize.Op
 
-// Helper function for natural sort
 const naturalSort = (a, b) => {
   const parse = (s) => (s || "").split(".").map(Number)
   const aa = parse(a.item_number)
@@ -30,7 +29,7 @@ const naturalSort = (a, b) => {
   return 0
 }
 
-const getChecklistTypeForInspectable = async (inspectableId, role_id, transaction) => {
+const getChecklistTypeForInspectable = async (inspectableId, request_role_id, transaction) => {
   const inspectable = await Inspectable.findByPk(inspectableId, {
     include: [{ model: Device, as: "deviceData", include: ["family"] }],
     transaction,
@@ -40,15 +39,18 @@ const getChecklistTypeForInspectable = async (inspectableId, role_id, transactio
     throw new Error(`Inspectable with ID ${inspectableId} not found.`)
   }
 
+  // buscar el tipo de checklist asociado al rol que opera el checklist 
+  const targetRoleId = (request_role_id === 4 || request_role_id === 1) ? 7 : request_role_id; 
+
   let checklistType
   if (inspectable.type_code === "attraction") {
     checklistType = await ChecklistType.findOne({
-      where: { attraction_id: inspectableId, role_id },
+      where: { attraction_id: inspectableId, role_id: targetRoleId },
       transaction,
     })
   } else if (inspectable.type_code === "device" && inspectable.deviceData && inspectable.deviceData.family) {
     checklistType = await ChecklistType.findOne({
-      where: { family_id: inspectable.deviceData.family.family_id, role_id },
+      where: { family_id: inspectable.deviceData.family.family_id, role_id: targetRoleId },
       transaction,
     })
   } else {
@@ -56,48 +58,52 @@ const getChecklistTypeForInspectable = async (inspectableId, role_id, transactio
   }
 
   if (!checklistType) {
-    throw new Error(`No checklist type found for inspectable ${inspectableId} and role ${role_id}.`)
+    throw new Error(`No checklist type found for inspectable ${inspectableId} and role ${request_role_id}.`)
   }
 
   return checklistType
 }
 
 const getDateRange = (date, frequency) => {
-  const targetDate = new Date(date)
-  if (frequency === "diario") {
-    const startDate = new Date(targetDate)
-    startDate.setUTCHours(0, 0, 0, 0)
-    const endDate = new Date(targetDate)
-    endDate.setUTCHours(23, 59, 59, 999)
-    return { [Op.between]: [startDate, endDate] }
-  } else if (frequency === "semanal") {
-    const dayOfWeek = targetDate.getUTCDay()
-    const startDate = new Date(targetDate)
-    startDate.setUTCDate(targetDate.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1))
-    startDate.setUTCHours(0, 0, 0, 0)
+  const targetDate = new Date(date);
 
-    const endDate = new Date(startDate)
-    endDate.setUTCDate(startDate.getUTCDate() + 6)
-    endDate.setUTCHours(23, 59, 59, 999)
-    return { [Op.between]: [startDate, endDate] }
+  if (isNaN(targetDate.getTime())) {
+    return { dateError: `Invalid date: ${date}` }; 
   }
-  return { [Op.eq]: date }
-}
+
+  const normalizedTargetDate = new Date(targetDate.setUTCHours(0, 0, 0, 0));
+
+  if (frequency === "diario") {
+    const startDate = new Date(normalizedTargetDate);
+    startDate.setUTCHours(0, 0, 0, 0); 
+    const endDate = new Date(normalizedTargetDate);
+    endDate.setUTCHours(23, 59, 59, 999);
+    return { [Op.between]: [startDate, endDate] };
+  } else if (frequency === "semanal") {
+    const dayOfWeek = normalizedTargetDate.getUTCDay();
+    const startDate = new Date(normalizedTargetDate);
+    startDate.setUTCDate(normalizedTargetDate.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    const endDate = new Date(startDate);
+    endDate.setUTCDate(startDate.getUTCDate() + 6);
+    endDate.setUTCHours(23, 59, 59, 999);
+    return { [Op.between]: [startDate, endDate] };
+  }
+
+  return { [Op.eq]: normalizedTargetDate };
+};
 
 const ensureChecklistInstance = async ({ inspectableId, premise_id, date, created_by, role_id }) => {
   let transaction
   try {
     transaction = await connection.transaction()
 
-    if (role_id !== 7) {
-      throw new Error("Solo el técnico de mantenimiento puede crear o acceder a su checklist.")
-    }
-
     const checklistType = await getChecklistTypeForInspectable(inspectableId, role_id, transaction)
     const dateCondition = getDateRange(date, checklistType.frequency)
 
-    const existingChecklist = await Checklist.findOne({
-      where: { inspectable_id: inspectableId, date: dateCondition, created_by },
+    let existingChecklist = await Checklist.findOne({
+      where: { inspectable_id: inspectableId, date: dateCondition },
       transaction,
     })
 
@@ -106,12 +112,17 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, date, create
       return getLatestChecklist({ inspectableId, date, role_id })
     }
 
+    // Si no existe un checklist, solo el técnico de mantenimiento puede crearlo
+    if (role_id !== 7) {
+      throw new Error("Solo el técnico de mantenimiento puede crear un nuevo checklist.")
+    }
+
     await Checklist.create(
       {
         checklist_type_id: checklistType.checklist_type_id,
         premise_id,
         inspectable_id: inspectableId,
-        date: new Date(date),
+        date: new Date(new Date(date).setUTCHours(0, 0, 0, 0)),
         created_by,
         version_label: checklistType.version_label,
       },
@@ -127,21 +138,26 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, date, create
 }
 
 const getLatestChecklist = async ({ inspectableId, date, role_id }) => {
-  const queryRole = role_id || 7
-  const definitiveChecklistType = await getChecklistTypeForInspectable(inspectableId, queryRole)
-  const dateCondition = getDateRange(date, definitiveChecklistType.frequency)
-
+  const normalizedInputDate = new Date(new Date(date).setUTCHours(0, 0, 0, 0));
+  const queryRole = role_id || 7;
+  const definitiveChecklistType = await getChecklistTypeForInspectable(inspectableId, queryRole);
+  const dateCondition = getDateRange(normalizedInputDate, definitiveChecklistType.frequency);
+  const whereClause = { inspectable_id: inspectableId, date: dateCondition };
   const checklist = await Checklist.findOne({
-    where: { inspectable_id: inspectableId, date: dateCondition },
+    where: whereClause,
     order: [["createdAt", "ASC"]],
     include: [{ model: ChecklistType, as: "type" }],
-  })
+  });
 
   if (!checklist) return null
 
+  if (!checklist.type) {
+    throw new Error(`Checklist with ID ${checklist.checklist_id} has a missing or invalid checklist type.`);
+  }
+
   let items = []
 
-  // If it is a family checklist, build items dynamically
+  // si es un checklist de familia, se deben obtener los dispositivos de la familia
   if (checklist.type.family_id) {
     const devices = await Device.findAll({
       where: { family_id: checklist.type.family_id },
@@ -177,7 +193,7 @@ const getLatestChecklist = async ({ inspectableId, date, role_id }) => {
                 // This is the real item ID, but we need to distinguish it per device on the frontend
                 unique_frontend_id: `${device.ins_id}-${template.checklist_item_id}`,
                 inspectable_id_for_response: device.ins_id, // Pass device ID for submitting response
-                responses: response ? [response] : [],
+                responses: response ? [response] : [], // response.value ya es ENUM
             }
         })
       }
@@ -185,7 +201,7 @@ const getLatestChecklist = async ({ inspectableId, date, role_id }) => {
     });
 
   } else {
-    // For non-family checklists, fetch items statically as before
+    // si no es un checklist de familia, se deben obtener los items estáticamente
     items = await ChecklistItem.findAll({
       where: {
         checklist_type_id: checklist.checklist_type_id,
@@ -243,10 +259,46 @@ const getLatestChecklist = async ({ inspectableId, date, role_id }) => {
     include: [{ model: User, as: "user", attributes: ["user_id", "user_name"] }],
   })
 
+  const pending_failures = await Failure.findAll({
+    where: {
+      status: 'pendiente'
+    },
+    include: [
+      {
+        model: ChecklistResponse,
+        as: 'response',
+        required: true,
+        include: [
+          {
+            model: Checklist,
+            as: 'checklist',
+            where: {
+              inspectable_id: inspectableId,
+              date: { [Op.lt]: checklist.date }
+            },
+            required: true
+          },
+          {
+            model: ChecklistItem,
+            as: 'item',
+            attributes: ['question_text']
+          },
+          {
+            model: User,
+            as: 'respondedBy',
+            attributes: ['user_name']
+          }
+        ]
+      }
+    ],
+    order: [['reported_at', 'ASC']]
+  });
+
   return {
     ...checklist.toJSON(),
     items,
     signatures,
+    pending_failures
   }
 }
 
@@ -275,26 +327,33 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
       throw new Error("Sólo los técnicos de mantenimiento pueden rellenar la lista de control.")
     }
 
-    const checklist = await Checklist.findByPk(checklist_id, { transaction })
+    const checklist = await Checklist.findByPk(checklist_id, { 
+      include: [{ model: ChecklistType, as: "type" }],
+      transaction 
+    })
     if (!checklist) throw new Error("Checklist not found")
 
+    if (!checklist.type) {
+      throw new Error(`Checklist with ID ${checklist.checklist_id} has a missing or invalid checklist type.`);
+    }
+
     for (const response of responses) {
-      const { checklist_item_id, value, comment, evidence_url, response_id, inspectable_id } = response // Added inspectable_id
+      const { checklist_item_id, value, comment, evidence_url, response_id, inspectable_id } = response 
 
       const item = await ChecklistItem.findByPk(checklist_item_id, { transaction })
       if (!item || item.checklist_type_id !== checklist.checklist_type_id) {
         throw new Error(`Item with ID ${checklist_item_id} is not valid for this checklist.`)
       }
 
-      const dbValue = value === "no cumple" ? 0 : 1
+    
 
       const [checklistResponse] = await ChecklistResponse.upsert(
         {
           response_id: response_id || undefined,
           checklist_id,
           checklist_item_id,
-          inspectable_id: checklist.type.family_id ? inspectable_id : null, // Save inspectable_id only for family checklists
-          value: dbValue,
+          inspectable_id: checklist.type.family_id ? inspectable_id : null,
+          value: value, 
           comment: comment || null,
           evidence_url: evidence_url || null,
           responded_by,
@@ -343,13 +402,12 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
   }
 }
 
-// ... (rest of the file is unchanged)
 
 const signChecklist = async ({ checklist_id, user_id, role_id }) => {
   const transaction = await connection.transaction()
   try {
     if (role_id !== 4) {
-      throw new Error(`Only the Head of Operations can sign. Current role: ${role_id}`)
+      throw new Error(`Solo el Jefe de Operaciones puede firmar la lista de control.`)
     }
 
     const checklist = await Checklist.findByPk(checklist_id, { transaction })
