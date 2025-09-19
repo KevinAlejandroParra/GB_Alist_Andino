@@ -10,6 +10,7 @@ const {
   listObservations,
   signChecklist,
   getChecklistHistory,
+  downloadChecklistPDF,
 } = require("../controllers/checklistController")
 
 // Rutas genéricas para checklists
@@ -22,6 +23,7 @@ router.post("/:id/responses", verifyToken, submitResponses)
 router.put("/failures/:id", verifyToken, updateFailure)
 router.get("/:id/observations", verifyToken, listObservations)
 router.post("/:id/sign", verifyToken, signChecklist)
+router.get("/:id/download-pdf", verifyToken, downloadChecklistPDF)
 
 
 router.post("/upload-evidence", verifyToken, upload.single("evidence"), (req, res) => {
