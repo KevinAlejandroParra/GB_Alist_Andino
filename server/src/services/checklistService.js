@@ -12,6 +12,8 @@ const {
   Device,
   Attraction,
   Family,
+  Premise,
+  Entity,
 } = require("../models")
 const { Sequelize } = require("../models");
 const Op = Sequelize.Op
@@ -510,6 +512,136 @@ const listObservations = async ({ checklist_id, start_date, end_date }) => {
     return observations;
 };
 
+const getChecklistDataForPDF = async (checklist_id) => {
+  const checklist = await Checklist.findByPk(checklist_id, {
+    include: [
+      { model: ChecklistType, as: "type" },
+      { 
+        model: User, 
+        as: "creator", 
+        attributes: ["user_name", "user_image"],
+        include: [{ model: Role, as: "role", attributes: ["role_name"] }]
+      },
+      {
+        model: Inspectable,
+        as: "inspectable",
+        include: [
+          {
+            model: Attraction,
+            as: "attractionData",
+          },
+          {
+            model: Premise,
+            as: "premise",
+          },
+          {
+            model: Device,
+            as: "deviceData",
+            include: ["family"],
+          },
+        ],
+      },
+    ],
+  })
+
+  if (!checklist) {
+    return null
+  }
+
+  let items = []
+  if (checklist.type.family_id) {
+    const devices = await Device.findAll({
+      where: { family_id: checklist.type.family_id },
+      include: { model: Inspectable, as: "inspectable" },
+    })
+
+    const templateItems = await ChecklistItem.findAll({
+      where: { checklist_type_id: checklist.checklist_type_id },
+    })
+
+    const allResponses = await ChecklistResponse.findAll({
+      where: { checklist_id: checklist.checklist_id },
+      include: [{ model: Failure, as: "failure" }],
+    })
+
+    const responseMap = new Map()
+    allResponses.forEach((r) => {
+      const key = `${r.inspectable_id}-${r.checklist_item_id}`
+      responseMap.set(key, r)
+    })
+
+    items = devices.map((device, index) => {
+      const deviceSection = {
+        checklist_item_id: `device-${device.ins_id}`,
+        item_number: `${index + 1}`,
+        question_text: device.inspectable.name,
+        input_type: "section",
+        subItems: templateItems.map((template) => {
+          const key = `${device.ins_id}-${template.checklist_item_id}`
+          const response = responseMap.get(key)
+          return {
+            ...template.toJSON(),
+            responses: response ? [response] : [],
+          }
+        }),
+      }
+      return deviceSection
+    })
+  } else {
+    items = await ChecklistItem.findAll({
+      where: {
+        checklist_type_id: checklist.checklist_type_id,
+        parent_item_id: null,
+      },
+      include: [
+        {
+          model: ChecklistItem,
+          as: "subItems",
+          separate: true,
+          include: [
+            {
+              model: ChecklistResponse,
+              as: "responses",
+              where: { checklist_id: checklist.checklist_id },
+              required: false,
+              include: [
+                { model: User, as: "respondedBy", attributes: ["user_id", "user_name"] },
+                { model: Failure, as: "failure", required: false },
+              ],
+            },
+          ],
+        },
+        {
+          model: ChecklistResponse,
+          as: "responses",
+          where: { checklist_id: checklist.checklist_id },
+          required: false,
+          include: [
+            { model: User, as: "respondedBy", attributes: ["user_id", "user_name"] },
+            { model: Failure, as: "failure", required: false },
+          ],
+        },
+      ],
+    })
+  }
+
+  items.forEach((item) => {
+    if (item.subItems) item.subItems.sort(naturalSort)
+  })
+  items.sort(naturalSort)
+
+  const signatures = await ChecklistSignature.findAll({
+    where: { checklist_id: checklist.checklist_id },
+    include: [{ model: User, as: "user", attributes: ["user_id", "user_name"] }],
+  })
+
+  return {
+    ...checklist.toJSON(),
+    items,
+    signatures,
+  }
+}
+
 module.exports = {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -518,4 +650,5 @@ module.exports = {
   listObservations,
   signChecklist,
   getChecklistHistory,
+  getChecklistDataForPDF,
 }
