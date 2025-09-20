@@ -114,17 +114,18 @@ const listObservations = async (req, res) => {
 
 const signChecklist = async (req, res) => {
   try {
-    const { id: checklist_id } = req.params
-    const user_id = req.user.user_id
-    const role_id = req.user.role_id
+    const { id: checklist_id } = req.params;
+    const { digital_token } = req.body;
+    const { user_id, role_id } = req.user; // Usar role_id del token
 
     await checklistService.signChecklist({
       checklist_id: Number.parseInt(checklist_id),
       user_id,
-      role_id,
-    })
+      role_id, // Pasar el role_id
+      digital_token,
+    });
 
-    res.status(200).json({ message: "Checklist firmado exitosamente" })
+    res.status(200).json({ message: "Checklist firmado exitosamente" });
   } catch (error) {
     // Si el error contiene información de ítems incompletos, enviarla al cliente
     if (error.incompleteItems) {
@@ -163,6 +164,7 @@ const downloadChecklistPDF = async (req, res) => {
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     })
     const page = await browser.newPage()
+    page.on('console', msg => console.log('PAGE LOG:', msg.text())); // Add this line
     await page.setContent(htmlContent, { waitUntil: "networkidle0" })
 
     // Inject a style tag to handle page breaks
@@ -308,7 +310,7 @@ const generateChecklistHTML = (data) => {
     .map(
       (sig) => `
         <div class="signature">
-            <img src="${sig.digital_token}" alt="Firma" style="width: 150px; height: auto; border-bottom: 1px solid #000;"/>
+            <img src="${sig.digital_token}" alt="Firma de ${sig.user.user_name}" style="max-width: 150px; height: auto; border-bottom: 1px solid #000;" onerror="this.onerror=null;this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';"/>
             <p>${sig.user.user_name}</p>
             <p><strong>${sig.role_at_signature}</strong></p>
             <p>Firmado: ${formatDate(sig.signed_at)}</p>
