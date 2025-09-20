@@ -21,6 +21,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.62.0",
+    "react-signature-canvas": "^1.1.0-alpha.2",
     "sweetalert2": "^11.22.2",
     "swiper": "^11.2.10"
   },
