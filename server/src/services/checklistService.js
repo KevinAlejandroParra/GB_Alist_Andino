@@ -390,12 +390,6 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
       }
     }
 
-    await ChecklistSignature.findOrCreate({
-      where: { checklist_id, user_id: responded_by, role_at_signature: "Tecnico de mantenimiento" },
-      defaults: { signed_at: new Date() },
-      transaction,
-    })
-
     await transaction.commit()
     return { success: true, message: "Respuestas guardadas exitosamente" }
   } catch (error) {
@@ -405,64 +399,87 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
 }
 
 
-const signChecklist = async ({ checklist_id, user_id, role_id }) => {
-  const transaction = await connection.transaction()
+const signChecklist = async ({ checklist_id, user_id, role_id, digital_token }) => {
+  const transaction = await connection.transaction();
   try {
-    if (role_id !== 4) {
-      throw new Error(`Solo el Jefe de Operaciones puede firmar la lista de control.`)
+    if (!digital_token) {
+      throw new Error("La firma digital (digital_token) es requerida.");
     }
 
-    const checklist = await Checklist.findByPk(checklist_id, { transaction })
-    if (!checklist) throw new Error("Checklist not found")
+    const userRole = await Role.findByPk(role_id, { transaction });
+    if (!userRole) {
+      throw new Error("Rol de usuario inválido.");
+    }
+    const role_name = userRole.role_name;
 
-    const answerableItems = await ChecklistItem.findAll({
-      where: { checklist_type_id: checklist.checklist_type_id, parent_item_id: { [Op.ne]: null } },
-      attributes: ["checklist_item_id"],
-      transaction,
-    })
-    const answerableItemIds = answerableItems.map((item) => item.checklist_item_id)
+    const allowed_roles = ["Tecnico de mantenimiento", "Jefe de Operaciones"];
+    if (!allowed_roles.includes(role_name)) {
+      throw new Error(`El rol '${role_name}' no tiene permisos para firmar.`);
+    }
 
-    const responses = await ChecklistResponse.findAll({
-      where: { checklist_id, checklist_item_id: { [Op.in]: answerableItemIds } },
-      transaction,
-    })
+    const checklist = await Checklist.findByPk(checklist_id, { transaction });
+    if (!checklist) {
+      throw new Error("Checklist no encontrado.");
+    }
 
-    const respondedItemIds = new Set(responses.map((r) => r.checklist_item_id))
-    const incompleteItemIds = answerableItemIds.filter((id) => !respondedItemIds.has(id))
+    // Lógica para el Jefe de Operaciones
+    if (role_name === "Jefe de Operaciones") {
+      const checklistType = await getChecklistTypeForInspectable(checklist.inspectable_id, 7, transaction); // Check against maintenance role type
+      
+      if (checklistType.family_id) {
+        const templateItems = await ChecklistItem.findAll({ where: { checklist_type_id: checklist.checklist_type_id }, attributes: ["checklist_item_id"], transaction });
+        const devices = await Device.findAll({ where: { family_id: checklistType.family_id }, attributes: ["ins_id"], transaction });
+        const totalResponsesNeeded = templateItems.length * devices.length;
+        const totalResponses = await ChecklistResponse.count({ where: { checklist_id }, transaction });
 
-    if (incompleteItemIds.length > 0) {
-      const incompleteItemsDetails = await ChecklistItem.findAll({
-        where: { checklist_item_id: { [Op.in]: incompleteItemIds } },
-        attributes: ["checklist_item_id", "question_text", "item_number"],
-        order: [["item_number", "ASC"]],
+        if (totalResponses < totalResponsesNeeded) {
+          const error = new Error("El checklist debe estar completamente diligenciado antes de que el Jefe de Operaciones pueda firmar.");
+          error.incompleteCount = totalResponsesNeeded - totalResponses;
+          throw error;
+        }
+      } else {
+        const answerableItems = await ChecklistItem.findAll({ where: { checklist_type_id: checklist.checklist_type_id, input_type: { [Op.ne]: 'section' } }, attributes: ["checklist_item_id"], transaction });
+        const allItemIds = answerableItems.map((item) => item.checklist_item_id);
+        const responses = await ChecklistResponse.findAll({ where: { checklist_id, checklist_item_id: { [Op.in]: allItemIds } }, transaction });
+
+        if (responses.length < allItemIds.length) {
+            const respondedItemIds = new Set(responses.map((r) => r.checklist_item_id));
+            const incompleteItemIds = allItemIds.filter((id) => !respondedItemIds.has(id));
+            const incompleteItemsDetails = await ChecklistItem.findAll({ where: { checklist_item_id: { [Op.in]: incompleteItemIds } }, attributes: ["checklist_item_id", "question_text", "item_number"], order: [["item_number", "ASC"]], transaction });
+            const error = new Error("El checklist debe estar completamente diligenciado antes de que el Jefe de Operaciones pueda firmar.");
+            error.incompleteItems = incompleteItemsDetails;
+            error.incompleteCount = incompleteItemIds.length;
+            throw error;
+        }
+      }
+
+      const technicianSignature = await ChecklistSignature.findOne({
+        where: { checklist_id, role_at_signature: "Tecnico de mantenimiento" },
         transaction,
-      })
-      const error = new Error("The checklist must be fully completed before the Head of Operations can sign.")
-      error.incompleteItems = incompleteItemsDetails
-      throw error
+      });
+
+      if (!technicianSignature) {
+        throw new Error("El técnico de mantenimiento debe firmar primero.");
+      }
     }
 
-    const technicianSignature = await ChecklistSignature.findOne({
-      where: { checklist_id, role_at_signature: "Tecnico de mantenimiento" },
+    // Crear la firma para cualquier rol permitido
+    await ChecklistSignature.findOrCreate({
+      where: { checklist_id, user_id },
+      defaults: {
+        role_at_signature: role_name,
+        signed_at: new Date(),
+        digital_token: digital_token,
+      },
       transaction,
-    })
-    if (!technicianSignature) {
-      throw new Error("The maintenance technician must sign first.")
-    }
+    });
 
-    const userRole = await Role.findByPk(role_id, { transaction })
-    if (!userRole) throw new Error("Invalid user role.")
+    await transaction.commit();
+    return { success: true, message: "Checklist firmado exitosamente." };
 
-    await ChecklistSignature.create(
-      { checklist_id, user_id, role_at_signature: userRole.role_name, signed_at: new Date() },
-      { transaction },
-    )
-
-    await transaction.commit()
-    return { success: true, message: "Checklist signed successfully" }
   } catch (error) {
-    await transaction.rollback()
-    throw error
+    await transaction.rollback();
+    throw error;
   }
 }
 
