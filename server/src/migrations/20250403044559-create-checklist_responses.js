@@ -19,10 +19,18 @@ module.exports = {
                 type: Sequelize.INTEGER,
                 allowNull: false,
             },
-            value: {
+            response_compliance: {
                 type: DataTypes.ENUM("cumple", "observación", "no cumple"),
                 allowNull: true, 
-              },
+            },
+            response_numeric: {
+                type: Sequelize.DECIMAL(10, 2),
+                allowNull: true,
+            },
+            response_text: {
+                type: Sequelize.TEXT,
+                allowNull: true,
+            },
             comment: {
                 type: Sequelize.STRING,
             },

@@ -28,7 +28,7 @@ module.exports = {
                 allowNull: false,
             },
             digital_token: {
-                type: Sequelize.STRING,
+                type: DataTypes.TEXT('long'),
                 allowNull: true,
             },
             createdAt: {
