@@ -24,7 +24,7 @@ const subItemTemplates = [
 ];
 
 module.exports = {
-  name: 'Apoyo',
+  name: 'Apoyo - Técnico',
   description: 'Checklist semanal de mantenimiento para la familia Apoyo',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',

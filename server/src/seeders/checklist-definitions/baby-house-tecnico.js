@@ -1,5 +1,5 @@
 module.exports = {
-  name: "Atracciones – Baby House (V1 SEP 2025  - BY: Alejandro Parra)",
+  name: "Atracciones – Baby House - Tecnico (V1 SEP 2025  - BY: Alejandro Parra)",
   description: "Checklist diario de mantenimiento para la atracción Baby House",
   frequency: "diario",
   version_label: "V1 SEP 2025 - BY: Alejandro Parra",

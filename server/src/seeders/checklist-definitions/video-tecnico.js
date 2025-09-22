@@ -15,16 +15,11 @@ const subItemTemplates = [
     item_number: '3', 
     question_text: "CICLO DE MÁQUINA", 
     guidance_text: "Comprobar que el ciclo de operación (tiempo, movimientos, sonidos) se complete según las especificaciones del fabricante.",
-  },
-  { 
-    item_number: '4', 
-    question_text: "CINTURON DE SEGURIDAD PLASTICO", 
-    guidance_text: "Inspeccionar el cinturón de seguridad en busca de fisuras, roturas o desgaste. Asegurarse de que el anclaje sea firme.",
   }
 ];
 
 module.exports = {
-  name: 'Video',
+  name: 'Video - Técnico',
   description: 'Checklist semanal de mantenimiento para la familia Video',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
