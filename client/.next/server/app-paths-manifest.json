@@ -1,6 +1,6 @@
 {
-  "/AdminDashboard/page": "app/AdminDashboard/page.js",
   "/_not-found/page": "app/_not-found/page.js",
+  "/control-de-premios/page": "app/control-de-premios/page.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js"

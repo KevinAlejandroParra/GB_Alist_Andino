@@ -1,14 +1,10 @@
 {
   "pages": {
-    "/AdminDashboard/page": [
+    "/_not-found/page": [
       "static/chunks/src_app_globals_b805903d.css",
       "static/chunks/node_modules_6bbc05d8._.js",
       "static/chunks/src_components_AuthContext_jsx_cc967bc5._.js",
       "static/chunks/src_app_layout_68b267f5.js",
-      "static/chunks/node_modules_next_dist_client_components_builtin_global-error_0478fcf3.js",
-      "static/chunks/src_6497aca4._.js",
-      "static/chunks/node_modules_08aebe19._.js",
-      "static/chunks/src_app_AdminDashboard_page_0478fcf3.js",
       "static/chunks/[turbopack]_browser_dev_hmr-client_hmr-client_ts_6aaa83c7._.js",
       "static/chunks/node_modules_next_dist_compiled_react-dom_1f56dc06._.js",
       "static/chunks/node_modules_next_dist_compiled_next-devtools_index_d575f738.js",
@@ -19,11 +15,14 @@
       "static/chunks/_e69f0d32._.js",
       "static/chunks/_01f48b92._.js"
     ],
-    "/_not-found/page": [
+    "/control-de-premios/page": [
       "static/chunks/src_app_globals_b805903d.css",
       "static/chunks/node_modules_6bbc05d8._.js",
       "static/chunks/src_components_AuthContext_jsx_cc967bc5._.js",
       "static/chunks/src_app_layout_68b267f5.js",
+      "static/chunks/node_modules_next_dist_client_components_builtin_global-error_0478fcf3.js",
+      "static/chunks/_bfcba8f1._.js",
+      "static/chunks/src_app_control-de-premios_page_0478fcf3.js",
       "static/chunks/[turbopack]_browser_dev_hmr-client_hmr-client_ts_6aaa83c7._.js",
       "static/chunks/node_modules_next_dist_compiled_react-dom_1f56dc06._.js",
       "static/chunks/node_modules_next_dist_compiled_next-devtools_index_d575f738.js",
@@ -40,7 +39,7 @@
       "static/chunks/src_components_AuthContext_jsx_cc967bc5._.js",
       "static/chunks/src_app_layout_68b267f5.js",
       "static/chunks/node_modules_next_dist_client_components_builtin_global-error_0478fcf3.js",
-      "static/chunks/node_modules_89148311._.js",
+      "static/chunks/node_modules_a04d4f79._.js",
       "static/chunks/src_454e454a._.js",
       "static/chunks/src_app_dashboard_page_0478fcf3.js",
       "static/chunks/[turbopack]_browser_dev_hmr-client_hmr-client_ts_6aaa83c7._.js",
