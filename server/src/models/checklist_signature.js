@@ -26,8 +26,8 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.STRING,
                 allowNull: false,
             },
-            digital_token: {
-                type: DataTypes.STRING,
+                digital_token: {
+                type: DataTypes.TEXT('long'),
                 allowNull: true,
             },
             createdAt: {

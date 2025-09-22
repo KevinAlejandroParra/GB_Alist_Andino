@@ -20,9 +20,17 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false,
       },
-      value: {
+      response_compliance: {
         type: DataTypes.ENUM("cumple", "observación", "no cumple"),
-        allowNull: true, // Permitir nulo inicialmente si no hay respuesta
+        allowNull: true,
+      },
+      response_numeric: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      response_text: {
+        type: DataTypes.TEXT,
+        allowNull: true,
       },
       comment: {
         type: DataTypes.STRING,

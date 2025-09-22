@@ -8,14 +8,14 @@ const checklistDefinitions = [];
 // Cargar todas las definiciones de checklist del directorio
 fs.readdirSync(definitionsDir).forEach(file => {
   if (file.endsWith('.js')) {
-    checklistDefinitions.push(require(path.join(definitionsDir, file)));
+    const definition = require(path.join(definitionsDir, file));
+    checklistDefinitions.push(definition);
   }
 });
 
 module.exports = {
   async up(queryInterface, Sequelize) {
     if (checklistDefinitions.length === 0) {
-      console.log('No checklist definitions found to seed.');
       return;
     }
 
@@ -25,20 +25,19 @@ module.exports = {
 
         if (definition.attraction_name && definition.premise_id) {
           const [attraction] = await queryInterface.sequelize.query(
-            `SELECT a.ins_id FROM attractions a 
-             INNER JOIN inspectables i ON a.ins_id = i.ins_id 
+            `SELECT a.ins_id FROM attractions a
+             INNER JOIN inspectables i ON a.ins_id = i.ins_id
              WHERE i.name = :attraction_name AND i.premise_id = :premise_id LIMIT 1;`,
             {
-              replacements: { 
+              replacements: {
                 attraction_name: definition.attraction_name,
                 premise_id: definition.premise_id
               },
-              type: Sequelize.QueryTypes.SELECT 
+              type: Sequelize.QueryTypes.SELECT
             }
           );
 
           if (!attraction) {
-            console.error(`Attraction '${definition.attraction_name}' not found for premise ${definition.premise_id}. Skipping this checklist type.`);
             continue;
           }
           association.attraction_id = attraction.ins_id;
@@ -53,13 +52,11 @@ module.exports = {
           );
 
           if (!family) {
-            console.error(`Family '${definition.family_name}' not found. Skipping this checklist type.`);
             continue;
           }
           association.family_id = family.family_id;
 
         } else {
-          console.error(`Checklist definition '${definition.name}' has no association (attraction or family). Skipping.`);
           continue;
         }
 
@@ -78,9 +75,7 @@ module.exports = {
           updatedAt: new Date(),
         }], {});
       }
-      console.log(`${checklistDefinitions.length} checklist types seeded successfully.`);
     } catch (error) {
-      console.error('Error seeding checklist types:', error);
       throw error;
     }
   },
