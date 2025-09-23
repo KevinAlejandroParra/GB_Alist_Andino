@@ -40,7 +40,7 @@ module.exports = {
   frequency: 'semanal',
   version_label: 'V1 Static Premios SEP 2025 BY: Alejandro Parra',
   role_id: 7, // Corresponde a "Tecnico de mantenimiento"
-  family_name: 'Apoyo', 
+  specific_inspectable_names: ['TOY BOX', 'TOY FAMILY', 'WORK ZONE'], 
   dynamic_items: false, 
   items: items,
 };
