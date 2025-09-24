@@ -13,11 +13,11 @@ module.exports = {
             },
             premise_id: {
                 type: Sequelize.INTEGER,
-                allowNull: false,
+                allowNull: true, // Cambiado a true
             },
             inspectable_id: {
                 type: Sequelize.INTEGER,
-                allowNull: false,
+                allowNull: true, // Cambiado a true
                 references: {
                     model: 'inspectables',
                     key: 'ins_id',
@@ -63,11 +63,14 @@ module.exports = {
                 allowNull: false,
             },
         });
-        await queryInterface.addConstraint('checklists', {
-            fields: ['checklist_type_id', 'inspectable_id', 'date'],
-            type: 'unique',
-            name: 'unique_checklist_per_type_inspectable_and_date'
-        });
+        // Se elimina la restricción unique_checklist_per_type_inspectable_and_date
+        // para permitir múltiples entradas con inspectable_id NULL para checklists de tipo 'specific' o 'static'.
+        // La unicidad se gestionará a nivel de aplicación en ensureChecklistInstance.
+        // await queryInterface.addConstraint('checklists', {
+        //     fields: ['checklist_type_id', 'inspectable_id', 'date'],
+        //     type: 'unique',
+        //     name: 'unique_checklist_per_type_inspectable_and_date'
+        // });
     },
     async down(queryInterface, Sequelize) {
         await queryInterface.dropTable("checklists");

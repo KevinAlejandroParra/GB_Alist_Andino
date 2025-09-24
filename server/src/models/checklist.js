@@ -12,11 +12,11 @@ module.exports = (sequelize, DataTypes) => {
             },
             premise_id: {
                 type: DataTypes.INTEGER,
-                allowNull: false,
+                allowNull: true,
             },
             inspectable_id: {
                 type: DataTypes.INTEGER,
-                allowNull: false,
+                allowNull: true,
             },
             checklist_type_id: {
                 type: DataTypes.INTEGER,
