@@ -95,7 +95,7 @@ Inspectable.hasOne(Device, {
     constraints: false,
 });
 Device.belongsTo(Inspectable, {
-    as: "inspectable",
+    as: "parentInspectable",
     foreignKey: "ins_id", // ins_id es la clave primaria de Inspectable
     constraints: false,
     scope: {
@@ -109,7 +109,7 @@ Inspectable.hasOne(Attraction, {
     constraints: false,
 });
 Attraction.belongsTo(Inspectable, {
-    as: "inspectable",
+    as: "parentInspectable", 
     foreignKey: "ins_id", // ins_id es la clave primaria de Inspectable
     constraints: false,
     scope: {
@@ -142,8 +142,6 @@ Premise.hasMany(Inventory, { as: "inventories", foreignKey: "location_id" });
 ChecklistType.belongsTo(Role, { as: "role", foreignKey: "role_id" });
 ChecklistType.hasMany(Checklist, { as: "checklists", foreignKey: "checklist_type_id" });
 ChecklistType.hasMany(ChecklistItem, { as: "items", foreignKey: "checklist_type_id" });
-ChecklistType.belongsTo(Attraction, { as: "attraction", foreignKey: "attraction_id" });
-ChecklistType.belongsTo(Family, { as: "family", foreignKey: "family_id" });
 
 // 5. Asociaciones de Checklist
 Checklist.belongsTo(ChecklistType, { as: "type", foreignKey: "checklist_type_id" });
@@ -225,13 +223,28 @@ Entity.belongsTo(Premise, { as: 'premise', foreignKey: 'premise_id' });
 // Un Device pertenece a una Family
 Device.belongsTo(Family, { as: "family", foreignKey: "family_id" });
 // Una Family puede tener muchos Devices
-Family.hasMany(Device, { as: "devices", foreignKey: "family_id" });
+Family.hasMany(Device, { as: "familyDevices", foreignKey: "family_id" });
 
 // Asociaciones de Audit
 Audit.belongsTo(User, { as: "user", foreignKey: "user_id" });
 Audit.belongsTo(Premise, { as: "premise", foreignKey: "premise_id" });
 User.hasMany(Audit, { as: "audits", foreignKey: "user_id" });
 Premise.hasMany(Audit, { as: "audits", foreignKey: "premise_id" });
+
+// 16. Asociaciones para ChecklistType específicos de Inspectable
+ChecklistType.belongsToMany(Inspectable, {
+  through: "ChecklistTypeInspectables",
+  foreignKey: "checklist_type_id",
+  otherKey: "ins_id",
+  as: "specificInspectables",
+});
+
+Inspectable.belongsToMany(ChecklistType, {
+  through: "ChecklistTypeInspectables",
+  foreignKey: "ins_id",
+  otherKey: "checklist_type_id",
+  as: "specificChecklistTypes",
+});
 
 // Exportar modelos
 module.exports = {
@@ -256,5 +269,5 @@ module.exports = {
     Entity,
     Audit,
     connection,
-    Sequelize, // Exportar el objeto Sequelize
+    Sequelize,
 };
