@@ -1,6 +1,42 @@
 'use strict';
 
 const deviceData = [
+        {
+        family_id: 4,
+        public_flag: "Sí",
+        arrival_date: "2005-10-13T00:00:00.000Z",
+        brand: "test",
+        inspectable: {
+            name: "Toy Box",
+            description: "maquina de peluches",
+            photo_url: "/media/photo-1756401480489-432766838.png",
+            premise_id: 2
+        }
+    },
+         {
+        family_id: 4,
+        public_flag: "Sí",
+        arrival_date: "2005-10-13T00:00:00.000Z",
+        brand: "test",
+        inspectable: {
+            name: "Toy family",
+            description: "maquina de peluches familia",
+            photo_url: "/media/photo-1756401480489-432766838.png",
+            premise_id: 2
+        }
+    },
+            {
+        family_id: 4,
+        public_flag: "Sí",
+        arrival_date: "2005-10-13T00:00:00.000Z",
+        brand: "test",
+        inspectable: {
+            name: "work zone",
+            description: "maquina de pelotas",
+            photo_url: "/media/photo-1756401480489-432766838.png",
+            premise_id: 2
+        }
+    },
     {
         family_id: 1,
         public_flag: "Sí",
