@@ -22,7 +22,7 @@ module.exports = {
   name: 'Apoyo - Anfitriones',
   description: 'Checklist diario de operación para la familia Apoyo',
   frequency: 'diario',
-  version_label: 'V1 Anfitriones SEP 2025 BY: Alejandro Parra',
+  version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
   role_id: 8, // Corresponde a "Anfitriones"
   family_name: 'Apoyo',
   dynamic_items: 'device', 

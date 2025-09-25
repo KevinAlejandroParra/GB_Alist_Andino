@@ -5,6 +5,8 @@ module.exports = {
   version_label: "V1 SEP 2025 - BY: Alejandro Parra",
   role_id: 7, // Corresponde a "Tecnico de mantenimiento"
   attraction_name: "Baby House", // Nombre del inspectable para buscar su ID
+  // Agrega specific_inspectable_names si este checklist es para inspectables específicos
+  specific_inspectable_names: ["Baby House (Atracción)"], // EJEMPLO: Reemplazar con nombres reales de inspectables
   premise_id: 2, // ID del local al que pertenece la atracción
   items: [
     {

@@ -6,6 +6,8 @@ module.exports = {
   role_id: 8, // Corresponde a "Anfitrión" 
   attraction_name: "Tren del Oeste", 
   premise_id: 2, 
+  // Agrega specific_inspectable_names si este checklist es para inspectables específicos
+  specific_inspectable_names: ["Tren del Oeste (Atracción)"], // EJEMPLO: Reemplazar con nombres reales de inspectables
   items: [
     {
       item_number: "1",
