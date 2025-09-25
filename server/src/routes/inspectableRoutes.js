@@ -8,5 +8,6 @@ router.get(
     "/premises-with-inspectables",
     inspectableController.getPremisesWithInspectables
 );
+router.get("/:id", inspectableController.getInspectableById); // Nueva ruta
 
 module.exports = router;

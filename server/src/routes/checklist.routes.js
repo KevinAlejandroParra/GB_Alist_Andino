@@ -11,12 +11,16 @@ const {
   signChecklist,
   getChecklistHistory,
   downloadChecklistPDF,
+  getChecklistByType,
+  getLatestChecklistByType,
 } = require("../controllers/checklistController")
 
 // Rutas genéricas para checklists
 router.post("/:inspectableId/ensure", verifyToken, ensureChecklistInstance)
 router.get("/:inspectableId/latest", verifyToken, getLatestChecklist)
 router.get("/:inspectableId/history", verifyToken, getChecklistHistory)
+router.get("/type/:checklistTypeId", verifyToken, getChecklistByType) // Nueva ruta para obtener checklist por tipo
+router.get("/type/:checklistTypeId/latest", verifyToken, getLatestChecklistByType)
 
 // Rutas para respuestas, fallas, etc. 
 router.post("/:id/responses", verifyToken, submitResponses)
