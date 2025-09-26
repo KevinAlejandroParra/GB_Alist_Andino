@@ -8,14 +8,14 @@ const checklistDefinitions = [];
 // Cargar todas las definiciones de checklist del directorio
 fs.readdirSync(definitionsDir).forEach(file => {
   if (file.endsWith('.js')) {
-    checklistDefinitions.push(require(path.join(definitionsDir, file)));
+    const definition = require(path.join(definitionsDir, file));
+    checklistDefinitions.push(definition);
   }
 });
 
 module.exports = {
   async up(queryInterface, Sequelize) {
     if (checklistDefinitions.length === 0) {
-      console.log('No checklist definitions found, so no items to seed.');
       return;
     }
 
@@ -31,7 +31,6 @@ module.exports = {
         );
 
         if (!checklistType) {
-          console.error(`ChecklistType '${definition.name}' not found. Run the types seeder first. Skipping items for this type.`);
           continue;
         }
         const checklistTypeId = checklistType.checklist_type_id;
@@ -68,7 +67,7 @@ module.exports = {
               createdAt: new Date(),
               updatedAt: new Date()
             }], {});
-            
+
             // Buscar el ID del padre insertado
             const [insertedParent] = await queryInterface.sequelize.query(
               `SELECT checklist_item_id FROM checklist_items WHERE item_number = :item_number AND checklist_type_id = :checklist_type_id AND parent_item_id IS NULL LIMIT 1;`,
@@ -79,7 +78,6 @@ module.exports = {
             );
 
             if (!insertedParent) {
-              console.error(`Failed to retrieve parent item ${parentItemDef.item_number}.`);
               continue;
             }
             const parentItemId = insertedParent.checklist_item_id;

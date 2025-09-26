@@ -17,7 +17,6 @@ const items = machines.map((machine, index) => ({
   item_number: `${index + 1}`,
   question_text: machine,
   children: allQuestions.map((q, childIndex) => { 
-    // Renumerar las preguntas viejas y nuevas para que sean consecutivas
     const originalQuestionNumber = q.item_number;
     return {
       ...q,

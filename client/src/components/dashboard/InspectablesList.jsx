@@ -22,9 +22,15 @@ export default function InspectablesList() {
         
         const API_URL = process.env.NEXT_PUBLIC_API || 'http://localhost:5000';
         
-        const checklistTypesResponse = await axios.get(`${API_URL}/api/checklist-types?role_id=${user?.role_id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // Si es Jefe de Operaciones (rol 4), obtener todos los checklist types
+        const checklistTypesResponse = await axios.get(
+          user?.role_id === 4
+            ? `${API_URL}/api/checklist-types`
+            : `${API_URL}/api/checklist-types?role_id=${user?.role_id}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
 
         setChecklistTypes(checklistTypesResponse.data);
 

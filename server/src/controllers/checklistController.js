@@ -1,10 +1,11 @@
+const { ChecklistType, ChecklistItem } = require("../models")
 const checklistService = require("../services/checklistService")
 const puppeteer = require("puppeteer")
 
 const ensureChecklistInstance = async (req, res) => {
   try {
     const { inspectableId } = req.params
-    const { premise_id, date } = req.body
+    const { premise_id, date, checklist_type_id } = req.body // Extraer checklist_type_id
     const user_id = req.user.user_id
     const role_id = req.user.role_id
 
@@ -14,6 +15,7 @@ const ensureChecklistInstance = async (req, res) => {
       date,
       created_by: user_id,
       role_id,
+      checklist_type_id: Number.parseInt(checklist_type_id), // Pasar checklist_type_id al servicio
     })
     res.status(200).json(checklist)
   } catch (error) {
@@ -24,10 +26,11 @@ const ensureChecklistInstance = async (req, res) => {
 const getLatestChecklist = async (req, res) => {
   try {
     const { inspectableId } = req.params
-    const { date } = req.query
+    const { date, checklist_type_id } = req.query // Extraer checklist_type_id
     const checklist = await checklistService.getLatestChecklist({
       inspectableId: Number.parseInt(inspectableId),
       date,
+      checklist_type_id: Number.parseInt(checklist_type_id), // Pasar checklist_type_id al servicio
     })
     res.status(200).json(checklist)
   } catch (error) {
@@ -223,6 +226,15 @@ const downloadChecklistPDF = async (req, res) => {
   }
 }
 
+const getChecklistTypes = async (req, res) => {
+  try {
+    const checklistTypes = await ChecklistType.findAll();
+    res.status(200).json(checklistTypes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const generateChecklistHTML = (data) => {
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A"
@@ -312,7 +324,7 @@ const generateChecklistHTML = (data) => {
         <div class="signature">
             <img src="${sig.digital_token}" alt="Firma de ${sig.user.user_name}" style="max-width: 150px; height: auto; border-bottom: 1px solid #000;" onerror="this.onerror=null;this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';"/>
             <p>${sig.user.user_name}</p>
-            <p><strong>${sig.role_at_signature}</strong></p>
+            <p><strong>${sig.role?.role_name || 'Rol Desconocido'}</strong></p>
             <p>Firmado: ${formatDate(sig.signed_at)}</p>
         </div>
     `,
@@ -419,6 +431,127 @@ const generateChecklistHTML = (data) => {
     `
 }
 
+const getChecklistTypesByRole = async (req, res) => {
+  try {
+    const { role_id } = req.params;
+    const checklistTypes = await ChecklistType.findAll({
+      where: { role_id: role_id },
+    });
+    res.status(200).json(checklistTypes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getChecklistByType = async (req, res) => {
+  try {
+    const { checklistTypeId } = req.params;
+    const user_id = req.user.user_id;
+    const role_id = req.user.role_id;
+
+    // 1. Ensure a checklist instance exists or is retrieved
+    const checklistInstanceData = await checklistService.ensureChecklistInstance({
+      checklist_type_id: Number.parseInt(checklistTypeId),
+      inspectableId: null, // For type-based checklists, inspectableId is null
+      date: new Date().toISOString().split('T')[0],
+      created_by: user_id,
+      role_id: role_id,
+    });
+
+    if (!checklistInstanceData) {
+      return res.status(404).json({ error: "Checklist no encontrado para el tipo especificado." });
+    }
+
+    // 2. Fetch the ChecklistType with its associated ChecklistItems (template)
+    const checklistTypeTemplate = await ChecklistType.findByPk(checklistTypeId, {
+      include: [
+        {
+          model: ChecklistItem,
+          as: 'items',
+          where: { parent_item_id: null }, // Only fetch top-level items
+          required: false,
+          include: [
+            {
+              model: ChecklistItem,
+              as: 'subItems',
+              required: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!checklistTypeTemplate) {
+      return res.status(404).json({ error: "Tipo de Checklist no encontrado." });
+    }
+
+    // 3. Combine the checklist instance data with the checklist type template
+    // The checklistInstanceData already contains the 'type' and 'signatures' and 'pending_failures'
+    // We need to merge the items from the template with the responses from the instance.
+
+    const combinedItems = checklistTypeTemplate.items.map(templateItem => {
+      const instanceItem = checklistInstanceData.items.find(
+        instItem => instItem.checklist_item_id === templateItem.checklist_item_id
+      );
+
+      const subItems = templateItem.subItems.map(templateSubItem => {
+        const instanceSubItem = checklistInstanceData.items.find(
+          instItem => instItem.checklist_item_id === templateSubItem.checklist_item_id
+        );
+        return {
+          ...templateSubItem.toJSON(),
+          responses: instanceSubItem ? instanceSubItem.responses : [],
+        };
+      });
+
+      return {
+        ...templateItem.toJSON(),
+        responses: instanceItem ? instanceItem.responses : [],
+        subItems: subItems,
+      };
+    });
+
+
+    const finalChecklistData = {
+      ...checklistInstanceData, // Contains checklist_id, date, type, signatures, pending_failures
+      type: checklistTypeTemplate.toJSON(), // Ensure the type data is from the template
+      items: combinedItems,
+    };
+
+    res.status(200).json(finalChecklistData);
+  } catch (error) {
+    console.error("Error fetching checklist by type ID:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getLatestChecklistByType = async (req, res) => {
+  try {
+    const { checklistTypeId } = req.params
+    const { date } = req.query
+    const { user_id, role_id } = req.user
+    const checklist = await checklistService.getLatestChecklistByType({
+      checklistTypeId: Number.parseInt(checklistTypeId),
+      date,
+      user_id,
+      role_id,
+    })
+    res.status(200).json(checklist)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+}
+
+const getChecklistHistoryByType = async (req, res) => {
+  try {
+    const { checklistTypeId } = req.params
+    const checklists = await checklistService.getChecklistHistoryByType(Number.parseInt(checklistTypeId))
+    res.status(200).json(checklists)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+}
+
 module.exports = {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -428,4 +561,9 @@ module.exports = {
   signChecklist,
   getChecklistHistory,
   downloadChecklistPDF,
+  getChecklistTypes,
+  getChecklistTypesByRole,
+  getChecklistByType,
+  getLatestChecklistByType,
+  getChecklistHistoryByType,
 }
