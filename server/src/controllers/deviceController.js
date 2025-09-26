@@ -10,7 +10,7 @@ const deviceController = {
                 where: whereClause,
                 include: [
                     { model: Family, as: "family" },
-                    { model: Inspectable, as: "inspectable" },
+                    { model: Inspectable, as: "parentInspectable" },
                 ],
             });
             res.status(200).json(devices);
@@ -26,7 +26,7 @@ const deviceController = {
             const device = await Device.findByPk(req.params.id, {
                 include: [
                     { model: Family, as: "family" },
-                    { model: Inspectable, as: "inspectable" },
+                    { model: Inspectable, as: "parentInspectable" },
                 ],
             });
             if (!device) {
@@ -115,7 +115,7 @@ const deviceController = {
                 const updatedDevice = await Device.findByPk(deviceId, {
                     include: [
                         { model: Family, as: "family" },
-                        { model: Inspectable, as: "inspectable" },
+                        { model: Inspectable, as: "parentInspectable" },
                     ],
                 });
                 return res.status(200).json({ message: "Dispositivo actualizado correctamente.", device: updatedDevice });
