@@ -13,7 +13,11 @@ const {
   downloadChecklistPDF,
   getChecklistByType,
   getLatestChecklistByType,
+  getChecklistHistoryByType, // Importar la nueva función
 } = require("../controllers/checklistController")
+
+// Importar funciones de diagnóstico (temporal para debugging)
+const { diagnoseChecklists, fixProblematicChecklists } = require("../utils/diagnose-checklists")
 
 // Rutas genéricas para checklists
 router.post("/:inspectableId/ensure", verifyToken, ensureChecklistInstance)
@@ -21,14 +25,36 @@ router.get("/:inspectableId/latest", verifyToken, getLatestChecklist)
 router.get("/:inspectableId/history", verifyToken, getChecklistHistory)
 router.get("/type/:checklistTypeId", verifyToken, getChecklistByType) // Nueva ruta para obtener checklist por tipo
 router.get("/type/:checklistTypeId/latest", verifyToken, getLatestChecklistByType)
+router.get("/type/:checklistTypeId/history", verifyToken, getChecklistHistoryByType) // Nueva ruta para el historial por tipo
 
-// Rutas para respuestas, fallas, etc. 
+// Rutas para respuestas, fallas, etc.
 router.post("/:id/responses", verifyToken, submitResponses)
 router.put("/failures/:id", verifyToken, updateFailure)
 router.get("/:id/observations", verifyToken, listObservations)
 router.post("/:id/sign", verifyToken, signChecklist)
 router.get("/:id/download-pdf", verifyToken, downloadChecklistPDF)
 
+
+// Rutas de diagnóstico (temporal para debugging)
+router.get("/diagnose", async (req, res) => {
+  try {
+    await diagnoseChecklists()
+    res.json({ message: "Diagnóstico completado. Revisa la consola del servidor." })
+  } catch (error) {
+    console.error("Error en diagnóstico:", error)
+    res.status(500).json({ error: "Error en diagnóstico", details: error.message })
+  }
+})
+
+router.post("/fix-checklists", async (req, res) => {
+  try {
+    await fixProblematicChecklists()
+    res.json({ message: "Corrección de checklists completada. Revisa la consola del servidor." })
+  } catch (error) {
+    console.error("Error corrigiendo checklists:", error)
+    res.status(500).json({ error: "Error corrigiendo checklists", details: error.message })
+  }
+})
 
 router.post("/upload-evidence", verifyToken, upload.single("evidence"), (req, res) => {
   try {
