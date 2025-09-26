@@ -24,23 +24,14 @@ module.exports = {
                 type: Sequelize.STRING,
                 allowNull: true,
             },
-            attraction_id: {
-                type: DataTypes.INTEGER,
-                allowNull: true,
-                references: {
-                    model: 'attractions',
-                    key: 'ins_id',
-                },
-                onDelete: 'CASCADE',
+            type_category: {
+                type: DataTypes.ENUM('family', 'attraction', 'specific', 'static'),
+                allowNull: false,
+                defaultValue: 'static',
             },
-            family_id: {
+            associated_id: {
                 type: DataTypes.INTEGER,
                 allowNull: true,
-                references: {
-                    model: 'families',
-                    key: 'family_id',
-                },
-                onDelete: 'CASCADE',
             },
             role_id: {
                 type: Sequelize.INTEGER,
