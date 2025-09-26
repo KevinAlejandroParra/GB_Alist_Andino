@@ -51,6 +51,41 @@ module.exports = {
                 onUpdate: 'CASCADE',
                 onDelete: 'SET NULL',
             },
+            jugadas_acumuladas: {
+                type: Sequelize.DECIMAL(10, 2),
+                allowNull: true,
+                defaultValue: null,
+            },
+            premios_acumulados: {
+                type: Sequelize.DECIMAL(10, 2),
+                allowNull: true,
+                defaultValue: null,
+            },
+            jugadas_desde_ultima: {
+                type: Sequelize.DECIMAL(10, 2),
+                allowNull: true,
+                defaultValue: null,
+            },
+            premios_desde_ultima: {
+                type: Sequelize.DECIMAL(10, 2),
+                allowNull: true,
+                defaultValue: null,
+            },
+            promedio_premios: {
+                type: Sequelize.DECIMAL(10, 2),
+                allowNull: true,
+                defaultValue: null,
+            },
+            premios_esperados: {
+                type: Sequelize.DECIMAL(10, 2),
+                allowNull: true,
+                defaultValue: null,
+            },
+            configuracion_maquina: {
+                type: Sequelize.TEXT,
+                allowNull: true,
+                defaultValue: null,
+            },
             createdAt: {
                 type: Sequelize.DATE,
                 defaultValue: Sequelize.NOW,

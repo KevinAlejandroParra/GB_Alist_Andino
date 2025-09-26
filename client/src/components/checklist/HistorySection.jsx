@@ -98,7 +98,7 @@ export default function HistorySection({
                       <ul className="list-disc list-inside text-sm text-gray-600 mb-4">
                         {historyChecklist.signatures.map((signature, index) => (
                           <li key={index}>
-                            {signature.role_at_signature} : {signature.user?.user_name || 'Desconocido'} el{' '}
+                            {signature.role?.role_name || 'Rol Desconocido'} - {signature.user?.user_name || 'Usuario Desconocido'} el{' '}
                             {formatLocalDateTime(signature.signed_at)}
                           </li>
                         ))}
