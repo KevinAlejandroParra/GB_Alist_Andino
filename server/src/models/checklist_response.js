@@ -46,6 +46,34 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
+      jugadas_acumuladas: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      premios_acumulados: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      jugadas_desde_ultima: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      premios_desde_ultima: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      promedio_premios: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      premios_esperados: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      configuracion_maquina: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
     },
     {
       sequelize,
