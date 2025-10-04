@@ -29,6 +29,16 @@ module.exports = (sequelize, DataTypes) => {
             date: {
                 type: DataTypes.DATEONLY,
                 allowNull: false,
+                get() {
+                    const rawValue = this.getDataValue('date');
+                    if (!rawValue || rawValue === 'Invalid date') {
+                        // Return today's date or null, depending on needs
+                        const today = new Date();
+                        const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+                        return dateStr;
+                    }
+                    return rawValue;
+                }
             },
             created_by: {
                 type: DataTypes.INTEGER,

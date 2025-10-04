@@ -2,6 +2,12 @@ const express = require("express")
 const router = express.Router()
 const { verifyToken } = require("../middleware/authMiddleware")
 const upload = require("../config/multerConfig")
+
+// Importar rutas de checklist de familia
+const familyChecklistRoutes = require('./familyChecklist.routes')
+
+// Usar las rutas de checklist de familia
+router.use('/', familyChecklistRoutes)
 const {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -13,7 +19,8 @@ const {
   downloadChecklistPDF,
   getChecklistByType,
   getLatestChecklistByType,
-  getChecklistHistoryByType, // Importar la nueva función
+  getChecklistHistoryByType,
+  getChecklistById
 } = require("../controllers/checklistController")
 
 // Importar funciones de diagnóstico (temporal para debugging)
@@ -28,6 +35,7 @@ router.get("/type/:checklistTypeId/latest", verifyToken, getLatestChecklistByTyp
 router.get("/type/:checklistTypeId/history", verifyToken, getChecklistHistoryByType) // Nueva ruta para el historial por tipo
 
 // Rutas para respuestas, fallas, etc.
+router.get("/:id", verifyToken, getChecklistById) // Nueva ruta para obtener checklist por ID
 router.post("/:id/responses", verifyToken, submitResponses)
 router.put("/failures/:id", verifyToken, updateFailure)
 router.get("/:id/observations", verifyToken, listObservations)

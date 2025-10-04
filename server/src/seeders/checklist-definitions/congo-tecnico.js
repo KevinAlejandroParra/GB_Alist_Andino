@@ -297,7 +297,7 @@ const transformItems = (items) => {
       item_number: String(child.id),
       question_text: child.question_text,
       guidance_text: child.guidance_text,
-      input_type: 'boolean',
+      input_type: 'radio',
       allow_comment: true,
     })),
   }));

@@ -100,7 +100,7 @@ const transformItems = (rawItems) => {
       item_number: `${sectionIndex + 1}.${itemIndex + 1}`,
       question_text: item.question_text,
       guidance_text: item.guidance_text,
-      input_type: 'boolean',
+      input_type: 'radio',
       allow_comment: true,
     })),
   }));

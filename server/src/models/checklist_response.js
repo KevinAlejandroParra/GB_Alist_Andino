@@ -3,7 +3,9 @@ const { Model } = require('sequelize');
 
 module.exports = (sequelize, DataTypes) => {
   class ChecklistResponse extends Model {
-    
+    static associate(models) {
+      // Las asociaciones se definen en index.js
+    }
   }
   ChecklistResponse.init(
     {
