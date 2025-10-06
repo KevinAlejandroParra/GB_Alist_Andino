@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosInstance from '../../utils/axiosConfig';
 import Swal from 'sweetalert2';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../AuthContext';
@@ -23,7 +23,7 @@ export default function InspectablesList() {
         const API_URL = process.env.NEXT_PUBLIC_API || 'http://localhost:5000';
         
         // Si es Jefe de Operaciones (rol 4), obtener todos los checklist types
-        const checklistTypesResponse = await axios.get(
+        const checklistTypesResponse = await axiosInstance.get(
           user?.role_id === 4
             ? `${API_URL}/api/checklist-types`
             : `${API_URL}/api/checklist-types?role_id=${user?.role_id}`,
@@ -49,55 +49,8 @@ export default function InspectablesList() {
   }, [user, authLoading]);
 
   const handleChecklistTypeClick = async (checklistType) => { // Async para la llamada a la API
-    if (checklistType.type_category === 'attraction') {
-      Swal.fire({ title: 'Cargando atracción...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-      try {
-        const token = localStorage.getItem('authToken');
-        const API_URL = process.env.NEXT_PUBLIC_API || 'http://localhost:5000';
-        const response = await axios.get(`${API_URL}/api/inspectables/${checklistType.associated_id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const attractionInspectable = response.data;
-        Swal.close();
-        router.push(`/inspectables/${checklistType.associated_id}?premiseId=${attractionInspectable.premise_id}&checklistTypeId=${checklistType.checklist_type_id}`);
-      } catch (err) {
-        console.error('Error fetching attraction inspectable:', err);
-        Swal.fire('Error', 'No se pudo cargar la información de la atracción.', 'error');
-      }
-    } else if (checklistType.type_category === 'family') {
-      Swal.fire({ title: 'Buscando dispositivo...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-      try {
-        const token = localStorage.getItem('authToken');
-        const API_URL = process.env.NEXT_PUBLIC_API || 'http://localhost:5000';
-        
-        const response = await axios.get(`${API_URL}/api/devices?family_id=${checklistType.associated_id}&limit=1`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const devices = response.data;
-
-        if (!devices || devices.length === 0) {
-          Swal.fire('Información', 'No se encontraron dispositivos para esta familia.', 'info');
-          Swal.close();
-          return;
-        }
-
-        const firstDevice = devices[0];
-        Swal.close();
-        router.push(`/inspectables/${firstDevice.parentInspectable.ins_id}?premiseId=${firstDevice.parentInspectable.premise_id}&checklistTypeId=${checklistType.checklist_type_id}`);
-
-      } catch (err) {
-        console.error('Error fetching device for family:', err);
-        Swal.fire('Error', 'No se pudo cargar el dispositivo de la familia.', 'error');
-      }
-    } else if (checklistType.type_category === 'specific' || checklistType.type_category === 'static') {
-      Swal.fire({ title: 'Cargando checklist...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-      Swal.close();
-    router.push(`/checklists/type/${checklistType.checklist_type_id}`);
-    } else {
-      console.warn("ChecklistType con categoría de tipo desconocida. Mostrar mensaje.", checklistType);
-      Swal.fire('Información', 'Este tipo de checklist no está asociado a una atracción, familia o local específico.', 'info');
-    }
+    // Ahora todos los tipos de checklist se dirigen primero a la página de detalle
+    router.push(`/checklists/detail/${checklistType.checklist_type_id}`);
   };
 
   if (loading || authLoading) {
