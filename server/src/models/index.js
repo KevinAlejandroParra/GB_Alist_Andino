@@ -161,13 +161,14 @@ ChecklistItem.belongsTo(ChecklistType, { as: "type", foreignKey: "checklist_type
 // Una respuesta pertenece a un elemento específico de la lista de comprobación.
 ChecklistResponse.belongsTo(ChecklistItem, {
     foreignKey: 'checklist_item_id',
-    as: 'item',
+    as: 'checklistItem',  // Cambiado de 'item' a 'checklistItem' para evitar conflictos
 });
 // Una respuesta forma parte de una instancia de lista de comprobación mayor.
 ChecklistResponse.belongsTo(Checklist, {
     foreignKey: 'checklist_id',
     as: 'checklist',
 });
+// Asociación con el usuario que respondió
 ChecklistResponse.belongsTo(User, {
     foreignKey: 'responded_by',
     as: 'respondedBy',
@@ -186,11 +187,11 @@ Failure.belongsTo(ChecklistResponse, {
 });
 Failure.belongsTo(User, {
     foreignKey: "responded_by",
-    as: "reporter",
+    as: "failureReporter",
 });
 Failure.belongsTo(User, { 
-    foreignKey: "responded_by",
-    as: "closedByUser",
+    foreignKey: "closed_by",
+    as: "failureCloser",
 });
 
 // 9. Asociaciones de MaintenanceAction

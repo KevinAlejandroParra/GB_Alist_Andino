@@ -10,7 +10,8 @@ const familyRoutes = require("./routes/familyRoutes");
 const deviceRoutes = require("./routes/deviceRoutes"); 
 const attractionRoutes = require("./routes/attractionRoutes"); 
 const inspectableRoutes = require("./routes/inspectableRoutes");
-const checklistRoutes = require("./routes/checklist.routes")
+const checklistRoutes = require("./routes/checklist.routes");
+const familyChecklistRoutes = require("./routes/familyChecklist.routes");
 const checklistTypeRoutes = require("./routes/checklistTypeRoutes");
 const swaggerUi = require('swagger-ui-express');
 const swaggerFile = require('./swagger-output.json');
@@ -56,7 +57,8 @@ app.use("/api/families", familyRoutes);
 app.use("/api/devices", deviceRoutes); 
 app.use("/api/attractions", attractionRoutes); 
 app.use("/api/inspectables", inspectableRoutes); 
-app.use("/api/checklists", checklistRoutes); 
+app.use("/api/checklists", checklistRoutes);
+app.use("/api/checklists", familyChecklistRoutes); 
 app.use("/api", checklistTypeRoutes); 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 
