@@ -10,7 +10,6 @@ import ValidationErrors from './ValidationErrors';
 import ChecklistHeader from './components/ChecklistHeader';
 import ChecklistActions from './components/ChecklistActions';
 import FailuresSection from './components/FailuresSection';
-import EntitySelectionModal from './EntitySelectionModal';
 import SignatureList from './SignatureList';
 import Swal from 'sweetalert2';
 
@@ -20,7 +19,6 @@ import { useResponseManagement } from './hooks/useResponseManagement';
 import { useFileUpload } from './hooks/useFileUpload';
 import { useSignature } from './hooks/useSignature';
 import { useChecklistValidation } from './hooks/useChecklistValidation';
-import { useEntitySelector } from './hooks/useEntitySelector';
 import { useChecklistActions } from './hooks/useChecklistActions';
 import axiosInstance from '../../utils/axiosConfig';
 
@@ -38,11 +36,10 @@ export default function BaseChecklistPage({
   const [showValidationErrors, setShowValidationErrors] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
 
-  // Hook para la selección de entidad (solo si no hay una pre-seleccionada)
-  const entitySelector = useEntitySelector(config.entityType);
   
-  // Determinar la entidad a usar: la pre-seleccionada o la del selector.
-  const activeEntity = preselectedEntity || entitySelector.selectedEntity;
+  
+  // Determinar la entidad a usar: la pre-seleccionada
+  const activeEntity = preselectedEntity 
 
   const originalChecklistData = useChecklistData(checklistTypeId, {
     ...config,
@@ -69,7 +66,6 @@ export default function BaseChecklistPage({
   };
 
   const handleCreateChecklist = async () => {
-    console.log("handleCreateChecklist llamado."); // Log para depurar
     try {
       const result = await checklistData.fetchChecklistData();
       if (result) {
@@ -213,12 +209,6 @@ export default function BaseChecklistPage({
     );
   };
 
-  // --- RENDERIZADO ---
-
-  console.log("DEBUG BaseChecklistPage render - checklistData.checklist:", checklistData.checklist);
-  console.log("DEBUG BaseChecklistPage render - config.createInstance:", config.createInstance);
-  console.log("DEBUG BaseChecklistPage render - isOldDaily:", isOldDaily);
-  console.log("DEBUG BaseChecklistPage render - activeEntity:", activeEntity);
 
   if (checklistData.loading) {
     return (
@@ -285,17 +275,7 @@ export default function BaseChecklistPage({
           <SignatureList signatures={checklistData.checklist?.signatures} />
         </div>
 
-        {/* Modales */}
-        <EntitySelectionModal 
-            isOpen={entitySelector.isModalOpen}
-            onClose={entitySelector.closeModal}
-            onSelect={entitySelector.handleSelectEntity}
-            entities={entitySelector.availableEntities}
-            loading={entitySelector.loading}
-            entityLabel={config.entityLabel || 'Elemento'}
-            searchTerm={entitySelector.searchTerm}
-            setSearchTerm={entitySelector.setSearchTerm}
-        />
+
 
         {signatureManager.showSignaturePad && (
           <SignaturePad
