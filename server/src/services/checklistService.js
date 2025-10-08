@@ -362,7 +362,7 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, date, create
     });
 
     if (created) {
-      console.log('Nuevo checklist creado:', {
+        console.log('Nuevo checklist creado:', {
         checklist_id: existingChecklist.checklist_id,
         inspectable_id: existingChecklist.inspectable_id,
         version_label: existingChecklist.version_label,
@@ -807,20 +807,20 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
             const premise_id = inspectable ? inspectable.premise_id : null;
 
             if (premise_id) {
-              const [createdChecklist] = await Checklist.findOrCreate({
-                  where: {
-                      checklist_type_id: checklist.checklist_type_id,
-                      date: getDateRange(new Date(), checklist.type.frequency),
-                      inspectable_id: null,
-                  },
-                  defaults: {
-                      premise_id: premise_id,
-                      created_by: responded_by,
-                      version_label: checklist.type.version_label,
-                      date: new Date(),
-                  },
-                  transaction,
-              });
+          const [createdChecklist] = await Checklist.findOrCreate({
+              where: {
+                  checklist_type_id: checklist.checklist_type_id,
+                  date: getDateRange(new Date(), checklist.type.frequency),
+                  inspectable_id: null,
+              },
+              defaults: {
+                  premise_id: premise_id,
+                  created_by: responded_by,
+                  version_label: checklist.type.version_label,
+                  date: new Date(),
+              },
+              transaction,
+          });
               console.log(`Checklist de familia CREADO (fallback). ID: ${createdChecklist.checklist_id}`);
               responses.forEach(response => {
                 response.checklist_id = createdChecklist.checklist_id;
@@ -1386,7 +1386,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
                 premise_id: premise_id,
                 created_by: user_id,
                 version_label: definitiveChecklistType.version_label,
-                date: effectiveDate, // Usar la fecha normalizada
+                date: effectiveDateStr,
             }
         });
         checklist = await Checklist.findByPk(createdChecklist.checklist_id, {
@@ -1653,6 +1653,33 @@ const getChecklistHistoryByType = async (checklistTypeId) => {
   return { isPremiosChecklist: true, tableData };
 }
 
+// Función para ordenamiento natural de números de ítems
+const naturalSortItemNumbers = (items) => {
+  return items.sort((a, b) => {
+    const itemA = a.item_number || '';
+    const itemB = b.item_number || '';
+    
+    // Dividir por puntos y convertir cada parte a número para comparación
+    const partsA = itemA.split('.').map(part => parseInt(part, 10) || 0);
+    const partsB = itemB.split('.').map(part => parseInt(part, 10) || 0);
+    
+    // Comparar parte por parte
+    const maxLength = Math.max(partsA.length, partsB.length);
+    
+    for (let i = 0; i < maxLength; i++) {
+      const partA = partsA[i] || 0;
+      const partB = partsB[i] || 0;
+      
+      if (partA !== partB) {
+        return partA - partB;
+      }
+    }
+    
+    // Si todas las partes son iguales, comparar como string como fallback
+    return itemA.localeCompare(itemB);
+  });
+};
+
 const getChecklistDataForPDF = async (checklistId) => {
   try {
     const checklist = await Checklist.findByPk(checklistId, {
@@ -1666,7 +1693,13 @@ const getChecklistDataForPDF = async (checklistId) => {
             { model: Role, as: "role", attributes: ["role_name"] }
           ]
         },
-        { model: Inspectable, as: "inspectable" },
+        { 
+          model: Inspectable, 
+          as: "inspectable",
+          include: [
+            { model: Premise, as: "premise", attributes: ["premise_name"] }
+          ]
+        },
         {
           model: ChecklistSignature,
           as: "signatures",
@@ -1698,13 +1731,16 @@ const getChecklistDataForPDF = async (checklistId) => {
             { model: Failure, as: "failure", required: false }
           ]
         }
-      ],
-      order: [["item_number", "ASC"]]
+      ]
+      // Removemos el order de aquí para aplicar ordenamiento personalizado después
     });
+
+    // Aplicar ordenamiento natural a los ítems
+    const sortedItems = naturalSortItemNumbers(items);
 
     return {
       ...checklist.toJSON(),
-      items: items
+      items: sortedItems
     };
   } catch (error) {
     console.error('Error in getChecklistDataForPDF:', error);
