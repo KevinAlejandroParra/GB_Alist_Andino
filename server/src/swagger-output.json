@@ -1664,6 +1664,38 @@
         }
       }
     },
+    "/api/checklists/type/{checklistTypeId}/details": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "checklistTypeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
     "/api/checklists/{id}": {
       "get": {
         "description": "",
