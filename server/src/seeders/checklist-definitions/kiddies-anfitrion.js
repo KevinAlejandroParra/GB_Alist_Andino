@@ -19,8 +19,8 @@ const subItemTemplates = [
 ];
 
 module.exports = {
-  name: 'Kiddies - Anfitrion',
-  description: 'Checklist semanal de operacion para la familia Kiddies',
+  name: 'Check List Familia Kiddies - Anfitrion',
+  description: 'Check list semanal de operacion para la familia Kiddies',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
   role_id: 8, // Corresponde a anfitrión"

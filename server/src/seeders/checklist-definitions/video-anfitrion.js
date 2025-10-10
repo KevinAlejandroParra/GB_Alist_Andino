@@ -19,8 +19,8 @@ const subItemTemplates = [
 ];
 
 module.exports = {
-  name: 'Video - Anfitrión',
-  description: 'Checklist semanal de operacion para la familia Video',
+  name: 'Check List Familia Video - Anfitrión',
+  description: 'Check list semanal de operacion para la familia Video',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
   role_id: 8, // Corresponde a anfitrión

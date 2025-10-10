@@ -24,8 +24,8 @@ const subItemTemplates = [
 ];
 
 module.exports = {
-  name: 'Redencion - Técnico',
-  description: 'Checklist semanal de mantenimiento para la familia redencion',
+  name: 'Check List Familia Redencion - Técnico',
+  description: 'Check list semanal de mantenimiento para la familia redencion',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
   role_id: 7, // Corresponde a "Tecnico de mantenimiento"

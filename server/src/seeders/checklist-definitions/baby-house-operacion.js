@@ -1,6 +1,6 @@
 module.exports = {
-  name: "Atracciones – Baby House - Operacion (V1 SEP 2025  - BY: Alejandro Parra)",
-  description: "Checklist diario de operacion para la atracción Baby House",
+  name: "Check List Atracciones – Baby House - Operacion",
+  description: "Check list diario de operacion para la atracción Baby House",
   frequency: "diario",
   version_label: "V1 SEP 2025 - BY: Alejandro Parra",
   role_id: 8, // Corresponde a anfitrión
@@ -128,6 +128,20 @@ module.exports = {
           input_type: "radio",
           allow_comment: true,
         },
+        {
+          item_number: "3.3",
+          question_text: "VERIFIQUE FIJACION GENERAL, COSTURAS Y ESTADO DE CADA BOXEADOR",
+          guidance_text: "Revise cada boxeador para confirmar que esté bien sujeto y sin roturas en las costuras.",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "3.4",
+          question_text: "VERIFICAR LA COSTURA DE LA REATA CON RESPECTO A LA LONA DE LOS BOXEADORES",
+          guidance_text: "Inspeccione cuidadosamente la unión de la reata a la lona para descartar desgarros.",
+          input_type: "radio",
+          allow_comment: true,
+        },
       ],
     },
     {
@@ -160,39 +174,18 @@ module.exports = {
     },
     {
       item_number: "5",
-      question_text: "FICHAS EN FOMY ARMATODO",
-      input_type: "section",
-      children: [
-        {
-          item_number: "5.1",
-          question_text: "VERIFICAR EL ASEO Y ESTADO DE CADA FICHA",
-          guidance_text: "Inspeccione que todas las fichas de fomy estén limpias y sin roturas o mordeduras.",
-          input_type: "radio",
-          allow_comment: true,
-        },
-        {
-          item_number: "5.2",
-          question_text: "ORGANIZAR FICHAS EN EL LUGAR DESIGNADO",
-          guidance_text: "Asegúrese de que todas las fichas estén ordenadas y guardadas en su área correspondiente.",
-          input_type: "radio",
-          allow_comment: true,
-        },
-      ],
-    },
-    {
-      item_number: "6",
       question_text: "LEON Y ACCESORIOS",
       input_type: "section",
       children: [
         {
-          item_number: "6.1",
+          item_number: "5.1",
           question_text: "VERIFICAR EL ASEO Y ESTADO DEL ACOLCHADO Y PEGUES DEL DISPOSITIVO",
           guidance_text: "Revise que el acolchado del león esté limpio y que todas las uniones y pegues estén firmes.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "6.2",
+          item_number: "5.2",
           question_text: "VERIFICAR AJUSTE DE DIENTES, COLA, OREJAS, MELENA Y OJOS",
           guidance_text: "Asegúrese de que todas las partes del león estén bien sujetas y no presenten riesgo de desprendimiento.",
           input_type: "radio",
@@ -201,19 +194,19 @@ module.exports = {
       ],
     },
     {
-      item_number: "7",
+      item_number: "6",
       question_text: "VOLCAN",
       input_type: "section",
       children: [
         {
-          item_number: "7.1",
+          item_number: "6.1",
           question_text: "VERIFICAR FUNCIONAMIENTO DEL BOTON Y BLOWER DEL VOLCAN",
           guidance_text: "Presione el botón para confirmar que el soplador (blower) se activa y funciona correctamente.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "7.2",
+          item_number: "6.2",
           question_text: "VERIFIQUE EL ESTADO Y ASEO DE LAS PELOTAS (Cantidad de bolas a la mitad de la Piscina)",
           guidance_text: "Revise que las pelotas estén limpias y que el nivel en la piscina sea el adecuado (aproximadamente a la mitad).",
           input_type: "radio",
@@ -222,40 +215,40 @@ module.exports = {
       ],
     },
     {
-      item_number: "8",
+      item_number: "7",
       question_text: "JUEGO INTERACTIVO GUITARRA Y BANDA TRANSPORTADORA",
       input_type: "section",
       children: [
         {
-          item_number: "8.1",
+          item_number: "7.1",
           question_text: "VERIFIQUE EL ESTADO Y FUNCIONAMIENTO DE CADA UNO DE LOS ELEMENTOS DEL JUEGO",
           guidance_text: "Pruebe cada componente interactivo de la guitarra para asegurar que todos funcionan.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "8.2",
+          item_number: "7.2",
           question_text: "VERIFIQUE EL ASEO Y ESTADO DE PELOTAS Y ATRACCION",
           guidance_text: "Asegúrese de que tanto las pelotas como la estructura general de la atracción estén limpias.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "8.3",
+          item_number: "7.3",
           question_text: "VERIFICAR FUNCIONAMIENTO DE SENSORES Y BLOWER DE CADA TUBO DE SUCCION",
           guidance_text: "Pruebe cada tubo para confirmar que los sensores detectan y activan el soplador correctamente.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "8.4",
+          item_number: "7.4",
           question_text: "VERIFICAR ESTADO, ASEO Y FIRMEZA DE LOS ACOLCHADOS DE LA PISCINA",
           guidance_text: "Inspeccione los acolchados de la piscina para verificar que estén limpios, firmes y sin daños.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "8.5",
+          item_number: "7.5",
           question_text: "VERIFICAR EL FUNCIONAMIENTO Y ASEO DE LA BANDA TRANSPORTADORA",
           guidance_text: "Active la banda para asegurar que se mueve suavemente y que su superficie está limpia.",
           input_type: "radio",
@@ -264,12 +257,12 @@ module.exports = {
       ],
     },
     {
-      item_number: "9",
+      item_number: "8",
       question_text: "ARBOL CON OJOS EN MOVIMIENTO Y PAJARO QQ",
       input_type: "section",
       children: [
         {
-          item_number: "9.1",
+          item_number: "8.1",
           question_text: "VERIFICAR ASEO, SONIDO Y FUNCIONAMIENTO DE LOS OJOS (OPRIMIENDO EL BOTON)",
           guidance_text: "Presione el botón para confirmar que los ojos se mueven, el sonido se activa y todo está limpio.",
           input_type: "radio",
@@ -278,26 +271,26 @@ module.exports = {
       ],
     },
     {
-      item_number: "10",
+      item_number: "9",
       question_text: "OSITO AVIADOR",
       input_type: "section",
       children: [
         {
-          item_number: "10.1",
+          item_number: "9.1",
           question_text: "VERIFIQUE FIJACION GENERAL Y ASEO DE LA ATRACCION",
           guidance_text: "Asegúrese de que el osito esté firmemente sujeto a su base y que toda la atracción esté limpia.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "10.2",
+          item_number: "9.2",
           question_text: "VERIFICAR QUE SE ESTE REALIZANDO EL MOVIMIENTO GIRATORIO DE LA ATRACCION",
           guidance_text: "Active el osito para comprobar que su movimiento giratorio es constante y sin ruidos extraños.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "10.3",
+          item_number: "9.3",
           question_text: "VERIFICAR ESTADO DE PROTECTORES (COSTURAS Y DESGASTE)",
           guidance_text: "Inspeccione los elementos de protección en busca de costuras rotas o desgaste excesivo.",
           input_type: "radio",
@@ -306,12 +299,12 @@ module.exports = {
       ],
     },
     {
-      item_number: "11",
+      item_number: "10",
       question_text: "ARBOL DEL TUCCAN",
       input_type: "section",
       children: [
         {
-          item_number: "11.1",
+          item_number: "10.1",
           question_text: "VERIFICAR ASEO, SONIDO Y FUNCIONAMIENTO DEL TUCAN (OPRIMIENDO EL BOTON)",
           guidance_text: "Presione el botón para asegurar que el tucán emite su sonido y funciona correctamente.",
           input_type: "radio",
@@ -320,68 +313,33 @@ module.exports = {
       ],
     },
     {
-      item_number: "12",
-      question_text: "ELEMENTOS INTERACTIVOS BOXEADORES",
-      input_type: "section",
-      children: [
-        {
-          item_number: "12.1",
-          question_text: "VERIFIQUE FIJACION GENERAL, COSTURAS Y ESTADO DE CADA BOXEADOR",
-          guidance_text: "Revise cada boxeador para confirmar que esté bien sujeto y sin roturas en las costuras.",
-          input_type: "radio",
-          allow_comment: true,
-        },
-        {
-          item_number: "12.2",
-          question_text: "VERIFICAR LA COSTURA DE LA REATA CON RESPECTO A LA LONA",
-          guidance_text: "Inspeccione cuidadosamente la unión de la reata a la lona para descartar desgarros.",
-          input_type: "radio",
-          allow_comment: true,
-        },
-      ],
-    },
-    {
-      item_number: "13",
+      item_number: "11",
       question_text: "ELEMENTOS INTERACTIVOS Y PUFF",
       input_type: "section",
       children: [
         {
-          item_number: "13.1",
+          item_number: "11.1",
           question_text: "VERIFICAR EL FUNCIONAMIENTO DE CADA UNO DE LOS ELEMENTOS INTERACTIVOS DE LA ATRACCION",
           guidance_text: "Pruebe todos los elementos interactivos para asegurar que responden y funcionan como se espera.",
           input_type: "radio",
           allow_comment: true,
         },
-      ],
-    },
-    {
-      item_number: "14",
-      question_text: "JUEGO INTERACTIVO (VACA)",
-      input_type: "section",
-      children: [
         {
-          item_number: "14.1",
-          question_text: "REVISAR CADA UNO DE LOS ELEMENTOS QUE COMPONEN LA ATRACCION",
-          guidance_text: "Inspeccione visual y funcionalmente cada parte del juego de la vaca.",
+          item_number: "11.2",
+          question_text: "VERIFICAR EL ASEO Y ESTADO DE CADA FICHA",
+          guidance_text: "Inspeccione que todas las fichas de fomy estén limpias y sin roturas o mordeduras.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "14.2",
-          question_text: "REVISAR ASEO DE PELOTAS Y ACOLCHADOS DE CERRAMIENTO",
-          guidance_text: "Asegúrese de que tanto las pelotas como los acolchados del área estén limpios y en buen estado.",
+          item_number: "11.3",
+          question_text: "ORGANIZAR FICHAS EN EL LUGAR DESIGNADO",
+          guidance_text: "Asegúrese de que todas las fichas estén ordenadas y guardadas en su área correspondiente.",
           input_type: "radio",
           allow_comment: true,
         },
-      ],
-    },
-    {
-      item_number: "15",
-      question_text: "PIANO DE PISO",
-      input_type: "section",
-      children: [
-        {
-          item_number: "15.1",
+         {
+          item_number: "11.4",
           question_text: "VERIFICAR ASEO, SONIDO Y FUNCIONAMIENTO DE LAS TECLAS (OPRIMIENDOLAS)",
           guidance_text: "Pise cada tecla para confirmar que está limpia, suena correctamente y responde al tacto.",
           input_type: "radio",
@@ -390,12 +348,12 @@ module.exports = {
       ],
     },
     {
-      item_number: "16",
+      item_number: "12",
       question_text: "ASEO",
       input_type: "section",
       children: [
         {
-          item_number: "16.1",
+          item_number: "12.1",
           question_text: "SE REALIZO EL ASEO Y LA DESINFECCIÓN CORRECTA DE LA ATRACCIÓN?",
           guidance_text: "Confirme que se han seguido todos los protocolos de limpieza y desinfección en toda el área.",
           input_type: "radio",
@@ -404,33 +362,54 @@ module.exports = {
       ],
     },
     {
-      item_number: "17",
+      item_number: "13",
+      question_text: "JUEGO INTERACTIVO (VACA)",
+      input_type: "section",
+      children: [
+        {
+          item_number: "13.1",
+          question_text: "REVISAR CADA UNO DE LOS ELEMENTOS QUE COMPONEN LA ATRACCION",
+          guidance_text: "Inspeccione visual y funcionalmente cada parte del juego de la vaca.",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "13.2",
+          question_text: "REVISAR ASEO DE PELOTAS Y ACOLCHADOS DE CERRAMIENTO",
+          guidance_text: "Asegúrese de que tanto las pelotas como los acolchados del área estén limpios y en buen estado.",
+          input_type: "radio",
+          allow_comment: true,
+        },
+      ],
+    },
+    {
+      item_number: "14",
       question_text: "LISTO PARA OPERAR (SI-NO)",
       input_type: "section",
       children: [
         {
-          item_number: "17.1",
+          item_number: "14.1",
           question_text: "VERIFICAR QUE SE CUENTE CON GEL ANTIBACTERIAL",
           guidance_text: "Asegúrese de que haya dispensadores con suficiente gel antibacterial para los visitantes.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "17.2",
+          item_number: "14.2",
           question_text: "VERIFICAR QUE LA ATRACCION CUENTE CON STICKERS DE FELIX Y ALEGRA Y/O DULCES",
           guidance_text: "Confirme que los insumos como stickers o dulces estén disponibles según corresponda.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "17.3",
+          item_number: "14.3",
           question_text: "VERIFICAR LA CANTIDAD DE MANILLAS DISPONIBLES PARA LA OPERACIÓN",
           guidance_text: "Asegúrese de que haya suficientes manillas de acceso para la jornada.",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "17.4",
+          item_number: "14.4",
           question_text: "VERIFICAR EL ESTADO DE LA FICHA DE SERVICIO Y AVISOS EN GENERAL",
           guidance_text: "Revise que la ficha de servicio esté visible y que todos los avisos informativos estén en buen estado.",
           input_type: "radio",

@@ -19,8 +19,8 @@ const subItemTemplates = [
 ];
 
 module.exports = {
-  name: 'Redencion - Anfitrión',
-  description: 'Checklist semanal de operacion para la familia redencion',
+  name: 'Check List Familia Redencion - Anfitrión',
+  description: 'Check list semanal de operacion para la familia redencion',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
   role_id: 8, // Corresponde a anfitrión

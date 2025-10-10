@@ -1,13 +1,13 @@
 module.exports = {
-  name: "Atracciones – Tren del Oeste (V1 SEP 2025 - BY: Alejandro Parra)",
-  description: "Checklist diario de operación para la atracción Tren del Oeste", // [cite: 2]
+  name: "Check List Atracciones – Tren del Oeste - Operacion",
+  description: "Check list diario de operación para la atracción Tren del Oeste",
   frequency: "diario",
   version_label: "V1 SEP 2025 - BY: Alejandro Parra",
   role_id: 8, // Corresponde a "Anfitrión" 
   attraction_name: "Tren del Oeste", 
   premise_id: 2, 
   // Agrega specific_inspectable_names si este checklist es para inspectables específicos
-  specific_inspectable_names: ["Tren del Oeste (Atracción)"], // EJEMPLO: Reemplazar con nombres reales de inspectables
+  specific_inspectable_names: ["Tren del Oeste (Atracción)"],
   items: [
     {
       item_number: "1",

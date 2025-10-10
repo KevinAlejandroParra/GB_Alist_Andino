@@ -19,8 +19,8 @@ const subItemTemplates = [
 ];
 
 module.exports = {
-  name: 'Apoyo - Anfitriones',
-  description: 'Checklist diario de operación para la familia Apoyo',
+  name: 'Check List Familia Apoyo - Anfitrión',
+  description: 'Check list para la familia Apoyo, diseñado para anfitriones que supervisan el estado y funcionamiento de los dispositivos asignados.',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
   role_id: 8, // Corresponde a "Anfitriones"

@@ -1,6 +1,6 @@
 module.exports = {
-  name: "Atracciones – Congo / Play Ground (V1 SEP 2025 - BY: Alejandro Parra)",
-  description: "Checklist diario de operación para la atracción Congo / Play Ground",
+  name: "Check List Atracciones – Congo / Play Ground - Operacion",
+  description: "Check list diario de operación para la atracción Congo a cargo del anfitrión",
   frequency: "diario",
   version_label: "V1 SEP 2025 - BY: Alejandro Parra",
   role_id: 8, // Corresponde a "Anfitrión"

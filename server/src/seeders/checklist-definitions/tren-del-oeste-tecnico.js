@@ -107,8 +107,8 @@ const transformItems = (rawItems) => {
 };
 
 module.exports = {
-  name: "Atracciones – Tren del Oeste (V1 SEP 2025)",
-  description: "Checklist diario de mantenimiento para la atracción Tren del Oeste",
+  name: "Check List Atracciones – Tren del Oeste - Tecnico",
+  description: "Check list diario de mantenimiento para la atracción Tren del Oeste",
   frequency: "diario",
   version_label: "V1 SEP 2025 BY: Alejandro Parra",
   role_id: 7, // Corresponde a "Tecnico de mantenimiento"

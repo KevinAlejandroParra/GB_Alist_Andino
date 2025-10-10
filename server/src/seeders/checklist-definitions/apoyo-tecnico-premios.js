@@ -10,7 +10,7 @@ const newQuestions = [
 // Combinar todas las preguntas aplicables
 const allQuestions = [...newQuestions];
 
-const machines = ['TOY BOX', 'TOY FAMILY', 'WORK ZONE'];
+const machines = ['TOY BOX 1', 'TOY BOX 2', 'TOY BOX 3', 'TOY BOX 4', 'TOY BOX XL', 'WORK ZONE'];
 
 // Generar la estructura de items estáticos
 const items = machines.map((machine, index) => ({
@@ -26,12 +26,12 @@ const items = machines.map((machine, index) => ({
 }));
 
 module.exports = {
-  name: 'Apoyo - Técnico (Premios)',
-  description: 'Checklist semanal de mantenimiento para máquinas de premios de la familia Apoyo',
+  name: 'Check List de Contadores de dispositivos de Premios (tecnico)',
+  description: 'Incluyen conteo de jugadas, premios y configuración de toy box, work zone y toy box XL.',
   frequency: 'semanal',
   version_label: 'V1 Static Premios SEP 2025 BY: Alejandro Parra',
   role_id: 7, // Corresponde a "Tecnico de mantenimiento"
-  specific_inspectable_names: ["Toy Box", "Toy family", "work zone"],
+  specific_inspectable_names: ["Toy Box 1", "Toy Box 2", "Toy Box 3", "Toy Box 4", "Toy Box XL", "work zone"],
   dynamic_items: false, 
   items: items,
 };

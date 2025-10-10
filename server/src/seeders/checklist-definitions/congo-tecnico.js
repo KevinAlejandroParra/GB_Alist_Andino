@@ -304,8 +304,8 @@ const transformItems = (items) => {
 };
 
 module.exports = {
-  name: "Atracciones – Congo (V1 SEP 2025)",
-  description: "Checklist diario de mantenimiento para la atracción Congo",
+  name: "Check List Atracciones – Congo / Play Ground - Tecnico",
+  description: "Check list diario de mantenimiento para la atracción Congo a cargo del técnico",
   frequency: "diario",
   version_label: "V1 SEP 2025 BY: Alejandro Parra",
   role_id: 7, // Corresponde a "Tecnico de mantenimiento"
