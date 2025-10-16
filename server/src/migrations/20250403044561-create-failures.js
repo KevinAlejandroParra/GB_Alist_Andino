@@ -23,6 +23,9 @@ module.exports = {
                 type: Sequelize.TEXT,
                 allowNull: true,
             },
+            evidence_solution_url: {
+                type: Sequelize.STRING,
+            },
             responsible_area: {
                 type: Sequelize.ENUM('Técnico', 'Operación', 'Mixto'),
                 allowNull: true,
@@ -49,14 +52,31 @@ module.exports = {
                 allowNull: true,
             },
               closed_by: {
-                type: DataTypes.INTEGER,
-                allowNull: true,
-            },
-            createdAt: {
-                type: Sequelize.DATE,
-                defaultValue: Sequelize.NOW,
-                allowNull: false,
-            },
+                  type: DataTypes.INTEGER,
+                  allowNull: true,
+              },
+              work_order_number: {
+                  type: DataTypes.STRING,
+                  allowNull: true,
+              },
+              first_reported_date: {
+                  type: DataTypes.DATE,
+                  allowNull: true,
+              },
+              last_updated_date: {
+                  type: DataTypes.DATE,
+                  allowNull: true,
+              },
+              recurrence_count: {
+                  type: DataTypes.INTEGER,
+                  allowNull: true,
+                  defaultValue: 1,
+              },
+              createdAt: {
+                  type: Sequelize.DATE,
+                  defaultValue: Sequelize.NOW,
+                  allowNull: false,
+              },
             updatedAt: {
                 type: Sequelize.DATE,
                 defaultValue: Sequelize.NOW,
