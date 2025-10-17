@@ -2,7 +2,46 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Checklist extends Model {}
+    class Checklist extends Model {
+        static associate(models) {
+            // Un checklist pertenece a un tipo de checklist
+            Checklist.belongsTo(models.ChecklistType, {
+                foreignKey: 'checklist_type_id',
+                as: 'type'
+            });
+
+            // Un checklist pertenece a un premise
+            Checklist.belongsTo(models.Premise, {
+                foreignKey: 'premise_id',
+                as: 'premise'
+            });
+
+            // Un checklist pertenece a un inspectable
+            Checklist.belongsTo(models.Inspectable, {
+                foreignKey: 'inspectable_id',
+                as: 'inspectable'
+            });
+
+            // Un checklist es creado por un usuario
+            Checklist.belongsTo(models.User, {
+                foreignKey: 'created_by',
+                as: 'creator'
+            });
+
+
+            // Un checklist puede tener muchas respuestas
+            Checklist.hasMany(models.ChecklistResponse, {
+                foreignKey: 'checklist_id',
+                as: 'responses'
+            });
+
+            // Un checklist puede tener muchas firmas
+            Checklist.hasMany(models.ChecklistSignature, {
+                foreignKey: 'checklist_id',
+                as: 'signatures'
+            });
+        }
+    }
     Checklist.init(
         {
             checklist_id: {
@@ -26,29 +65,7 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.STRING,
                 allowNull: true,
             },
-            date: {
-                type: DataTypes.DATEONLY,
-                allowNull: false,
-                get() {
-                    const rawValue = this.getDataValue('date');
-                    if (!rawValue || rawValue === 'Invalid date') {
-                        // Return today's date or null, depending on needs
-                        const today = new Date();
-                        const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-                        return dateStr;
-                    }
-                    return rawValue;
-                }
-            },
-            created_by: {
-                type: DataTypes.INTEGER,
-                allowNull: false,
-            },
-            signed_by: {
-                type: DataTypes.INTEGER,
-                allowNull: true, 
-            },
-            createdAt: {
+          createdAt: {
                 type: DataTypes.DATE,
                 defaultValue: DataTypes.NOW,
                 allowNull: false,
