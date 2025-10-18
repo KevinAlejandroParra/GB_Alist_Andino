@@ -5,19 +5,21 @@ const puppeteer = require("puppeteer")
 const ensureChecklistInstance = async (req, res) => {
   try {
     const { inspectableId } = req.params
-    const { premise_id, date, checklist_type_id } = req.body // Extraer checklist_type_id
+    const { premise_id, checklist_type_id } = req.body 
     const user_id = req.user.user_id
     const role_id = req.user.role_id
 
-    const checklist = await checklistService.ensureChecklistInstance({
+    const result = await checklistService.ensureChecklistInstance({
       inspectableId: Number.parseInt(inspectableId),
       premise_id,
-      date,
       created_by: user_id,
       role_id,
-      checklist_type_id: Number.parseInt(checklist_type_id), // Pasar checklist_type_id al servicio
+      checklist_type_id: Number.parseInt(checklist_type_id),
     })
-    res.status(200).json(checklist)
+
+    if (result.isNew) {
+    }
+    res.status(200).json(result)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -26,10 +28,9 @@ const ensureChecklistInstance = async (req, res) => {
 const getLatestChecklist = async (req, res) => {
   try {
     const { inspectableId } = req.params
-    const { date, checklist_type_id } = req.query // Extraer checklist_type_id
+    const { checklist_type_id } = req.query 
     const checklist = await checklistService.getLatestChecklist({
       inspectableId: Number.parseInt(inspectableId),
-      date,
       checklist_type_id: Number.parseInt(checklist_type_id), // Pasar checklist_type_id al servicio
     })
     res.status(200).json(checklist)
@@ -41,14 +42,13 @@ const getLatestChecklist = async (req, res) => {
 const createChecklist = async (req, res) => {
   try {
     const { checklistTypeId } = req.params;
-    const { date, inspectableId } = req.query;
+    const { inspectableId } = req.query;
     const user_id = req.user.user_id;
     const role_id = req.user.role_id;
 
     // Primero verificamos si ya existe una instancia para hoy
     const existingChecklist = await checklistService.getLatestChecklist({
       inspectableId: inspectableId ? Number.parseInt(inspectableId) : null,
-      date,
       checklist_type_id: Number.parseInt(checklistTypeId),
     });
 
@@ -58,26 +58,32 @@ const createChecklist = async (req, res) => {
     }
 
     // Si no existe, creamos una nueva instancia
-    const newChecklist = await checklistService.ensureChecklistInstance({
+    const newChecklistResult = await checklistService.ensureChecklistInstance({
       inspectableId: inspectableId ? Number.parseInt(inspectableId) : null,
-      date,
       created_by: user_id,
       role_id,
       checklist_type_id: Number.parseInt(checklistTypeId),
     });
 
-    if (!newChecklist) {
+    if (!newChecklistResult || !newChecklistResult.checklist) {
       return res.status(400).json({ error: "No se pudo crear el checklist" });
+    }
+
+    // Enviar notificación si se creó una nueva instancia
+    if (newChecklistResult.isNew) {
+      console.log(`✅ Nueva instancia creada: ${newChecklistResult.message}`);
     }
 
     // Obtenemos el checklist completo con todos sus datos
     const fullChecklist = await checklistService.getLatestChecklist({
       inspectableId: inspectableId ? Number.parseInt(inspectableId) : null,
-      date,
       checklist_type_id: Number.parseInt(checklistTypeId),
     });
 
-    res.status(201).json(fullChecklist);
+    res.status(201).json({
+      ...fullChecklist,
+      notification: newChecklistResult.isNew ? newChecklistResult.message : null
+    });
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -898,7 +904,7 @@ const generateChecklistHTML = (data) => {
                             <th>Checklist ID</th>
                             <td>${data.checklist_id}</td>
                             <th>Fecha</th>
-                            <td>${formatDate(data.date)}</td>
+                            <td>${formatDate(data.createdAt)}</td>
                         </tr>
                         <tr>
                             <th>Realizado por</th>
@@ -994,7 +1000,6 @@ const getChecklistByType = async (req, res) => {
     const checklistInstanceData = await checklistService.ensureChecklistInstance({
       checklist_type_id: Number.parseInt(checklistTypeId),
       inspectableId: null, // For type-based checklists, inspectableId is null
-      date: new Date().toISOString(),
       created_by: user_id,
       role_id: role_id,
     });
@@ -1054,8 +1059,8 @@ const getChecklistByType = async (req, res) => {
 
 
     const finalChecklistData = {
-      ...checklistInstanceData, // Contains checklist_id, date, type, signatures, pending_failures
-      type: checklistTypeTemplate.toJSON(), // Ensure the type data is from the template
+       ...checklistInstanceData, // Contains checklist_id, type, signatures, pending_failures
+       type: checklistTypeTemplate.toJSON(), // Ensure the type data is from the template
       items: combinedItems,
     };
 
@@ -1068,11 +1073,9 @@ const getChecklistByType = async (req, res) => {
 const getLatestChecklistByType = async (req, res) => {
   try {
     const { checklistTypeId } = req.params
-    const { date } = req.query
     const { user_id, role_id } = req.user
     const checklist = await checklistService.getLatestChecklistByType({
       checklistTypeId: Number.parseInt(checklistTypeId),
-      date,
       user_id,
       role_id,
     })

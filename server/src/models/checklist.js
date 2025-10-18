@@ -65,15 +65,22 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.STRING,
                 allowNull: true,
             },
-          createdAt: {
+            created_by: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                references: {
+                    model: "users",
+                    key: "user_id",
+                },
+            },
+            createdAt: {
                 type: DataTypes.DATE,
-                defaultValue: DataTypes.NOW,
+                defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
                 allowNull: false,
             },
             updatedAt: {
                 type: DataTypes.DATE,
-                defaultValue: DataTypes.NOW,
-                onUpdate: DataTypes.NOW,
+                defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
                 allowNull: false,
             },
         },

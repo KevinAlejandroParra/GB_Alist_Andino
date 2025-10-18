@@ -254,37 +254,9 @@ const getChecklistTypeForInspectable = async (inspectableId, request_role_id, tr
   return checklistType;
 }
 
-const getDateRange = (date, frequency) => {
-  const targetDate = new Date(date);
 
-  if (isNaN(targetDate.getTime())) {
-    return { dateError: `Invalid date: ${date}` }; 
-  }
 
-  const normalizedTargetDate = new Date(targetDate.setUTCHours(0, 0, 0, 0));
-
-  if (frequency === "Diaria") { // Cambiado a "Diaria" para coincidir con la base de datos
-    const startDate = new Date(normalizedTargetDate);
-    startDate.setUTCHours(0, 0, 0, 0); 
-    const endDate = new Date(normalizedTargetDate);
-    endDate.setUTCHours(23, 59, 59, 999);
-    return { [Op.between]: [startDate, endDate] };
-  } else if (frequency === "Semanal") { // Cambiado a "Semanal" para coincidir con la base de datos
-    const dayOfWeek = normalizedTargetDate.getUTCDay();
-    const startDate = new Date(normalizedTargetDate);
-    startDate.setUTCDate(normalizedTargetDate.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
-    startDate.setUTCHours(0, 0, 0, 0);
-
-    const endDate = new Date(startDate);
-    endDate.setUTCDate(startDate.getUTCDate() + 6);
-    endDate.setUTCHours(23, 59, 59, 999);
-    return { [Op.between]: [startDate, endDate] };
-  }
-  // Para frecuencias que no son diarias ni semanales, se espera una fecha exacta.
-  return { [Op.eq]: normalizedTargetDate };
-};
-
-const ensureChecklistInstance = async ({ inspectableId, premise_id, date, created_by, role_id, checklist_type_id }) => {
+const ensureChecklistInstance = async ({ inspectableId, premise_id, created_by, role_id, checklist_type_id }) => {
   let transaction;
   try {
     transaction = await connection.transaction();
@@ -300,19 +272,18 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, date, create
       checklistTypeInstance = await getChecklistTypeForInspectable(inspectableId, role_id, transaction);
     }
     
-    // Manejar la fecha
-    let effectiveDate = date ? new Date(date) : getTodayNormalizedUTC(); // Usar fecha proporcionada o hoy
-    effectiveDate.setUTCHours(0, 0, 0, 0); // Normalizar a medianoche UTC
-    
-    const dateCondition = getDateRange(effectiveDate, checklistTypeInstance.frequency);
-    if (dateCondition.dateError) {
-      throw new Error(dateCondition.dateError); // Manejar error de fecha inválida
-    }
+    const today = getTodayNormalizedUTC();
+    const startOfDay = new Date(today);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setUTCHours(23, 59, 59, 999);
 
     // Construir la cláusula where para buscar checklist existente
     const whereClause = {
       checklist_type_id: checklistTypeInstance.checklist_type_id,
-      date: dateCondition
+      createdAt: {
+        [Op.between]: [startOfDay, endOfDay],
+      }
     };
     if (inspectableId !== null && inspectableId !== undefined) {
       whereClause.inspectable_id = inspectableId;
@@ -347,33 +318,44 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, date, create
       }
     }
 
-    // Usar findOrCreate para evitar race conditions
-    const [existingChecklist, created] = await Checklist.findOrCreate({
+    // Primero, buscar si ya existe un checklist con las condiciones dadas
+    let existingChecklist = await Checklist.findOne({
       where: whereClause,
-      defaults: {
-        checklist_type_id: checklistTypeInstance.checklist_type_id,
-        inspectable_id: inspectableId,
-        premise_id: effectivePremiseId,
-        date: effectiveDate, // Usar la fecha normalizada aquí
-        created_by,
-        version_label: checklistTypeInstance.version_label,
-      },
       transaction,
     });
 
-    if (created) {
-        console.log('Nuevo checklist creado:', {
-        checklist_id: existingChecklist.checklist_id,
-        inspectable_id: existingChecklist.inspectable_id,
-        version_label: existingChecklist.version_label,
-        date: existingChecklist.date // Log la fecha para verificar
-      });
-    } else {
+    // Si el checklist existe, lo retornamos
+    if (existingChecklist) {
       console.log('Checklist existente encontrado:', existingChecklist.checklist_id);
+      await transaction.commit();
+      return {
+        checklist: existingChecklist,
+        isNew: false,
+        message: 'Checklist existente encontrado'
+      };
     }
 
+    // Si no existe, lo creamos
+    const newChecklist = await Checklist.create({
+      checklist_type_id: checklistTypeInstance.checklist_type_id,
+      inspectable_id: inspectableId,
+      premise_id: effectivePremiseId,
+      created_by,
+      version_label: checklistTypeInstance.version_label,
+    }, { transaction });
+
+    console.log('Nuevo checklist creado:', {
+      checklist_id: newChecklist.checklist_id,
+      inspectable_id: newChecklist.inspectable_id,
+      version_label: newChecklist.version_label,
+    });
+
     await transaction.commit();
-    return existingChecklist;
+    return {
+      checklist: newChecklist,
+      isNew: true,
+      message: 'Nueva instancia de checklist creada exitosamente'
+    };
 
   } catch (error) {
     console.error('Error en ensureChecklistInstance:', error);
@@ -382,9 +364,12 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, date, create
   }
 };
 
-const getLatestChecklist = async ({ inspectableId, date, role_id, checklist_type_id }) => {
-  const normalizedInputDate = date ? new Date(date) : getTodayNormalizedUTC(); // Usar fecha proporcionada o hoy
-  normalizedInputDate.setUTCHours(0, 0, 0, 0); // Normalizar a medianoche UTC
+const getLatestChecklist = async ({ inspectableId, role_id, checklist_type_id }) => {
+  const today = getTodayNormalizedUTC();
+  const startOfDay = new Date(today);
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const endOfDay = new Date(today);
+  endOfDay.setUTCHours(23, 59, 59, 999);
   
   let definitiveChecklistType;
 
@@ -398,15 +383,12 @@ const getLatestChecklist = async ({ inspectableId, date, role_id, checklist_type
       definitiveChecklistType = await getChecklistTypeForInspectable(inspectableId, queryRole);
   }
 
-  let effectiveDate = normalizedInputDate;
-  const dateCondition = getDateRange(normalizedInputDate, definitiveChecklistType.frequency);
-  if (dateCondition.dateError) {
-    // Use today's date as fallback for invalid dates
-    effectiveDate = new Date();
-    effectiveDate.setUTCHours(0, 0, 0, 0);
-  }
-  const correctedDateCondition = getDateRange(effectiveDate, definitiveChecklistType.frequency);
-  const whereClause = { date: correctedDateCondition, checklist_type_id: definitiveChecklistType.checklist_type_id };
+  const whereClause = { 
+    createdAt: {
+      [Op.between]: [startOfDay, endOfDay],
+    },
+    checklist_type_id: definitiveChecklistType.checklist_type_id 
+  };
   if (inspectableId !== null && inspectableId !== undefined) {
     whereClause.inspectable_id = inspectableId;
   }
@@ -414,7 +396,7 @@ const getLatestChecklist = async ({ inspectableId, date, role_id, checklist_type
   // Solo buscar y retornar la instancia existente, sin crear una nueva
   const checklist = await Checklist.findOne({
     where: whereClause,
-    order: [["createdAt", "ASC"]],
+    order: [["createdAt", "DESC"]],
     include: [{ model: ChecklistType, as: "type" }],
   });
 
@@ -559,7 +541,7 @@ const getLatestChecklist = async ({ inspectableId, date, role_id, checklist_type
             as: 'checklist',
             where: {
               inspectable_id: inspectableId,
-              date: { [Op.lt]: checklist.date }
+              createdAt: { [Op.lt]: checklist.createdAt }
             },
             required: true
           },
@@ -604,7 +586,7 @@ const getChecklistHistory = async (inspectableId) => {
         ],
       },
     ],
-    order: [["date", "DESC"]],
+    order: [["createdAt", "DESC"]],
   })
   return checklists
 }
@@ -633,7 +615,7 @@ const handlePremiosCalculations = async (checklist, transaction) => {
     where: {
       inspectable_id: checklist.inspectable_id,
       checklist_type_id: checklist.checklist_type_id,
-      date: { [Op.lt]: checklist.date },
+      createdAt: { [Op.lt]: checklist.createdAt },
     },
     include: [
       {
@@ -642,7 +624,7 @@ const handlePremiosCalculations = async (checklist, transaction) => {
         include: [{ model: ChecklistItem, as: 'checklistItem' }],
       },
     ],
-    order: [['date', 'DESC']],
+    order: [['createdAt', 'DESC']],
     transaction,
   });
 
@@ -739,7 +721,7 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
       })
       if (!checklist) throw new Error("Checklist not found")
     } else {
-      // For specific checklists without checklist_id, find by type and date
+      // For specific checklists without checklist_id, find by type and createdAt
       const firstResponse = responses[0];
       if (!firstResponse) throw new Error("No responses provided");
 
@@ -753,7 +735,6 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
       checklist = {
         checklist_id: null,
         type: checklistType,
-        date: new Date(),
         checklist_type_id: item.checklist_type_id
       };
     }
@@ -773,13 +754,12 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
 
       if (checklist.type.type_category === 'family') {
         console.log('Procesando checklist de FAMILIA');
-        // Para checklists de familia, solo debe existir UNA instancia de checklist sin inspectable_id.
-        // Esta instancia ya debería haber sido creada por getLatestChecklistByType.
-        // Aquí, solo la buscamos para asignar el ID correcto a las respuestas.
         const familyChecklist = await Checklist.findOne({
           where: {
             checklist_type_id: checklist.checklist_type_id,
-            date: getDateRange(new Date(), checklist.type.frequency),
+            createdAt: {
+              [Op.between]: [startOfDay, endOfDay],
+            },
             inspectable_id: null
           },
           transaction
@@ -810,14 +790,15 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
           const [createdChecklist] = await Checklist.findOrCreate({
               where: {
                   checklist_type_id: checklist.checklist_type_id,
-                  date: getDateRange(new Date(), checklist.type.frequency),
+                  createdAt: {
+                    [Op.between]: [startOfDay, endOfDay],
+                  },
                   inspectable_id: null,
               },
               defaults: {
                   premise_id: premise_id,
                   created_by: responded_by,
                   version_label: checklist.type.version_label,
-                  date: new Date(),
               },
               transaction,
           });
@@ -841,12 +822,14 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
               where: {
                 inspectable_id: insId,
                 checklist_type_id: checklist.checklist_type_id,
-                date: getDateRange(new Date(), checklist.type.frequency)
+                createdAt: {
+                  [Op.between]: [startOfDay, endOfDay],
+                }
               },
               defaults: {
                 created_by: responded_by,
                 version_label: checklist.type.version_label,
-                premise_id: inspectable ? inspectable.premise_id : null // Corregido: Obtener premise_id
+                premise_id: inspectable ? inspectable.premise_id : null
               },
               transaction
             });
@@ -858,7 +841,9 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
             where: {
               inspectable_id: { [Op.in]: inspectableIds },
               checklist_type_id: checklist.checklist_type_id,
-              date: getDateRange(new Date(), checklist.type.frequency)
+              createdAt: {
+                [Op.between]: [startOfDay, endOfDay],
+              }
             },
             transaction
           });
@@ -1019,7 +1004,9 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
           const createdChecklists = await Checklist.findAll({
             where: {
               checklist_type_id: checklist.checklist_type_id,
-              date: getDateRange(new Date(), checklist.type.frequency)
+              createdAt: {
+                [Op.between]: [startOfDay, endOfDay],
+              }
             },
             transaction
           });
@@ -1198,8 +1185,9 @@ const signChecklist = async ({ checklist_id, user_id, role_id, digital_token }) 
   }
 };
 
-const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_id }) => {
-  const normalizedInputDate = new Date(new Date(date).setUTCHours(0, 0, 0, 0));
+const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) => {
+  const normalizedInputDate = new Date();
+  normalizedInputDate.setUTCHours(0, 0, 0, 0);
   
   const definitiveChecklistType = await ChecklistType.findByPk(checklistTypeId, {
       include: [{ model: Inspectable, as: 'specificInspectables' }]
@@ -1210,12 +1198,10 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
   }
 
   let effectiveDate = normalizedInputDate;
-  const dateCondition = getDateRange(normalizedInputDate, definitiveChecklistType.frequency);
-  if (dateCondition.dateError) {
-    effectiveDate = new Date();
-    effectiveDate.setUTCHours(0, 0, 0, 0);
-  }
-  const correctedDateCondition = getDateRange(effectiveDate, definitiveChecklistType.frequency);
+  const startOfDay = new Date(effectiveDate);
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const endOfDay = new Date(effectiveDate);
+  endOfDay.setUTCHours(23, 59, 59, 999);
 
   if (definitiveChecklistType.type_category === 'specific') {
     const specificInspectables = definitiveChecklistType.specificInspectables || [];
@@ -1225,14 +1211,14 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
         where: {
         inspectable_id: { [Op.in]: inspectableIds },
         checklist_type_id: checklistTypeId,
-        date: correctedDateCondition,
+        createdAt: {
+          [Op.between]: [startOfDay, endOfDay],
+        },
     },
     include: [{ model: ChecklistType, as: "type" }]
     });
 
     if (!checklists || checklists.length === 0) {
-        // NOTA: La creación para checklists 'specific' es compleja y se maneja en 'submitResponses'.
-        // Devolver una estructura vacía es el comportamiento esperado aquí para evitar crear instancias incompletas.
         const templateItems = await ChecklistItem.findAll({ where: { checklist_type_id: checklistTypeId } });
         const parentItems = templateItems.filter(item => item.parent_item_id === null);
         const childItems = templateItems.filter(item => item.parent_item_id !== null);
@@ -1259,7 +1245,6 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
 
         return {
             checklist_id: null,
-            date: effectiveDate,
             type: definitiveChecklistType.toJSON(),
             items: items.sort(naturalSort),
             signatures: [],
@@ -1327,7 +1312,6 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
 
     const checklistData = checklists.length > 0 ? checklists[0].toJSON() : {
         checklist_id: null,
-        date: normalizedInputDate,
         type: definitiveChecklistType.toJSON(),
     };
     
@@ -1339,7 +1323,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
       ...checklistData,
       items,
       signatures,
-      pending_failures: []
+      pending_failures: [],
     }
 
   } else if (definitiveChecklistType.type_category === 'static' || definitiveChecklistType.type_category === 'attraction') {
@@ -1347,16 +1331,14 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
     const inspectableId = isStatic ? null : definitiveChecklistType.associated_id;
 
     const whereClause = {
-        date: correctedDateCondition,
+        createdAt: {
+          [Op.between]: [startOfDay, endOfDay],
+        },
         checklist_type_id: definitiveChecklistType.checklist_type_id,
         inspectable_id: inspectableId,
     };
 
-    // Para checklists diarios, filtrar por la columna `date` que ya tiene la fecha normalizada
-    // Se elimina la condición `createdAt` ya que no es relevante para la lógica de negocio de "checklist para hoy"
-    // if (definitiveChecklistType.frequency === 'Diaria') {
-    //     whereClause.createdAt = correctedDateCondition;
-    // }
+    // Crear consulta para buscar checklist existente del día
 
     let checklist = await Checklist.findOne({
       where: whereClause,
@@ -1386,7 +1368,6 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
                 premise_id: premise_id,
                 created_by: user_id,
                 version_label: definitiveChecklistType.version_label,
-                date: effectiveDateStr,
             }
         });
         checklist = await Checklist.findByPk(createdChecklist.checklist_id, {
@@ -1446,9 +1427,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
               as: 'checklist',
               where: {
                 inspectable_id: inspectableId,
-                // La fecha de un checklist ya es la fecha de interés, no la de creación
-                // Si la frecuencia es 'Diaria', `correctedDateCondition` ya maneja el rango diario
-                date: { [Op.lt]: normalizedInputDate } // Solo si es menor estricto, para fallas pendientes de DÍAS ANTERIORES
+                createdAt: { [Op.lt]: new Date() }
               },
               required: true
             },
@@ -1479,7 +1458,9 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
     let familyChecklist = await Checklist.findOne({
         where: {
           checklist_type_id: checklistTypeId,
-          date: correctedDateCondition,
+          createdAt: {
+            [Op.between]: [startOfDay, endOfDay],
+          },
           inspectable_id: null,
         },
     });
@@ -1491,7 +1472,13 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
 
     if (!familyChecklist) {
         if (devices.length === 0) {
-            return { checklist_id: null, date: effectiveDate, type: definitiveChecklistType.toJSON(), items: [], signatures: [], pending_failures: [] };
+            return {
+                checklist_id: null,
+                type: definitiveChecklistType.toJSON(),
+                items: [],
+                signatures: [],
+                pending_failures: [],
+            };
         }
         const firstDeviceInspectable = devices[0].parentInspectable;
         if (!firstDeviceInspectable || !firstDeviceInspectable.premise_id) {
@@ -1500,21 +1487,28 @@ const getLatestChecklistByType = async ({ checklistTypeId, date, user_id, role_i
         const [createdChecklist] = await Checklist.findOrCreate({
             where: {
                 checklist_type_id: checklistTypeId,
-                date: correctedDateCondition,
+                createdAt: {
+                  [Op.between]: [startOfDay, endOfDay],
+                },
                 inspectable_id: null,
             },
             defaults: {
                 premise_id: firstDeviceInspectable.premise_id,
                 created_by: user_id,
                 version_label: definitiveChecklistType.version_label,
-                date: effectiveDate, // Usar la fecha normalizada
             },
         });
         familyChecklist = createdChecklist;
     }
 
     if (devices.length === 0) {
-      return { checklist_id: familyChecklist.checklist_id, date: effectiveDate, type: definitiveChecklistType.toJSON(), items: [], signatures: [], pending_failures: [] };
+      return {
+        checklist_id: familyChecklist.checklist_id,
+        type: definitiveChecklistType.toJSON(),
+        items: [],
+        signatures: [],
+        pending_failures: [],
+      };
     }
 
     const templateItems = await ChecklistItem.findAll({ where: { checklist_type_id: checklistTypeId } });
@@ -1590,7 +1584,7 @@ const getChecklistHistoryByType = async (checklistTypeId) => {
           include: [{ model: User, as: "user", attributes: ["user_name"] }],
         },
       ],
-      order: [["date", "DESC"]],
+      order: [["createdAt", "DESC"]],
     });
     return checklists;
   }
@@ -1599,7 +1593,7 @@ const getChecklistHistoryByType = async (checklistTypeId) => {
   const historicalChecklists = await Checklist.findAll({
     where: { checklist_type_id: checklistTypeId },
     include: [{ model: User, as: "creator", attributes: ["user_name"] }],
-    order: [["date", "DESC"]],
+    order: [["createdAt", "DESC"]],
   });
 
   const tableData = [];
@@ -1636,7 +1630,7 @@ const getChecklistHistoryByType = async (checklistTypeId) => {
       const config = group['CONFIGURACION DE LA MAQUINA'];
 
       tableData.push({
-        fecha: checklist.date,
+        fecha: checklist.createdAt,
         maquina: machineName,
         jugadas_acumuladas: jugadas ? jugadas.jugadas_acumuladas : null,
         premios_acumulados: premios ? premios.premios_acumulados : null,
@@ -1829,7 +1823,7 @@ const getFailuresByChecklistType = async ({ checklist_type_id }) => {
                         where: {
                             checklist_type_id
                         },
-                        attributes: ['checklist_id', 'date']
+                        attributes: ['checklist_id', 'createdAt']
                     },
                     {
                         model: ChecklistItem,
