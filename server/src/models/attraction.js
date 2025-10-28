@@ -2,7 +2,16 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Attraction extends Model {}
+    class Attraction extends Model {
+        static associate(models) {
+            // Una atracción pertenece a un inspectable (herencia)
+            Attraction.belongsTo(models.Inspectable, {
+                foreignKey: 'ins_id',
+                as: 'parentInspectable',
+                constraints: false,
+            });
+        }
+    }
     Attraction.init(
         {
             ins_id: {

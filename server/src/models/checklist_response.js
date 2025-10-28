@@ -4,7 +4,29 @@ const { Model } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
   class ChecklistResponse extends Model {
     static associate(models) {
-      // Las asociaciones se definen en index.js
+      // Una respuesta pertenece a un checklist.
+      ChecklistResponse.belongsTo(models.Checklist, {
+        foreignKey: 'checklist_id',
+        as: 'checklist',
+      });
+
+      // Una respuesta pertenece a un item de checklist.
+      ChecklistResponse.belongsTo(models.ChecklistItem, {
+        foreignKey: 'checklist_item_id',
+        as: 'checklistItem',
+      });
+
+      // Una respuesta es creada por un usuario.
+      ChecklistResponse.belongsTo(models.User, {
+        foreignKey: 'responded_by',
+        as: 'respondedBy',
+      });
+
+      // Una respuesta puede tener una falla asociada.
+      ChecklistResponse.hasOne(models.Failure, {
+        foreignKey: 'response_id',
+        as: 'failure',
+      });
     }
   }
   ChecklistResponse.init(

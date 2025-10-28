@@ -25,6 +25,20 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'checklist_item_id',
         as: 'responses'
       });
+
+      // Un item puede estar asociado a múltiples códigos QR (relación many-to-many)
+      ChecklistItem.belongsToMany(models.ChecklistQrCode, {
+        through: models.ChecklistQrItemAssociation,
+        foreignKey: 'checklist_item_id',
+        otherKey: 'qr_id',
+        as: 'associatedQrCodes'
+      });
+
+      // Un item puede tener muchas asociaciones QR
+      ChecklistItem.hasMany(models.ChecklistQrItemAssociation, {
+        foreignKey: 'checklist_item_id',
+        as: 'qrAssociations'
+      });
     }
   }
   ChecklistItem.init(

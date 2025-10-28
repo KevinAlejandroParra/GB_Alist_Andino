@@ -2,12 +2,26 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Part extends Model {}
+    class Part extends Model {
+        static associate(models) {
+            // Una parte puede estar en muchos ítems de requisición
+            Part.hasMany(models.RequisitionItem, {
+                foreignKey: 'part_id',
+                as: 'requisitionItems'
+            });
+
+            // Una parte puede estar en muchos inventarios
+            Part.hasMany(models.Inventory, {
+                foreignKey: 'part_id',
+                as: 'inventories'
+            });
+        }
+    }
     Part.init(
         {
             part_id: {
                 type: DataTypes.INTEGER,
-                defaultValue: DataTypes.INTEGER,
+                autoIncrement: true,
                 primaryKey: true,
             },
             part_name: {

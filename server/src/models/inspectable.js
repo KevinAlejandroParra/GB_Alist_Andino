@@ -2,7 +2,42 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Inspectable extends Model {}
+    class Inspectable extends Model {
+        static associate(models) {
+            // Un inspectable pertenece a un premise
+            Inspectable.belongsTo(models.Premise, {
+                foreignKey: 'premise_id',
+                as: 'premise'
+            });
+
+            // Un inspectable puede tener muchos checklists
+            Inspectable.hasMany(models.Checklist, {
+                foreignKey: 'inspectable_id',
+                as: 'checklists'
+            });
+
+            // Un inspectable puede estar relacionado con muchos tipos de checklist específicos
+            Inspectable.belongsToMany(models.ChecklistType, {
+                through: 'ChecklistTypeInspectables',
+                foreignKey: 'ins_id',
+                otherKey: 'checklist_type_id',
+                as: 'specificChecklistTypes'
+            });
+
+            // Asociaciones para herencia (Single Table Inheritance)
+            Inspectable.hasOne(models.Device, {
+                foreignKey: 'ins_id',
+                as: 'deviceData',
+                constraints: false,
+            });
+
+            Inspectable.hasOne(models.Attraction, {
+                foreignKey: 'ins_id',
+                as: 'attractionData',
+                constraints: false,
+            });
+        }
+    }
     Inspectable.init(
         {
             ins_id: {

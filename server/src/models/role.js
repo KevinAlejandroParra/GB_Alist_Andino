@@ -2,7 +2,27 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Role extends Model {}
+    class Role extends Model {
+        static associate(models) {
+            // Un rol puede tener muchos usuarios
+            Role.hasMany(models.User, {
+                foreignKey: 'role_id',
+                as: 'users'
+            });
+
+            // Un rol puede tener muchos tipos de checklist
+            Role.hasMany(models.ChecklistType, {
+                foreignKey: 'role_id',
+                as: 'checklistTypes'
+            });
+
+            // Un rol puede tener muchas firmas de checklist
+            Role.hasMany(models.ChecklistSignature, {
+                foreignKey: 'role_at_signature',
+                as: 'signatures'
+            });
+        }
+    }
     Role.init(
         {
             role_id: {

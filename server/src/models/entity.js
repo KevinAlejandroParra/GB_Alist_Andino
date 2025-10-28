@@ -2,7 +2,21 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Entity extends Model {}
+    class Entity extends Model {
+        static associate(models) {
+            // Una entidad pertenece a un premise
+            Entity.belongsTo(models.Premise, {
+                foreignKey: 'premise_id',
+                as: 'premise'
+            });
+
+            // Una entidad puede tener muchos usuarios
+            Entity.hasMany(models.User, {
+                foreignKey: 'entity_id',
+                as: 'users'
+            });
+        }
+    }
     Entity.init(
         {
             entity_id: {

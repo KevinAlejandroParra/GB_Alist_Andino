@@ -2,7 +2,27 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class ChecklistSignature extends Model {}
+    class ChecklistSignature extends Model {
+        static associate(models) {
+            // Una firma pertenece a un checklist
+            ChecklistSignature.belongsTo(models.Checklist, {
+                foreignKey: 'checklist_id',
+                as: 'checklist'
+            });
+
+            // Una firma pertenece a un usuario
+            ChecklistSignature.belongsTo(models.User, {
+                foreignKey: 'user_id',
+                as: 'user'
+            });
+
+            // Una firma pertenece a un rol
+            ChecklistSignature.belongsTo(models.Role, {
+                foreignKey: 'role_at_signature',
+                as: 'role'
+            });
+        }
+    }
     ChecklistSignature.init(
         {
             signature_id: {

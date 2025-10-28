@@ -2,11 +2,26 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class RequisitionItem extends Model {}
+    class RequisitionItem extends Model {
+        static associate(models) {
+            // Un ítem de requisición pertenece a una requisición
+            RequisitionItem.belongsTo(models.Requisition, {
+                foreignKey: 'requisition_id',
+                as: 'requisition'
+            });
+
+            // Un ítem de requisición pertenece a una parte
+            RequisitionItem.belongsTo(models.Part, {
+                foreignKey: 'part_id',
+                as: 'part'
+            });
+        }
+    }
     RequisitionItem.init(
-        {      requisition_item_id: {
+        {
+            requisition_item_id: {
                 type: DataTypes.INTEGER,
-                defaultValue: DataTypes.INTEGER,
+                autoIncrement: true,
                 primaryKey: true,
             },
             requisition_id: {

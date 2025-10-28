@@ -2,7 +2,22 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Device extends Model {}
+    class Device extends Model {
+        static associate(models) {
+            // Un device pertenece a un inspectable (herencia)
+            Device.belongsTo(models.Inspectable, {
+                foreignKey: 'ins_id',
+                as: 'parentInspectable',
+                constraints: false,
+            });
+
+            // Un device pertenece a una familia
+            Device.belongsTo(models.Family, {
+                foreignKey: 'family_id',
+                as: 'family'
+            });
+        }
+    }
     Device.init(
         {
             ins_id: {

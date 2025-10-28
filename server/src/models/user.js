@@ -4,6 +4,43 @@ const bcrypt = require("bcrypt");
 
 module.exports = (sequelize, DataTypes) => {
     class User extends Model {
+        static associate(models) {
+            // Un usuario pertenece a un rol
+            User.belongsTo(models.Role, {
+                foreignKey: 'role_id',
+                as: 'role'
+            });
+
+            // Un usuario pertenece a una sede (premise)
+            User.belongsTo(models.Premise, {
+                foreignKey: 'premise_id',
+                as: 'premise'
+            });
+
+            // Un usuario pertenece a una entidad
+            User.belongsTo(models.Entity, {
+                foreignKey: 'entity_id',
+                as: 'entity'
+            });
+
+            // Un usuario puede crear muchos checklists
+            User.hasMany(models.Checklist, {
+                foreignKey: 'created_by',
+                as: 'createdChecklists'
+            });
+
+            // Un usuario puede tener muchas firmas
+            User.hasMany(models.ChecklistSignature, {
+                foreignKey: 'user_id',
+                as: 'signatures'
+            });
+
+            // Un usuario puede realizar muchos escaneos de QR
+            User.hasMany(models.ChecklistQrScan, {
+                foreignKey: 'scanned_by',
+                as: 'qrScans'
+            });
+        }
         // Método para comparar contraseñas en el login
         async comparePassword(candidatePassword) {
             return await bcrypt.compare(candidatePassword, this.user_password);
