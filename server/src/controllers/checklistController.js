@@ -1,4 +1,4 @@
-const { ChecklistType, ChecklistItem, Checklist, ChecklistResponse, ChecklistSignature, User } = require("../models")
+const { ChecklistType, ChecklistItem, Checklist, ChecklistResponse, ChecklistSignature, User, ChecklistQrCode, ChecklistQrItemAssociation } = require("../models")
 const checklistService = require("../services/checklistService")
 const puppeteer = require("puppeteer")
 
@@ -46,45 +46,62 @@ const createChecklist = async (req, res) => {
     const user_id = req.user.user_id;
     const role_id = req.user.role_id;
 
-    // Primero verificamos si ya existe una instancia para hoy
-    const existingChecklist = await checklistService.getLatestChecklist({
-      inspectableId: inspectableId ? Number.parseInt(inspectableId) : null,
-      checklist_type_id: Number.parseInt(checklistTypeId),
+    console.log(`🔍 Solicitando checklist tipo ${checklistTypeId} para inspectable ${inspectableId || 'null'}`);
+
+    // PRIMERO: Verificar si ya existe un checklist válido usando database query directa
+    const Checklist = require('../models').Checklist;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const existingChecklist = await Checklist.findOne({
+      where: {
+        checklist_type_id: Number.parseInt(checklistTypeId),
+        ...(inspectableId && { inspectable_id: Number.parseInt(inspectableId) }),
+        createdAt: {
+          [require('sequelize').Op.gte]: today,
+          [require('sequelize').Op.lt]: tomorrow
+        }
+      },
+      include: [
+        { model: require('../models').ChecklistType, as: 'type' },
+        { model: require('../models').ChecklistSignature, as: 'signatures' },
+        { model: require('../models').ChecklistResponse, as: 'responses' }
+      ],
+      order: [['createdAt', 'DESC']]
     });
 
     if (existingChecklist) {
-      // Si ya existe una instancia, la retornamos
+      console.log(`📋 Checklist existente encontrado (ID: ${existingChecklist.checklist_id}), retornando`);
       return res.status(200).json(existingChecklist);
     }
 
-    // Si no existe, creamos una nueva instancia
-    const newChecklistResult = await checklistService.ensureChecklistInstance({
+    // Si no existe, crear uno nuevo usando ensureChecklistInstance
+    console.log(`🆕 Creando nueva instancia de checklist para tipo ${checklistTypeId}`);
+    const checklistResult = await checklistService.ensureChecklistInstance({
       inspectableId: inspectableId ? Number.parseInt(inspectableId) : null,
       created_by: user_id,
       role_id,
       checklist_type_id: Number.parseInt(checklistTypeId),
     });
 
-    if (!newChecklistResult || !newChecklistResult.checklist) {
+    if (!checklistResult || !checklistResult.checklist) {
       return res.status(400).json({ error: "No se pudo crear el checklist" });
     }
 
-    // Enviar notificación si se creó una nueva instancia
-    if (newChecklistResult.isNew) {
-      console.log(`✅ Nueva instancia creada: ${newChecklistResult.message}`);
-    }
+    console.log(`✅ Nueva instancia creada: ${checklistResult.message}`);
 
-    // Obtenemos el checklist completo con todos sus datos
-    const fullChecklist = await checklistService.getLatestChecklist({
-      inspectableId: inspectableId ? Number.parseInt(inspectableId) : null,
-      checklist_type_id: Number.parseInt(checklistTypeId),
-    });
+    // Para checklists de tipo (sin inspectable específico), necesitamos el formato especial
+    // Usar la lógica original de getChecklistByType para procesar correctamente
+    const processedChecklist = await getChecklistByTypeHelper(checklistTypeId, checklistResult.checklist);
 
     res.status(201).json({
-      ...fullChecklist,
-      notification: newChecklistResult.isNew ? newChecklistResult.message : null
+      ...processedChecklist,
+      notification: checklistResult.message
     });
   } catch (error) {
+    console.error('❌ Error en createChecklist:', error);
     res.status(500).json({ error: error.message })
   }
 }
@@ -151,6 +168,34 @@ const submitResponses = async (req, res) => {
       responded_by: user_id,
       role_id,
     })
+
+    // Reset is_unlocked status for associated QR codes
+    const checklist = await Checklist.findByPk(Number.parseInt(checklist_id));
+
+    if (checklist && checklist.checklist_type_id) {
+      console.log(`[submitResponses] Responses submitted for checklist ${checklist_id}. Resetting is_unlocked...`);
+
+      const qrCodes = await ChecklistQrCode.findAll({
+        where: { checklist_type_id: checklist.checklist_type_id },
+        attributes: ['qr_id']
+      });
+
+      if (qrCodes.length > 0) {
+        const qrIds = qrCodes.map(qr => qr.qr_id);
+
+        const [updateCount] = await ChecklistQrItemAssociation.update(
+          { is_unlocked: false, unlocked_at: null },
+          {
+            where: {
+              qr_id: qrIds,
+              is_unlocked: true
+            }
+          }
+        );
+        console.log(`[submitResponses] Reset is_unlocked for ${updateCount} item associations for checklist ${checklist_id}.`);
+      }
+    }
+
     res.status(200).json({ message: "Respuestas registradas exitosamente" })
   } catch (error) {
     res.status(400).json({ error: error.message })
@@ -258,6 +303,55 @@ const signChecklist = async (req, res) => {
       role_id, // Pasar el role_id
       digital_token,
     });
+
+    // Verificar si el checklist ya tiene ambas firmas después de firmar
+    const checklist = await Checklist.findByPk(checklist_id, {
+      include: [
+        {
+          model: ChecklistSignature,
+          as: 'signatures',
+          include: [{ model: User, as: 'user' }]
+        }
+      ]
+    });
+
+    if (checklist) {
+      // Verificar si tiene ambas firmas requeridas
+      const hasTechnicalSignature = checklist.signatures.some(
+        sig => sig.role_id === 7 || sig.role_at_signature === '7' || sig.role?.role_name === 'Tecnico de mantenimiento'
+      );
+      const hasOperationsSignature = checklist.signatures.some(
+        sig => sig.role_id === 4 || sig.role_at_signature === '4' || sig.role?.role_name === 'Jefe de Operaciones'
+      );
+
+      // Si tiene ambas firmas, resetear is_unlocked a false para todos los items asociados
+      if (hasTechnicalSignature && hasOperationsSignature) {
+        console.log(`🔒 Checklist ${checklist_id} completado con ambas firmas. Reseteando is_unlocked...`);
+
+        // Obtener todos los QR codes asociados al tipo de checklist
+        const qrCodes = await ChecklistQrCode.findAll({
+          where: { checklist_type_id: checklist.type_id },
+          attributes: ['qr_id']
+        });
+
+        if (qrCodes.length > 0) {
+          const qrIds = qrCodes.map(qr => qr.qr_id);
+
+          // Resetear is_unlocked para todos los items asociados a estos QR codes
+          await ChecklistQrItemAssociation.update(
+            { is_unlocked: false, unlocked_at: null },
+            {
+              where: {
+                qr_id: qrIds,
+                is_unlocked: true // Solo actualizar los que están desbloqueados
+              }
+            }
+          );
+
+          console.log(`✅ Reseteado is_unlocked para ${qrIds.length} códigos QR asociados al checklist ${checklist_id}`);
+        }
+      }
+    }
 
     res.status(200).json({ message: "Checklist firmado exitosamente" });
   } catch (error) {
@@ -990,81 +1084,93 @@ const getChecklistTypesByRole = async (req, res) => {
   }
 };
 
+// Función helper para procesar checklists por tipo
+const getChecklistByTypeHelper = async (checklistTypeId, checklistInstanceData) => {
+  // 2. Fetch the ChecklistType with its associated ChecklistItems (template)
+  const checklistTypeTemplate = await ChecklistType.findByPk(checklistTypeId, {
+    include: [
+      {
+        model: ChecklistItem,
+        as: 'items',
+        where: { parent_item_id: null }, // Only fetch top-level items
+        required: false,
+        include: [
+          {
+            model: ChecklistItem,
+            as: 'subItems',
+            required: false,
+          },
+        ],
+      },
+    ],
+  });
+
+  if (!checklistTypeTemplate) {
+    throw new Error("Tipo de Checklist no encontrado.");
+  }
+
+  // 3. Get responses if the checklist exists
+  let instanceItems = [];
+  if (checklistInstanceData && checklistInstanceData.checklist) {
+    // Load existing responses for this checklist
+    const ChecklistResponse = require('../models').ChecklistResponse;
+    const responses = await ChecklistResponse.findAll({
+      where: { checklist_id: checklistInstanceData.checklist.checklist_id }
+    });
+    instanceItems = responses;
+  }
+
+  const combinedItems = (checklistTypeTemplate.items || []).map(templateItem => {
+    const instanceItem = instanceItems.find(
+      instItem => instItem.checklist_item_id === templateItem.checklist_item_id
+    );
+
+    const subItems = (templateItem.subItems || []).map(templateSubItem => {
+      const instanceSubItem = instanceItems.find(
+        instItem => instItem.checklist_item_id === templateSubItem.checklist_item_id
+      );
+      return {
+        ...templateSubItem.toJSON(),
+        responses: instanceSubItem ? [instanceSubItem] : [],
+        unique_frontend_id: templateSubItem.checklist_item_id.toString(), // Add for client compatibility
+        inspectable_id_for_response: null, // Static checklists don't have specific inspectable
+      };
+    });
+
+    return {
+      ...templateItem.toJSON(),
+      responses: instanceItem ? [instanceItem] : [],
+      subItems: subItems,
+      unique_frontend_id: templateItem.checklist_item_id.toString(), // Add for client compatibility
+      inspectable_id_for_response: null, // Static checklists don't have specific inspectable
+    };
+  });
+
+  return {
+     ...checklistInstanceData, // Contains checklist_id, type, signatures, pending_failures
+     type: checklistTypeTemplate.toJSON(), // Ensure the type data is from the template
+    items: combinedItems,
+  };
+};
+
 const getChecklistByType = async (req, res) => {
   try {
     const { checklistTypeId } = req.params;
     const user_id = req.user.user_id;
     const role_id = req.user.role_id;
 
-    // 1. Ensure a checklist instance exists or is retrieved
-    const checklistInstanceData = await checklistService.ensureChecklistInstance({
-      checklist_type_id: Number.parseInt(checklistTypeId),
-      inspectableId: null, // For type-based checklists, inspectableId is null
-      created_by: user_id,
-      role_id: role_id,
+    // Use the existing service function that handles all checklist types correctly
+    const checklist = await checklistService.getLatestChecklistByType({
+      checklistTypeId: Number.parseInt(checklistTypeId),
+      user_id,
+      role_id,
     });
 
-    if (!checklistInstanceData) {
+    if (!checklist) {
       return res.status(404).json({ error: "Checklist no encontrado para el tipo especificado." });
     }
 
-    // 2. Fetch the ChecklistType with its associated ChecklistItems (template)
-    const checklistTypeTemplate = await ChecklistType.findByPk(checklistTypeId, {
-      include: [
-        {
-          model: ChecklistItem,
-          as: 'items',
-          where: { parent_item_id: null }, // Only fetch top-level items
-          required: false,
-          include: [
-            {
-              model: ChecklistItem,
-              as: 'subItems',
-              required: false,
-            },
-          ],
-        },
-      ],
-    });
-
-    if (!checklistTypeTemplate) {
-      return res.status(404).json({ error: "Tipo de Checklist no encontrado." });
-    }
-
-    // 3. Combine the checklist instance data with the checklist type template
-    // The checklistInstanceData already contains the 'type' and 'signatures' and 'pending_failures'
-    // We need to merge the items from the template with the responses from the instance.
-
-    const combinedItems = checklistTypeTemplate.items.map(templateItem => {
-      const instanceItem = checklistInstanceData.items.find(
-        instItem => instItem.checklist_item_id === templateItem.checklist_item_id
-      );
-
-      const subItems = templateItem.subItems.map(templateSubItem => {
-        const instanceSubItem = checklistInstanceData.items.find(
-          instItem => instItem.checklist_item_id === templateSubItem.checklist_item_id
-        );
-        return {
-          ...templateSubItem.toJSON(),
-          responses: instanceSubItem ? instanceSubItem.responses : [],
-        };
-      });
-
-      return {
-        ...templateItem.toJSON(),
-        responses: instanceItem ? instanceItem.responses : [],
-        subItems: subItems,
-      };
-    });
-
-
-    const finalChecklistData = {
-       ...checklistInstanceData, // Contains checklist_id, type, signatures, pending_failures
-       type: checklistTypeTemplate.toJSON(), // Ensure the type data is from the template
-      items: combinedItems,
-    };
-
-    res.status(200).json(finalChecklistData);
+    res.status(200).json(checklist);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1112,6 +1218,95 @@ const getFailuresByChecklistType = async (req, res) => {
   }
 };
 
+// Obtener items padre ordenados para un tipo de checklist específico
+const getParentItemsByChecklistType = async (req, res) => {
+  try {
+    const { checklistTypeId } = req.params;
+
+    // Validar que el tipo de checklist existe
+    const checklistType = await ChecklistType.findByPk(checklistTypeId);
+    if (!checklistType) {
+      return res.status(404).json({
+        success: false,
+        message: "Tipo de Checklist no encontrado."
+      });
+    }
+
+    // Obtener items padre ordenados por número de item
+    const parentItems = await ChecklistItem.findAll({
+      where: {
+        checklist_type_id: checklistTypeId,
+        parent_item_id: null // Solo items padre
+      },
+      attributes: [
+        'checklist_item_id',
+        'item_number',
+        'question_text',
+        'guidance_text',
+        'input_type',
+        'allow_comment'
+      ],
+      order: [
+        ['item_number', 'ASC'] // Ordenar por número de item
+      ]
+    });
+
+    // Función para ordenamiento natural de números de ítems
+    const naturalSortParentItems = (items) => {
+      return items.sort((a, b) => {
+        const itemA = a.item_number || '';
+        const itemB = b.item_number || '';
+
+        // Dividir por puntos y convertir cada parte a número para comparación
+        const partsA = itemA.split('.').map(part => parseInt(part, 10) || 0);
+        const partsB = itemB.split('.').map(part => parseInt(part, 10) || 0);
+
+        // Comparar parte por parte
+        const maxLength = Math.max(partsA.length, partsB.length);
+
+        for (let i = 0; i < maxLength; i++) {
+          const partA = partsA[i] || 0;
+          const partB = partsB[i] || 0;
+
+          if (partA !== partB) {
+            return partA - partB;
+          }
+        }
+
+        // Si todas las partes son iguales, comparar como string como fallback
+        return itemA.localeCompare(itemB);
+      });
+    };
+
+    // Aplicar ordenamiento natural
+    const sortedParentItems = naturalSortParentItems(parentItems);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        checklist_type_id: checklistType.checklist_type_id,
+        checklist_type_name: checklistType.name,
+        total_parent_items: sortedParentItems.length,
+        parent_items: sortedParentItems.map(item => ({
+          checklist_item_id: item.checklist_item_id,
+          item_number: item.item_number,
+          question_text: item.question_text,
+          guidance_text: item.guidance_text,
+          input_type: item.input_type,
+          allow_comment: item.allow_comment
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error obteniendo items padre:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 const getChecklistTypeDetails = async (req, res) => {
   try {
     const { checklistTypeId } = req.params;
@@ -1146,5 +1341,6 @@ module.exports = {
   getPendingFailures,
   getClosedFailures,
   getFailuresByChecklistType,
-  getChecklistTypeDetails
+  getChecklistTypeDetails,
+  getParentItemsByChecklistType
 }

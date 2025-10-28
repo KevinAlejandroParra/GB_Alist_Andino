@@ -727,6 +727,13 @@ const handlePremiosCalculations = async (checklist, transaction) => {
 const submitResponses = async ({ checklist_id, responses, responded_by, role_id }) => {
   const transaction = await connection.transaction()
   try {
+    // Definir fechas para el rango de búsqueda
+    const today = getTodayNormalizedUTC();
+    const startOfDay = new Date(today);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
     if (role_id !== 7) {
       throw new Error("Sólo los técnicos de mantenimiento pueden rellenar la lista de control.")
     }
@@ -1236,6 +1243,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
   }
 
   let effectiveDate = normalizedInputDate;
+  // Definir fechas al inicio para que estén disponibles en todo el scope
   const startOfDay = new Date(effectiveDate);
   startOfDay.setUTCHours(0, 0, 0, 0);
   const endOfDay = new Date(effectiveDate);
@@ -1522,6 +1530,17 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
         if (!firstDeviceInspectable || !firstDeviceInspectable.premise_id) {
             throw new Error('Cannot create family checklist: premise_id not found on the first device.');
         }
+        // Crear checklist con fechas explícitas para evitar 'Invalid date'
+        const checklistDefaults = {
+            premise_id: firstDeviceInspectable.premise_id,
+            created_by: user_id,
+            version_label: definitiveChecklistType.version_label,
+            createdAt: new Date(), // Asegurar que createdAt sea una fecha válida
+            updatedAt: new Date()  // También actualizar updatedAt
+        };
+        
+        console.log('Intentando crear checklist con defaults:', checklistDefaults);
+        
         const [createdChecklist] = await Checklist.findOrCreate({
             where: {
                 checklist_type_id: checklistTypeId,
@@ -1530,11 +1549,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
                 },
                 inspectable_id: null,
             },
-            defaults: {
-                premise_id: firstDeviceInspectable.premise_id,
-                created_by: user_id,
-                version_label: definitiveChecklistType.version_label,
-            },
+            defaults: checklistDefaults,
         });
         familyChecklist = createdChecklist;
     }
