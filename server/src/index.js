@@ -13,20 +13,32 @@ const inspectableRoutes = require("./routes/inspectableRoutes");
 const checklistRoutes = require("./routes/checklist.routes");
 const familyChecklistRoutes = require("./routes/familyChecklist.routes");
 const checklistTypeRoutes = require("./routes/checklistTypeRoutes");
+const workOrderRoutes = require("./routes/workOrderRoutes");
+const qrCodeRoutes = require("./routes/qrCodeRoutes");
 const swaggerUi = require('swagger-ui-express');
 const swaggerFile = require('./swagger-output.json');
 const path = require("path");
-app.use(express.json());
 const cors = require('cors');
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+// Configurar middleware en orden correcto
 app.use(cors({
   origin: "*",
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
+
+// Configurar body parsing DESPUÉS de CORS
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Headers adicionales para CORS y tipos de contenido
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  next();
+});
 app.use(express.static(path.join(__dirname, "../public"), {
    setHeaders: (res, path) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -58,8 +70,10 @@ app.use("/api/devices", deviceRoutes);
 app.use("/api/attractions", attractionRoutes); 
 app.use("/api/inspectables", inspectableRoutes); 
 app.use("/api/checklists", checklistRoutes);
-app.use("/api/checklists", familyChecklistRoutes); 
-app.use("/api", checklistTypeRoutes); 
+app.use("/api/checklists", familyChecklistRoutes);
+app.use("/api", checklistTypeRoutes);
+app.use("/api/work-orders", workOrderRoutes);
+app.use("/api", qrCodeRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 
 module.exports = {
