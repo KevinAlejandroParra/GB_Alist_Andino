@@ -25,7 +25,8 @@ const {
   getPendingFailures,
   getClosedFailures,
   getFailuresByChecklistType,
-  getChecklistTypeDetails // Importar el nuevo controlador
+  getChecklistTypeDetails,
+  getParentItemsByChecklistType // Importar el nuevo controlador
 } = require("../controllers/checklistController")
 
 // Importar funciones de diagnóstico (temporal para debugging)
@@ -40,6 +41,7 @@ router.get("/type/:checklistTypeId/latest", verifyToken, getLatestChecklistByTyp
 router.get("/type/:checklistTypeId/create", verifyToken, createChecklist) // Nueva ruta para crear instancias
 router.get("/type/:checklistTypeId/history", verifyToken, getChecklistHistoryByType) // Nueva ruta para el historial por tipo
 router.get("/type/:checklistTypeId/details", verifyToken, getChecklistTypeDetails) // Nueva ruta para obtener detalles del tipo de checklist
+router.get("/type/:checklistTypeId/parent-items", verifyToken, getParentItemsByChecklistType) // Nueva ruta para obtener items padre ordenados
 
 // Rutas para respuestas, fallas, etc.
 router.get("/:id", verifyToken, getChecklistById) // Nueva ruta para obtener checklist por ID

@@ -13,7 +13,9 @@ const {
   Attraction,
   Family,
   Premise,
-  Entity
+  Entity,
+  ChecklistQrCode,
+  ChecklistQrItemAssociation
 } = require("../models");
 const { Sequelize } = require("../models");
 const Op = Sequelize.Op
@@ -22,6 +24,42 @@ const getTodayNormalizedUTC = () => {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   return today;
+};
+
+const resetQrCodesForChecklist = async (checklistId) => {
+  try {
+    const checklist = await Checklist.findByPk(checklistId);
+    if (!checklist) {
+      throw new Error("Checklist not found");
+    }
+
+    const qrCodes = await ChecklistQrCode.findAll({
+      where: { checklist_type_id: checklist.checklist_type_id },
+    });
+
+    if (qrCodes.length === 0) {
+      return { success: true, message: "No QR codes to reset for this checklist type." };
+    }
+
+    const qrIds = qrCodes.map(qr => qr.qr_id);
+
+    const [affectedRows] = await ChecklistQrItemAssociation.update(
+      { is_unlocked: 0, unlocked_at: null },
+      {
+        where: {
+          qr_id: { [Op.in]: qrIds },
+        },
+      }
+    );
+
+    return {
+      success: true,
+      message: `${affectedRows} QR code associations have been reset.`,
+    };
+  } catch (error) {
+    console.error("Error resetting QR codes for checklist:", error);
+    throw error;
+  }
 };
 
 const naturalSort = (a, b) => {
@@ -1864,4 +1902,5 @@ module.exports = {
   getFailuresByStatus,
   updateFailure,
   getFailuresByChecklistType,
+  resetQrCodesForChecklist
 };

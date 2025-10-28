@@ -373,5 +373,5 @@ module.exports = {
   getPendingWorkOrders,
   handleWorkOrderForResponse,
   getWorkOrderStats,
-  generateWorkOrderId
+  generateWorkOrderId,
 };
