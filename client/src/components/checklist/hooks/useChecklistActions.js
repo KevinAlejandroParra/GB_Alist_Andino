@@ -6,10 +6,6 @@ import axiosInstance from '../../../utils/axiosConfig';
 export function useChecklistActions(config, user, checklistTypeId) {
 
   const handleDownloadPdf = useCallback(async () => {
-    if (!user) {
-        Swal.fire('Error', 'Usuario no autenticado.', 'error');
-        return;
-    }
 
     Swal.fire({
         title: "Generando PDF...",
@@ -21,7 +17,6 @@ export function useChecklistActions(config, user, checklistTypeId) {
     try {
         const response = await axiosInstance.get(config.downloadEndpoint, {
             responseType: 'blob',
-            headers: { Authorization: `Bearer ${user.token}` },
         });
 
         const blob = new Blob([response.data], { type: 'application/pdf' });
@@ -39,7 +34,7 @@ export function useChecklistActions(config, user, checklistTypeId) {
         console.error('Error al descargar PDF:', error);
         Swal.fire('Error', 'No se pudo descargar el PDF.', 'error');
     }
-  }, [config, user, checklistTypeId]);
+  }, [config, checklistTypeId]);
 
   return { handleDownloadPdf };
 }
