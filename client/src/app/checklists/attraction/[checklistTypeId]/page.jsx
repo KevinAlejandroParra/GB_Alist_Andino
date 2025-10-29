@@ -3,6 +3,7 @@
 import React from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import BaseChecklistPage from '../../../../components/checklist/BaseChecklistPage';
+import { CHECKLIST_TYPES, getUiConfig } from '../../../../components/checklist/config/checklistTypes.config';
 
 export default function AttractionChecklistPage() {
   const params = useParams();
@@ -13,30 +14,26 @@ export default function AttractionChecklistPage() {
   // Crear un objeto de entidad pre-seleccionada para pasarlo al componente base
   const preselectedEntity = inspectableId ? { id: inspectableId } : null;
 
-  // El endpoint de guardado debe usar el checklist_id real, que se obtiene dinámicamente
-  const config = {
-    type: 'attraction',
-    requiresEntitySelection: false, // Revertido a false, el inspectableId se obtiene del checklistType.associated_id
-    entityType: 'inspectable',
-    // saveEndpoint se construirá dinámicamente en BaseChecklistPage usando checklist?.checklist_id
-    saveEndpoint: null,
-    downloadEndpoint: `/api/checklists/type/${checklistTypeId}/download-pdf`,
-    createInstance: true, // Indicamos que esta página debe crear una instancia si no existe
-  };
+  // Usar la configuración centralizada
+  const typeConfig = CHECKLIST_TYPES.attraction;
+  const uiConfig = getUiConfig('attraction');
 
   const breadcrumbItems = [
     { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Checklists de Atracción', href: '/checklists/attraction' },
+    { label: uiConfig.breadcrumbLabel, href: '/checklists/attraction' },
     { label: checklistTypeId },
   ];
 
   return (
     <BaseChecklistPage
       checklistTypeId={checklistTypeId}
-      config={config}
-      pageTitle="Checklist de Atracción"
+      checklistType="attraction"  // Especificar el tipo de checklist
+      config={typeConfig.data}
+      pageTitle={typeConfig.displayName}
+      pageDescription={typeConfig.description}
       breadcrumbItems={breadcrumbItems}
       preselectedEntity={preselectedEntity}
+      icon={uiConfig.icon}
     />
   );
 }

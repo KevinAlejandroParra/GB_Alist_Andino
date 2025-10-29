@@ -44,7 +44,7 @@ export default function ChecklistDetailPage() {
       if (historyResponse.data && historyResponse.data.length > 0) {
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
         const todayChecklist = historyResponse.data.find(checklist =>
-          checklist.date.split('T')[0] === today
+          checklist.createdAt.split('T')[0] === today
         );
         if (todayChecklist) {
           setTodayChecklist(todayChecklist);
@@ -61,13 +61,45 @@ export default function ChecklistDetailPage() {
   };
 
   useEffect(() => {
-    if (checklistTypeId) {
+    if (checklistTypeId && user && user.token) {
       fetchChecklistData();
     }
-  }, [checklistTypeId]);
+  }, [checklistTypeId, user]);
 
-  const handleCreateOrEditChecklist = () => {
-    router.push(`/checklists/attraction/${checklistTypeId}`);
+  const handleCreateOrEditChecklist = async () => {
+    try {
+      // Primero obtener el tipo real del checklist
+      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
+      const response = await axiosInstance.get(`${API_URL}/api/checklists/type/${checklistTypeId}/details`, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      
+      const checklistTypeData = response.data;
+      const typeCategory = checklistTypeData?.type_category;
+      
+      // Redirigir según el tipo real del checklist
+      switch (typeCategory) {
+        case 'attraction':
+          router.push(`/checklists/attraction/${checklistTypeId}`);
+          break;
+        case 'family':
+          router.push(`/checklists/family/${checklistTypeId}`);
+          break;
+        case 'premios':
+        case 'specific':
+          router.push(`/checklists/premios/${checklistTypeId}`);
+          break;
+        default:
+          console.warn(`Tipo de checklist desconocido: ${typeCategory}`);
+          // Fallback a atracción por compatibilidad
+          router.push(`/checklists/attraction/${checklistTypeId}`);
+          break;
+      }
+    } catch (error) {
+      console.error("Error al obtener el tipo de checklist:", error);
+      // En caso de error, usar el comportamiento anterior
+      router.push(`/checklists/attraction/${checklistTypeId}`);
+    }
   };
 
   const handleViewHistoricChecklist = (checklistId) => {
@@ -86,6 +118,11 @@ export default function ChecklistDetailPage() {
 
   const handleUpdateFailure = async (updatePayload) => {
     if (!selectedFailure) return;
+
+    if (!user || !user.user_id) {
+      alert('No estás autenticado. Por favor, inicia sesión de nuevo.');
+      return;
+    }
 
     const payload = {
       ...updatePayload,
@@ -110,6 +147,11 @@ export default function ChecklistDetailPage() {
   };
 
   const handleDownload = async (checklistId, date) => {
+    if (!user || !user.token) {
+      alert('No estás autenticado. Por favor, inicia sesión de nuevo.');
+      return;
+    }
+
     setDownloading(checklistId);
     try {
       const response = await axiosInstance.get(`/api/checklists/${checklistId}/download`, {
@@ -140,7 +182,7 @@ export default function ChecklistDetailPage() {
     { label: checklistType?.name || 'Detalle de Checklist' },
   ];
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-6">
