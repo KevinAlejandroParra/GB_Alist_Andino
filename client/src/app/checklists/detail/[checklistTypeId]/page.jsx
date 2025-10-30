@@ -6,8 +6,8 @@ import ProtectedRoute from '../../../../components/ProtectedRoute';
 import { useAuth } from '../../../../components/AuthContext';
 import ChecklistHeader from '../../../../components/checklist/components/ChecklistHeader';
 import FailureList from '../../../../components/checklist/FailureList';
-import UpdateFailureModal from '../../../../components/checklist/UpdateFailureModal';
 import HistorySection from '../../../../components/checklist/HistorySection';
+import ResolvedFailuresHistory from '../../../../components/checklist/ResolvedFailuresHistory';
 import axiosInstance from '../../../../utils/axiosConfig';
 import { formatLocalDate, formatLocalDateTime } from '../../../../utils/dateUtils';
 
@@ -21,10 +21,9 @@ export default function ChecklistDetailPage() {
   const [todayChecklist, setTodayChecklist] = useState(null);
   const [checklistHistory, setChecklistHistory] = useState([]);
   const [failures, setFailures] = useState([]);
+  const [resolvedFailures, setResolvedFailures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedFailure, setSelectedFailure] = useState(null);
   const [expandedHistoricalChecklists, setExpandedHistoricalChecklists] = useState({});
   const [downloading, setDownloading] = useState(null);
 
@@ -32,14 +31,16 @@ export default function ChecklistDetailPage() {
     try {
       setLoading(true);
       
-      const [typeResponse, historyResponse, failuresResponse] = await Promise.all([
+      const [typeResponse, historyResponse, failuresResponse, resolvedFailuresResponse] = await Promise.all([
         axiosInstance.get(`/api/checklist-types/${checklistTypeId}`),
         axiosInstance.get(`/api/checklists/type/${checklistTypeId}/history`),
-        axiosInstance.get(`/api/checklists/failures/by-type/${checklistTypeId}`)
+        axiosInstance.get(`/api/work-orders/by-type/${checklistTypeId}`),
+        axiosInstance.get(`/api/work-orders/resolved/by-type/${checklistTypeId}`)
       ]);
 
       setChecklistType(typeResponse.data);
-      setFailures(failuresResponse.data);
+      setFailures(failuresResponse.data?.data || []);
+      setResolvedFailures(resolvedFailuresResponse.data?.data || []);
       
       if (historyResponse.data && historyResponse.data.length > 0) {
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -104,39 +105,6 @@ export default function ChecklistDetailPage() {
 
   const handleViewHistoricChecklist = (checklistId) => {
     router.push(`/checklists/view/${checklistId}`);
-  };
-
-  const handleOpenModal = (failure) => {
-    setSelectedFailure(failure);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setSelectedFailure(null);
-    setIsModalOpen(false);
-  };
-
-  const handleUpdateFailure = async (updatePayload) => {
-    if (!selectedFailure) return;
-
-    if (!user || !user.user_id) {
-      alert('No estás autenticado. Por favor, inicia sesión de nuevo.');
-      return;
-    }
-
-    const payload = {
-      ...updatePayload,
-      closed_by: user.user_id,
-    };
-
-    try {
-      await axiosInstance.put(`/api/checklists/failures/${selectedFailure.failure_id}`, payload);
-      await fetchChecklistData(); 
-      handleCloseModal();
-    } catch (error) {
-      console.error("Error al actualizar la falla:", error);
-      throw new Error('No se pudo actualizar la falla. Inténtelo de nuevo.');
-    }
   };
 
   const toggleHistoricalChecklist = (checklistId) => {
@@ -258,10 +226,18 @@ export default function ChecklistDetailPage() {
             )}
           </div>
 
-          {/* Historial de Fallas */}
+          {/* Fallas Activas */}
           <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Historial de Fallas</h2>
-            <FailureList failures={failures} onUpdateFailure={handleOpenModal} />
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Fallas Activas ({failures.length})</h2>
+            <p className="text-sm text-gray-600 mb-4">Fallas reportadas que aún están pendientes de resolución o en proceso.</p>
+            <FailureList failures={failures} />
+          </div>
+
+          {/* Historial de Fallas Resueltas */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Fallas Resueltas ({resolvedFailures.length})</h2>
+            <p className="text-sm text-gray-600 mb-4">Historial completo de fallas que han sido resueltas o cerradas.</p>
+            <ResolvedFailuresHistory resolvedFailures={resolvedFailures} />
           </div>
 
           {/* Historial de Checklists */}
@@ -276,13 +252,6 @@ export default function ChecklistDetailPage() {
             />
           </div>
         </div>
-
-        <UpdateFailureModal 
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          failure={selectedFailure}
-          onUpdate={handleUpdateFailure}
-        />
       </div>
     </ProtectedRoute>
   );

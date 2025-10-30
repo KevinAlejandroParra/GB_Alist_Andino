@@ -3,6 +3,7 @@
 import React from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import BaseChecklistPage from '../../../../components/checklist/BaseChecklistPage';
+import { CHECKLIST_TYPES, getUiConfig } from '../../../../components/checklist/config/checklistTypes.config';
 
 export default function FamilyChecklistPage() {
   const params = useParams();
@@ -13,28 +14,26 @@ export default function FamilyChecklistPage() {
   // Crear un objeto de entidad pre-seleccionada para pasarlo al componente base
   const preselectedEntity = familyId ? { id: familyId } : null;
 
-  const config = {
-    type: 'family',
-    requiresEntitySelection: false, // La entidad viene en la URL, no se selecciona interactivamente
-    entityType: 'family',
-    saveEndpoint: `/api/checklists/type/${checklistTypeId}/responses`,
-    downloadEndpoint: `/api/checklists/type/${checklistTypeId}/download-pdf`,
-    generateDynamicTemplate: true, // Indicar que este checklist genera items dinámicamente
-  };
+  // Usar la configuración centralizada
+  const typeConfig = CHECKLIST_TYPES.family;
+  const uiConfig = getUiConfig('family');
 
   const breadcrumbItems = [
     { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Checklists de Familia', href: '/checklists/family' },
+    { label: uiConfig.breadcrumbLabel, href: '/checklists/family' },
     { label: checklistTypeId },
   ];
 
   return (
     <BaseChecklistPage
       checklistTypeId={checklistTypeId}
-      config={config}
-      pageTitle="Checklist de Familia"
+      checklistType="family"  // Especificar el tipo de checklist
+      config={typeConfig.data}
+      pageTitle={typeConfig.displayName}
+      pageDescription={typeConfig.description}
       breadcrumbItems={breadcrumbItems}
       preselectedEntity={preselectedEntity}
+      icon={uiConfig.icon}
     />
   );
 }

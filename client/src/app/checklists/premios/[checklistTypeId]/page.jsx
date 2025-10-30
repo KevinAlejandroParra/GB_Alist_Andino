@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import BaseChecklistPage from '../../../../components/checklist/BaseChecklistPage';
 import { usePremios } from '../../../../components/checklist/hooks/usePremios';
 import PremiosDataModal from '../../../../components/checklist/PremiosDataModal';
+import { CHECKLIST_TYPES, getUiConfig } from '../../../../components/checklist/config/checklistTypes.config';
 
 export default function PremiosChecklistPage() {
   const params = useParams();
@@ -13,23 +14,15 @@ export default function PremiosChecklistPage() {
   // Hook para la lógica de Premios
   const premios = usePremios(checklistTypeId);
 
-  const config = {
-    type: 'premios', // Tipo dedicado
-    requiresEntitySelection: false, 
-    hideHistory: true, // El historial de premios se maneja de forma especial
-    allowDownload: true,
-    saveEndpoint: `/api/checklists/type/${checklistTypeId}/responses`,
-    downloadEndpoint: `/api/checklists/type/${checklistTypeId}/download-pdf`,
-    // Acción personalizada para abrir el modal de registro de datos
-    customActions: [
-      {
-        key: 'premios-data',
-        label: 'Registrar Datos de Premios',
-        onClick: premios.openPremiosModal,
-        variant: 'secondary'
-      }
-    ],
-  };
+  // Usar la configuración centralizada
+  const typeConfig = CHECKLIST_TYPES.premios;
+  const uiConfig = getUiConfig('premios');
+
+  // Crear acciones personalizadas basadas en la configuración
+  const customActions = typeConfig.data.customActions.map(action => ({
+    ...action,
+    onClick: premios.openPremiosModal
+  }));
 
   const breadcrumbItems = [
     { label: 'Dashboard', href: '/dashboard' },
@@ -41,12 +34,16 @@ export default function PremiosChecklistPage() {
     <>
       <BaseChecklistPage
         checklistTypeId={checklistTypeId}
-        config={config}
-        pageTitle="Checklist de Apoyo Técnico (Premios)"
+        checklistType="premios"  // Especificar el tipo de checklist
+        config={typeConfig.data}
+        pageTitle={typeConfig.displayName}
+        pageDescription={typeConfig.description}
         breadcrumbItems={breadcrumbItems}
+        icon={uiConfig.icon}
+        customActions={customActions}
       />
       {/* Renderizar el modal de premios */}
-      <PremiosDataModal 
+      <PremiosDataModal
         isOpen={premios.isPremiosModalOpen}
         onClose={premios.closePremiosModal}
         data={premios.premiosData}

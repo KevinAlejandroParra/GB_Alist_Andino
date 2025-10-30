@@ -1,40 +1,76 @@
 'use client'
-import React from 'react'
-import BaseChecklistPage from '../../../components/checklist/BaseChecklistPage'
-import { useParams } from 'next/navigation'
 
-const FamilyChecklistIcon = () => (
+import React from 'react';
+import { useRouter } from 'next/navigation';
+import ProtectedRoute from '../../../components/ProtectedRoute';
+import ChecklistHeader from '../../../components/checklist/components/ChecklistHeader';
+import { CHECKLIST_TYPES } from '../../../components/checklist/config/checklistTypes.config';
+
+const FamilyIcon = () => (
   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-    />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
   </svg>
-)
+);
 
-export default function FamilyChecklistPage() {
-  const params = useParams()
-  const { checklistTypeId } = params
+export default function FamilyChecklistIndex() {
+  const router = useRouter();
 
-  // El checklist de familia es especial porque:
-  // 1. Se genera dinámicamente basado en los dispositivos de la familia
-  // 2. No necesita seleccionar una familia específica, ya que el checklistTypeId
-  //    ya determina la familia (ej: apoyo técnico)
-  // 3. La plantilla se regenera automáticamente si hay nuevos dispositivos
+  const breadcrumbItems = [
+    { label: 'Dashboard', href: '/dashboard' },
+    { label: 'Checklists de Familia' },
+  ];
+
+  const checklistTypeConfig = CHECKLIST_TYPES.family;
 
   return (
-    <BaseChecklistPage
-      checklistTypeId={checklistTypeId}
-      title="Checklist por Familia"
-      subtitle="Checklist semanal para familias de dispositivos"
-      frequency="Semanal"
-      category="Familia"
-      icon={<FamilyChecklistIcon />}
-      showEntitySelector={false} // No necesitamos selector, el tipo ya define la familia
-      fetchChecklistEndpoint="latest"
-      generateDynamicTemplate={true} // Indica que este checklist genera su plantilla dinámicamente
-    />
-  )
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6">
+        <ChecklistHeader 
+          pageTitle={checklistTypeConfig.displayName}
+          breadcrumbItems={breadcrumbItems}
+          icon={checklistTypeConfig.ui.icon}
+        />
+        
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Información del tipo */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Información del Tipo</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Descripción</p>
+                <p className="font-medium">{checklistTypeConfig.description}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Frecuencia</p>
+                <p className="font-medium">{checklistTypeConfig.frequency}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Instrucciones */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">¿Cómo usar los Checklists de Familia?</h2>
+            <div className="space-y-4 text-gray-700">
+              <p>1. Los checklists de familia se generan automáticamente para familias de dispositivos específicas</p>
+              <p>2. Cada checklist incluye todos los dispositivos activos de la familia seleccionada</p>
+              <p>3. Completa cada ítem con la respuesta correspondiente (Cumple, Observación, No Cumple)</p>
+              <p>4. El checklist se regenera automáticamente si se añaden nuevos dispositivos a la familia</p>
+              <p>5. Añade comentarios y evidencia cuando sea necesario</p>
+              <p>6. Firma el checklist cuando esté completo</p>
+            </div>
+          </div>
+
+          {/* Enlace para volver al dashboard */}
+          <div className="text-center">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all"
+            >
+              Volver al Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    </ProtectedRoute>
+  );
 }

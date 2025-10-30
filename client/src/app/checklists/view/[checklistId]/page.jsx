@@ -21,13 +21,18 @@ export default function ViewChecklistPage() {
   // Cargar datos del checklist específico
   useEffect(() => {
     const fetchChecklistData = async () => {
+      if (!user || !user.token) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        
+
         // Obtener información del checklist
         const response = await axiosInstance.get(`/api/checklists/${checklistId}`);
         setChecklist(response.data);
-        
+
         setLoading(false);
       } catch (err) {
         console.error('Error al cargar datos del checklist:', err);
@@ -35,11 +40,11 @@ export default function ViewChecklistPage() {
         setLoading(false);
       }
     };
-    
-    if (checklistId) {
+
+    if (checklistId && user && user.token) {
       fetchChecklistData();
     }
-  }, [checklistId]);
+  }, [checklistId, user]);
 
   const handleDownloadPdf = async () => {
     try {
@@ -74,10 +79,10 @@ export default function ViewChecklistPage() {
     { label: 'Checklists', href: '/dashboard' },
     { label: checklist?.type?.name || 'Detalle de Checklist', 
       href: checklist?.checklist_type_id ? `/checklists/detail/${checklist.checklist_type_id}` : undefined },
-    { label: `Checklist ${formatLocalDate(checklist?.date)}` },
+    { label: `Checklist ${formatLocalDate(checklist?.createdAt)}` },
   ];
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-6">
@@ -132,9 +137,9 @@ export default function ViewChecklistPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-6">
-        <ChecklistHeader 
-          pageTitle={`${checklist.type?.name || 'Checklist'} - ${formatLocalDate(checklist.date)}`} 
-          breadcrumbItems={breadcrumbItems} 
+        <ChecklistHeader
+          pageTitle={`${checklist.type?.name || 'Checklist'} - ${formatLocalDate(checklist.createdAt)}`}
+          breadcrumbItems={breadcrumbItems}
         />
         
         <div className="max-w-4xl mx-auto space-y-6">
@@ -161,7 +166,7 @@ export default function ViewChecklistPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-500">Fecha</p>
-                <p className="font-medium">{formatLocalDate(checklist.date)}</p>
+                <p className="font-medium">{formatLocalDate(checklist.createdAt)}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Creado por</p>
