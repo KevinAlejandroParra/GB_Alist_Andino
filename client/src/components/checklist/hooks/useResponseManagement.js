@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import Swal from 'sweetalert2'
 import axiosInstance from '../../../utils/axiosConfig'
 
@@ -8,14 +8,77 @@ import axiosInstance from '../../../utils/axiosConfig'
  * @returns {Object} - Estado y funciones para manejar respuestas
  */
 export function useResponseManagement(checklist) {
-  const [itemResponses, setItemResponses] = useState({})
+  const [itemResponses, setItemResponses] = useState(() => {
+    if (typeof window !== 'undefined' && checklist?.checklist_id) {
+      try {
+        const saved = localStorage.getItem(`checklist_responses_${checklist.checklist_id}`)
+        const parsedResponses = saved ? JSON.parse(saved) : null
+        
+        if (parsedResponses) {
+          console.log('📥 Cargando respuestas guardadas:', parsedResponses);
+          return parsedResponses;
+        }
+      } catch (e) {
+        console.warn('Error cargando respuestas guardadas:', e)
+      }
+    }
+    
+    console.log('🆕 Inicializando respuestas vacías');
+    return {};
+  })
   const [modifiedResponses, setModifiedResponses] = useState(new Set())
   const [hasExistingResponses, setHasExistingResponses] = useState(false)
+  const [initializedFor, setInitializedFor] = useState(null);
+
+  const allItemsMap = useMemo(() => {
+    const map = new Map();
+    const collectItems = (items) => {
+        if (!items) return;
+        items.forEach((item) => {
+            if (!item) return;
+            const id = item.unique_frontend_id || item.checklist_item_id;
+            map.set(id, item);
+            if (item.subItems) {
+                collectItems(item.subItems);
+            }
+        });
+    };
+    if (checklist && checklist.items) {
+        collectItems(checklist.items);
+    }
+    return map;
+  }, [checklist]);
+
+  // Debug effect para monitorear cambios en itemResponses
+  useEffect(() => {
+    console.log('🔍 Estado actual de respuestas:', itemResponses);
+  }, [itemResponses]);
+
+  // Guardar respuestas en localStorage cuando cambien
+  useEffect(() => {
+    if (typeof window !== 'undefined' && checklist?.checklist_id) {
+      try {
+        const dataToSave = JSON.stringify(itemResponses);
+        localStorage.setItem(
+          `checklist_responses_${checklist.checklist_id}`,
+          dataToSave
+        );
+        console.log('💾 Guardado en localStorage:', JSON.parse(dataToSave));
+      } catch (e) {
+        console.warn('Error saving responses to localStorage:', e);
+      }
+    }
+  }, [itemResponses, checklist?.checklist_id]);
 
   /**
-   * Inicializa respuestas desde datos del checklist
+   * Inicializa las respuestas desde los datos del checklist, pero evita sobreescribir
+   * el estado si ya ha sido inicializado para el mismo checklist.
    */
   const initializeResponses = useCallback((checklistData) => {
+    if (!checklistData || !checklistData.items || checklistData.checklist_id === initializedFor) {
+      return;
+    }
+
     const initialResponses = {}
     let hasResponses = false
 
@@ -76,41 +139,56 @@ export function useResponseManagement(checklist) {
 
     setHasExistingResponses(hasResponses)
     setItemResponses(initialResponses)
-  }, [])
+    setInitializedFor(checklistData.checklist_id);
+  }, [initializedFor])
 
   /**
    * Maneja cambios en respuestas individuales
    */
-  const handleResponseChange = (itemId, field, value) => {
-    setItemResponses((prevResponses) => {
-      const currentResponse = prevResponses[itemId] || {}
-      const newResponse = { ...currentResponse, [field]: value }
+  const handleResponseChange = useCallback((itemId, field, value) => {
+    const item = allItemsMap.get(itemId);
+    if (!item) {
+        console.error(`Could not find item in allItemsMap for ID: ${itemId}`);
+        return;
+    }
 
-      // When a radio button changes, update the related fields
+    setItemResponses(prevResponses => {
+      const currentResponse = prevResponses[itemId] || {};
+      
+      const newResponse = {
+        ...currentResponse,
+        [field]: value,
+        checklist_item_id: item.checklist_item_id, // <-- THE FIX
+        inspectable_id: item.inspectable_id_for_response || currentResponse.inspectable_id,
+      };
+
       if (field === 'response_compliance') {
-        newResponse.value = value // Keep a generic 'value' field in sync
+        newResponse.value = value;
         switch (value) {
           case "cumple":
-            newResponse.response_type = "cumple"
-            break
+            newResponse.response_type = "cumple";
+            newResponse.comment = "";
+            newResponse.evidence_url = "";
+            break;
           case "no cumple":
-            newResponse.response_type = "no_cumple"
-            break
+            newResponse.response_type = "no_cumple";
+            break;
           case "observación":
-            newResponse.response_type = "observaciones"
-            break
+            newResponse.response_type = "observaciones";
+            break;
           default:
-            newResponse.response_type = null
+            newResponse.response_type = null;
         }
       }
 
       return {
         ...prevResponses,
         [itemId]: newResponse,
-      }
-    })
-    setModifiedResponses((prev) => new Set(prev).add(itemId))
-  }
+      };
+    });
+
+    setModifiedResponses((prev) => new Set(prev).add(itemId));
+  }, [allItemsMap]);
 
   /**
    * Maneja cambios de tipo de respuesta
@@ -129,7 +207,12 @@ export function useResponseManagement(checklist) {
   };
 
   const handleResponseTypeChange = useCallback((itemId, rawResponseType) => {
-    console.log('handleResponseTypeChange called with:', itemId, rawResponseType);
+    const item = allItemsMap.get(itemId);
+    if (!item) {
+        console.error(`Could not find item in allItemsMap for ID: ${itemId}`);
+        return;
+    }
+
     const responseType = normalizeResponseType(rawResponseType);
     setItemResponses((prevResponses) => {
       const currentResponse = prevResponses[itemId] || {};
@@ -156,8 +239,8 @@ export function useResponseManagement(checklist) {
         value: response_compliance,
         comment: responseType === "cumple" ? "" : currentResponse.comment || "",
         evidence_url: responseType === "cumple" ? "" : currentResponse.evidence_url || "",
-        checklist_item_id: currentResponse.checklist_item_id,
-        inspectable_id: currentResponse.inspectable_id
+        checklist_item_id: item.checklist_item_id,
+        inspectable_id: item.inspectable_id_for_response || currentResponse.inspectable_id
       };
 
       return {
@@ -166,36 +249,82 @@ export function useResponseManagement(checklist) {
       };
     });
     setModifiedResponses((prev) => new Set(prev).add(itemId));
-  }, []);
+  }, [allItemsMap]);
 
   /**
-   * Marca todos los ítems hermanos con la misma respuesta
+   * Marca todos los ítems hermanos con la misma respuesta de manera optimizada
    */
-  const handleMarkAllSiblings = useCallback((parentItemId, inspectableId, responseType) => {
+   const handleMarkAllSiblings = useCallback((parentItemId, inspectableId, responseType) => {
+    if (!checklist || !checklist.items) return;
+
     const findSiblings = (items, parentId) => {
       for (const item of items) {
-        if (item.checklist_item_id === parentId && item.subItems) {
-          return item.subItems
+        if (item.checklist_item_id === parentId) {
+          return item.subItems;
         }
         if (item.subItems) {
-          const found = findSiblings(item.subItems, parentId)
-          if (found) return found
+          const found = findSiblings(item.subItems, parentId);
+          if (found) return found;
         }
       }
-      return null
+      return null;
+    };
+
+    const siblings = findSiblings(checklist.items, parentItemId);
+
+    if (!siblings) {
+      console.error("Could not find siblings for parent item:", parentItemId);
+      return;
     }
 
-    const siblings = findSiblings(checklist.items, parentItemId)
-    if (!siblings) return
+    setItemResponses(prevResponses => {
+      const batchUpdates = {};
+      siblings.forEach(sibling => {
+        const siblingId = sibling.unique_frontend_id || sibling.checklist_item_id;
+        const currentResponse = prevResponses[siblingId] || {};
+        
+        let response_compliance;
+        switch (responseType) {
+          case "cumple":
+            response_compliance = "cumple";
+            break;
+          case "no_cumple":
+            response_compliance = "no cumple";
+            break;
+          case "observaciones":
+            response_compliance = "observación";
+            break;
+          default:
+            response_compliance = "cumple";
+        }
 
-    console.log('Marking siblings for parent', parentItemId, 'responseType', responseType, 'siblings', siblings.map(s => s.checklist_item_id || s.unique_frontend_id))
+        batchUpdates[siblingId] = {
+          ...currentResponse,
+          response_type: responseType,
+          response_compliance,
+          value: response_compliance,
+          comment: responseType === "cumple" ? "" : currentResponse.comment || "",
+          evidence_url: responseType === "cumple" ? "" : currentResponse.evidence_url || "",
+          checklist_item_id: sibling.checklist_item_id,
+          inspectable_id: inspectableId || sibling.inspectable_id_for_response || currentResponse.inspectable_id
+        };
+      });
 
-    siblings.forEach(sibling => {
-      const siblingId = sibling.unique_frontend_id || sibling.checklist_item_id
-      handleResponseTypeChange(siblingId, responseType)
-    })
-  }, [checklist?.items, handleResponseTypeChange])
+      return {
+        ...prevResponses,
+        ...batchUpdates
+      };
+    });
 
+    setModifiedResponses(prev => {
+      const newSet = new Set(prev);
+      siblings.forEach(sibling => {
+        const siblingId = sibling.unique_frontend_id || sibling.checklist_item_id;
+        newSet.add(siblingId);
+      });
+      return newSet;
+    });
+  }, [checklist]);
   /**
    * Resetea las modificaciones
    */
@@ -206,43 +335,17 @@ export function useResponseManagement(checklist) {
   const saveResponses = useCallback(async (config, user, checklistTypeId, signature, validation, onSuccess) => {
     const isValid = validation.validateResponses(itemResponses);
     if (!isValid) {
-        if (onSuccess) onSuccess(false, validation.errors); // Indicate failure
-        return;
-    }
-
-    const hasTechnicalSignature = checklist?.signatures?.some(sig => sig.role?.role_name === 'Tecnico de mantenimiento');
-    const hasOperationsSignature = checklist?.signatures?.some(sig => sig.role?.role_name === 'Jefe de Operaciones');
-
-    if (hasTechnicalSignature && hasOperationsSignature) {
-        await Swal.fire({
-            title: "Checklist Bloqueado",
-            text: "Este checklist ya ha sido firmado. No se pueden realizar modificaciones.",
-            icon: "warning",
-            confirmButtonColor: "#7c3aed",
-        });
+        if (onSuccess) onSuccess(false, validation.errors);
         return;
     }
 
     if (!user || !checklist) return;
 
-    const allItems = new Map();
-    const collectItems = (items) => {
-      if (!items) return;
-      items.forEach((item) => {
-        const id = item.unique_frontend_id || item.checklist_item_id;
-        allItems.set(id, item);
-        if (item.subItems) {
-          collectItems(item.subItems);
-        }
-      });
-    };
-    collectItems(checklist.items);
-
     const responsesToSend = [];
     let validationFailed = false;
 
     for (const itemId of Object.keys(itemResponses)) {
-      const item = allItems.get(itemId);
+      const item = allItemsMap.get(itemId);
       const response = itemResponses[itemId];
 
       if (!item || !response) {
@@ -250,18 +353,54 @@ export function useResponseManagement(checklist) {
         continue;
       }
       
-      if (response.response_type === "no_cumple" && (!response.comment || response.comment.trim() === "")) {
-        validationFailed = true;
-        Swal.fire({
-          title: "Comentario requerido",
-          text: `El ítem "${item.question_text}" marcado como "No Cumple" requiere un comentario.`,
-          icon: "warning",
-          confirmButtonColor: "#7c3aed",
-        });
-        break;
+      // Validar "no cumple" - requiere comentario y evidencia
+      if (response.response_type === "no_cumple") {
+        if (!response.comment || response.comment.trim() === "") {
+          validationFailed = true;
+          Swal.fire({
+            title: "Comentario obligatorio",
+            text: `El ítem "${item.question_text}" marcado como "No Cumple" requiere un comentario explicativo.`,
+            icon: "warning",
+            confirmButtonColor: "#7c3aed",
+          });
+          break;
+        }
+        if (!response.evidence_url || response.evidence_url.trim() === "") {
+          validationFailed = true;
+          Swal.fire({
+            title: "Evidencia obligatoria",
+            text: `El ítem "${item.question_text}" marcado como "No Cumple" requiere evidencia fotográfica.`,
+            icon: "warning",
+            confirmButtonColor: "#7c3aed",
+          });
+          break;
+        }
       }
 
-      // Validación específica para checklists de familia
+      // Validar "observación" - requiere comentario y evidencia
+      if (response.response_type === "observaciones") {
+        if (!response.comment || response.comment.trim() === "") {
+          validationFailed = true;
+          Swal.fire({
+            title: "Comentario obligatorio",
+            text: `El ítem "${item.question_text}" marcado como "Observación" requiere un comentario explicativo.`,
+            icon: "warning",
+            confirmButtonColor: "#7c3aed",
+          });
+          break;
+        }
+        if (!response.evidence_url || response.evidence_url.trim() === "") {
+          validationFailed = true;
+          Swal.fire({
+            title: "Evidencia obligatoria",
+            text: `El ítem "${item.question_text}" marcado como "Observación" requiere evidencia fotográfica.`,
+            icon: "warning",
+            confirmButtonColor: "#7c3aed",
+          });
+          break;
+        }
+      }
+
       if (checklist.type?.type_category === 'family' && !response.inspectable_id) {
         validationFailed = true;
         Swal.fire({
@@ -301,7 +440,6 @@ export function useResponseManagement(checklist) {
     });
 
   try {
-    // Usar el endpoint configurado si existe, si no, usar el anterior por compatibilidad
     const endpoint = config.saveEndpoint || `/api/checklists/${checklist.checklist_id}/responses`;
     await axiosInstance.post(endpoint, {
       responses: responsesToSend
@@ -318,19 +456,18 @@ export function useResponseManagement(checklist) {
     });
 
     resetModifications();
-    if (onSuccess) onSuccess(true); // Indicar éxito
+    if (onSuccess) onSuccess(true);
 
   } catch (error) {
     console.error('Error al guardar:', error);
-    console.log('Error response data:', error.response?.data);
     Swal.fire({
       title: 'Error',
       text: error.response?.data?.message || 'No se pudo guardar el checklist',
       icon: 'error'
     });
-    if (onSuccess) onSuccess(false); // Indicar fallo
+    if (onSuccess) onSuccess(false);
   }
-  }, [itemResponses, checklist, resetModifications]);
+  }, [itemResponses, checklist, resetModifications, allItemsMap]);
 
   return {
     itemResponses,

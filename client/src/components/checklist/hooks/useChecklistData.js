@@ -110,7 +110,13 @@ export function useChecklistData(checklistTypeId, options = {}) {
       if (response.data) {
         // Si hay datos y es un checklist de atracción, agrupamos los items
         if (response.data.type && response.data.type.type_category === 'attraction') {
-          response.data.items = groupItems(response.data.items);
+          // Ensure items exist and is an array before grouping
+          if (response.data.items && Array.isArray(response.data.items)) {
+            response.data.items = groupItems(response.data.items);
+          } else {
+            console.warn('No items array found or items is not an array for attraction checklist');
+            response.data.items = [];
+          }
         }
         setChecklist(response.data)
         return response.data
@@ -149,12 +155,23 @@ export function useChecklistData(checklistTypeId, options = {}) {
   }, [])
 
   function groupItems(items) {
-    const parentItems = items.filter(item => item.parent_item_id === null);
+    // Handle case where items is undefined, null, or not an array
+    if (!items || !Array.isArray(items)) {
+      console.warn('groupItems received invalid items:', items);
+      return [];
+    }
+    
+    // Also handle empty array case
+    if (items.length === 0) {
+      return [];
+    }
+    
+    const parentItems = items.filter(item => item && item.parent_item_id === null);
     return parentItems.map(parent => ({
       ...parent,
       subItems: items
-        .filter(sub => sub.parent_item_id === parent.checklist_item_id)
-        .sort((a, b) => a.item_number.localeCompare(b.item_number, 'en', { numeric: true }))
+        .filter(sub => sub && sub.parent_item_id === parent.checklist_item_id)
+        .sort((a, b) => (a?.item_number || '').localeCompare(b?.item_number || '', 'en', { numeric: true }))
     }));
   }
 

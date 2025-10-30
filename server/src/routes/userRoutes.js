@@ -2,30 +2,9 @@ const express = require('express');
 const UserController = require('../controllers/userController');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { checkRole } = require('../middleware/authMiddleware');
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const upload = require('../config/userMulterConfig');
 
 const router = express.Router();
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const folder = path.join(__dirname, "..", "..", "public", "images", "users"); 
-    cb(null, folder);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const fileName = `user-${req.params.user_id}-${Date.now()}${ext}`;
-    cb(null, fileName);
-  },
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|gif/;
-  const isValid = allowed.test(file.mimetype);
-  isValid ? cb(null, true) : cb(new Error("Tipo de archivo no permitido"), false);
-};
-
-const upload = multer({ storage, fileFilter });
 
 router.get('/', verifyToken, checkRole([1]), (req, res, next) => {
     next();

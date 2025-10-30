@@ -53,7 +53,6 @@ export function useFileUpload(user) {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
       const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData, {
         headers: {
-          Authorization: `Bearer ${user.token}`,
           "Content-Type": "multipart/form-data",
         },
       })
@@ -78,7 +77,7 @@ export function useFileUpload(user) {
         confirmButtonColor: "#7c3aed",
       })
     }
-  }, [user])
+  }, [])
 
   return { handleFileUpload }
 }
