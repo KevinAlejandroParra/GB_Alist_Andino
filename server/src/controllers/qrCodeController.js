@@ -162,6 +162,27 @@ class QrCodeController {
         return res.status(400).json({ success: false, message: 'Este código QR no pertenece al tipo de checklist actual' });
       }
 
+      // CRÍTICO: Verificar si este QR ya fue escaneado para este checklist específico
+      const existingScan = await ChecklistQrScan.findOne({
+        where: {
+          checklist_id: checklist_id,
+          qr_id: qrCode.qr_id
+        }
+      });
+
+      if (existingScan) {
+        console.log(`🚫 RE-ESCANEO DETECTADO - QR ${qr_code} ya registrado para checklist ${checklist_id}`);
+        return res.status(400).json({
+          success: false,
+          message: 'Este código QR ya fue escaneado anteriormente para este checklist',
+          data: {
+            error_type: 'duplicate_scan',
+            scan_id: existingScan.scan_id,
+            scanned_at: existingScan.scanned_at
+          }
+        });
+      }
+
       const unlockedItems = [];
       if (qrCode.itemAssociations && qrCode.itemAssociations.length > 0) {
         for (const association of qrCode.itemAssociations) {
@@ -185,6 +206,8 @@ class QrCodeController {
 
       await qrCode.increment('usage_count');
       await qrCode.update({ last_used_at: new Date() });
+
+      console.log(`✅ ESCANEO REGISTRADO - QR ${qr_code} para checklist ${checklist_id}, scan_id: ${scan.scan_id}`);
 
       res.status(201).json({
         success: true,
@@ -334,21 +357,42 @@ class QrCodeController {
         return res.status(400).json({ success: false, message: 'Solo los tipos de checklist de atracción pueden generar códigos QR por particiones' });
       }
 
-      const parentItems = await ChecklistItem.findAll({
+      // SOLUCIÓN: Mapear IDs para mantener el orden original de selección del usuario
+      console.log('🔍 DEBUG - IDs recibidos del frontend:', parent_item_ids);
+      
+      // Obtener todos los items y crear un mapa para acceso rápido
+      const allItems = await ChecklistItem.findAll({
         where: { checklist_item_id: parent_item_ids, checklist_type_id, parent_item_id: null },
         order: [['item_number', 'ASC']]
       });
 
-      if (parentItems.length === 0) {
+      // Crear mapa de ID -> item para búsqueda rápida
+      const itemsMap = {};
+      allItems.forEach(item => {
+        itemsMap[item.checklist_item_id] = item;
+      });
+
+      // CRÍTICO: Mantener el orden original de selección del usuario
+      // Mapear los IDs en el orden exacto que llegaron desde el frontend
+      const parentItemsInOriginalOrder = parent_item_ids
+        .map(id => itemsMap[id])
+        .filter(item => item !== undefined); // Filtrar items no encontrados
+
+      console.log('🔍 DEBUG - Items en orden original de selección:', parentItemsInOriginalOrder.map(item => `${item.item_number}:${item.checklist_item_id}`));
+
+      if (parentItemsInOriginalOrder.length === 0) {
         return res.status(404).json({ success: false, message: 'No se encontraron items padre válidos para los IDs proporcionados' });
       }
 
       const partitionSize = partition_config.partition_size || 1;
       const generatedQRCodes = [];
 
-      for (let i = 0; i < parentItems.length; i += partitionSize) {
-        const groupItems = parentItems.slice(i, i + partitionSize);
+      for (let i = 0; i < parentItemsInOriginalOrder.length; i += partitionSize) {
+        const groupItems = parentItemsInOriginalOrder.slice(i, i + partitionSize);
         const groupNumber = Math.floor(i / partitionSize) + 1;
+        
+        console.log(`🔍 DEBUG - Grupo ${groupNumber}: items`, groupItems.map(item => `${item.item_number}:${item.checklist_item_id}`));
+
         const qrName = `QR-Grupo-${groupNumber}`;
         const qrCodeValue = QrCodeController.generateUniqueQrCode();
 
@@ -574,25 +618,31 @@ class QrCodeController {
       // IMPORTANTE: Lógica corregida para permitir completar secciones ya desbloqueadas
       // El sistema debe permitir trabajar en las secciones desbloqueadas antes de requerir el siguiente QR
 
-      // Si el QR ya fue escaneado anteriormente, permitir su uso (re-escaneo)
+      // VERIFICAR si el QR ya fue escaneado para este checklist específico
       const wasAlreadyScanned = qrScans.some(scan => scan.qr_id === qrCode.qr_id);
+      
+      console.log(`🔍 DEBUG - QR ${qr_code} ya escaneado:`, wasAlreadyScanned);
+      console.log(`🔍 DEBUG - Escaneos previos:`, qrScans.map(s => `QR:${s.qr_id}`));
 
       // Si este QR tiene asociaciones de items, verificar si están desbloqueadas
       const hasAssociations = qrCode.itemAssociations && qrCode.itemAssociations.length > 0;
       const hasUnlockedAssociations = hasAssociations && qrCode.itemAssociations.some(assoc => assoc.is_unlocked);
 
-      // Permitir el QR si:
-      // 1. Ya fue escaneado anteriormente (re-escaneo permitido), O
-      // 2. Es el siguiente requerido según la lógica de particiones, O
-      // 3. Tiene asociaciones de items que están desbloqueadas (sección ya autorizada)
-      const isValidForCurrentProgress = wasAlreadyScanned ||
-                                       (nextQrRequired && nextQrRequired.qr_id === qrCode.qr_id) ||
-                                       hasUnlockedAssociations;
+      // CORRECCIÓN: NO PERMITIR re-escaneos de QR ya utilizados
+      // Solo permitir el QR si:
+      // 1. Es el siguiente requerido según la lógica de particiones, Y no ha sido escaneado antes
+      const isValidForCurrentProgress = !wasAlreadyScanned &&
+                                       (nextQrRequired && nextQrRequired.qr_id === qrCode.qr_id);
+
+      // Si el QR ya fue escaneado, es definitivamente inválido
+      if (wasAlreadyScanned) {
+        console.log(`🚫 RE-ESCANEO DETECTADO - QR ${qr_code} ya fue utilizado anteriormente`);
+      }
 
       // Información del QR correcto si no es válido
       const correctQrInfo = !isValidForCurrentProgress && nextQrRequired ?
         { qr_code: nextQrRequired.qr_code, group_number: nextQrRequired.group_number } :
-        (!isValidForCurrentProgress && wasAlreadyScanned ? null : null); // Si ya fue escaneado, no mostrar error
+        (!isValidForCurrentProgress && wasAlreadyScanned ? null : null);
 
       // Calcular progreso actual
       const currentProgress = {

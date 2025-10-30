@@ -6,9 +6,15 @@ module.exports = (sequelize, DataTypes) => {
   class WorkOrder extends Model {
     static associate(models) {
       // Una orden de trabajo es reportada por un usuario.
-      WorkOrder.belongsTo(models.User, { 
-        foreignKey: 'reported_by_id', 
-        as: 'reporter' 
+      WorkOrder.belongsTo(models.User, {
+        foreignKey: 'reported_by_id',
+        as: 'reporter'
+      });
+
+      // Una orden de trabajo puede ser cerrada por un usuario.
+      WorkOrder.belongsTo(models.User, {
+        foreignKey: 'closed_by',
+        as: 'closer'
       });
 
       // Una orden de trabajo pertenece a un ítem inspeccionable específico.
@@ -24,15 +30,15 @@ module.exports = (sequelize, DataTypes) => {
       });
 
       // Una orden de trabajo es generada por una única respuesta de checklist.
-      WorkOrder.belongsTo(models.ChecklistResponse, { 
-        foreignKey: 'initial_response_id', 
-        as: 'initialResponse' 
+      WorkOrder.belongsTo(models.ChecklistResponse, {
+        foreignKey: 'initial_response_id',
+        as: 'initialResponse'
       });
 
       // Una orden de trabajo puede ser cerrada por una respuesta de checklist.
-      WorkOrder.belongsTo(models.ChecklistResponse, { 
-        foreignKey: 'closing_response_id', 
-        as: 'closingResponse' 
+      WorkOrder.belongsTo(models.ChecklistResponse, {
+        foreignKey: 'closing_response_id',
+        as: 'closingResponse'
       });
 
       // Una orden de trabajo puede tener muchas requisiciones de partes.
@@ -73,6 +79,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true
     },
+    solution_text: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
     resolved_at: {
       type: DataTypes.DATE,
       allowNull: true
@@ -80,11 +90,43 @@ module.exports = (sequelize, DataTypes) => {
     recurrence_count: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      defaultValue: 0
+      defaultValue: 1
+    },
+    severity: {
+      type: DataTypes.ENUM('leve', 'crítica'),
+      allowNull: true
+    },
+    responsible_area: {
+      type: DataTypes.ENUM('Técnico', 'Operación', 'Mixto'),
+      allowNull: true
+    },
+    evidence_solution_url: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    first_reported_date: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    last_updated_date: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    reported_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    closed_at: {
+      type: DataTypes.DATE,
+      allowNull: true
     },
     reported_by_id: {
       type: DataTypes.INTEGER,
       allowNull: false
+    },
+    closed_by: {
+      type: DataTypes.INTEGER,
+      allowNull: true
     },
     inspectable_id: {
       type: DataTypes.INTEGER,

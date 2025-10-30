@@ -27,6 +27,10 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: true
       },
+      solution_text: {
+        type: Sequelize.TEXT,
+        allowNull: true
+      },
       resolved_at: {
         type: Sequelize.DATE,
         allowNull: true
@@ -34,11 +38,47 @@ module.exports = {
       recurrence_count: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        defaultValue: 0
+        defaultValue: 1
+      },
+      severity: {
+        type: Sequelize.ENUM('leve', 'crítica'),
+        allowNull: true
+      },
+      responsible_area: {
+        type: Sequelize.ENUM('Técnico', 'Operación', 'Mixto'),
+        allowNull: true
+      },
+      evidence_solution_url: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      first_reported_date: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
+      last_updated_date: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
+      reported_at: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
+      closed_at: {
+        type: Sequelize.DATE,
+        allowNull: true
       },
       reported_by_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
+        references: {
+          model: 'users',
+          key: 'user_id'
+        }
+      },
+      closed_by: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
         references: {
           model: 'users',
           key: 'user_id'
@@ -55,7 +95,7 @@ module.exports = {
       initial_response_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        unique: true, // Una respuesta solo puede generar una OT
+        unique: true,
         references: {
           model: 'checklist_responses',
           key: 'response_id'
@@ -64,7 +104,7 @@ module.exports = {
       closing_response_id: {
         type: Sequelize.INTEGER,
         allowNull: true,
-        unique: true, // Una respuesta solo puede cerrar una OT
+        unique: true,
         references: {
           model: 'checklist_responses',
           key: 'response_id'
