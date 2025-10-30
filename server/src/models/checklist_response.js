@@ -22,10 +22,10 @@ module.exports = (sequelize, DataTypes) => {
         as: 'respondedBy',
       });
 
-      // Una respuesta puede tener una falla asociada.
-      ChecklistResponse.hasOne(models.Failure, {
-        foreignKey: 'response_id',
-        as: 'failure',
+      // Una respuesta puede tener una orden de trabajo asociada.
+      ChecklistResponse.hasOne(models.WorkOrder, {
+        foreignKey: 'initial_response_id',
+        as: 'workOrder',
       });
     }
   }

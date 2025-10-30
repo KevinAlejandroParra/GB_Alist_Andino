@@ -24,10 +24,6 @@ module.exports = (sequelize, DataTypes) => {
                 autoIncrement: true,
                 primaryKey: true,
             },
-            failure_id: {
-                type: DataTypes.INTEGER,
-                allowNull: false,
-            },
             requested_by: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
