@@ -129,7 +129,7 @@ const getChecklistById = async (req, res) => {
           include: [
             {
               model: ChecklistItem,
-              as: 'item'
+              as: 'checklistItem'
             }
           ]
         },
@@ -162,6 +162,7 @@ const submitResponses = async (req, res) => {
     const { responses } = req.body
     const user_id = req.user.user_id
     const role_id = req.user.role_id
+    
     await checklistService.submitResponses({
       checklist_id: Number.parseInt(checklist_id),
       responses,
@@ -198,18 +199,30 @@ const submitResponses = async (req, res) => {
 
     res.status(200).json({ message: "Respuestas registradas exitosamente" })
   } catch (error) {
-    res.status(400).json({ error: error.message })
+    console.error('Error en submitResponses:', error.message);
+    
+    // Manejar errores de validación específicos
+    if (error.message.includes('requiere un comentario') ||
+        error.message.includes('requiere evidencia')) {
+      res.status(400).json({
+        error: error.message,
+        type: 'validation_error',
+        code: 'REQUIRED_FIELDS'
+      });
+    } else {
+      res.status(400).json({ error: error.message });
+    }
   }
 }
 
 const getPendingFailures = async (req, res) => {
   try {
     const { checklist_id } = req.params;
-    const failures = await checklistService.getFailuresByStatus({
+    const workOrders = await checklistService.getWorkOrdersByStatus({
       checklist_id: Number.parseInt(checklist_id),
       status: 'pendiente'
     });
-    res.status(200).json(failures);
+    res.status(200).json(workOrders);
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -221,11 +234,11 @@ const getPendingFailures = async (req, res) => {
 const getClosedFailures = async (req, res) => {
   try {
     const { checklist_id } = req.params;
-    const failures = await checklistService.getFailuresByStatus({
+    const workOrders = await checklistService.getWorkOrdersByStatus({
       checklist_id: Number.parseInt(checklist_id),
       status: 'resuelto'
     });
-    res.status(200).json(failures);
+    res.status(200).json(workOrders);
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -234,9 +247,9 @@ const getClosedFailures = async (req, res) => {
   }
 };
 
-const updateFailure = async (req, res) => {
+const updateWorkOrder = async (req, res) => {
   try {
-    const { id: failure_id } = req.params
+    const { id: work_order_id } = req.params
     const {
       description,
       solution_text,
@@ -251,7 +264,7 @@ const updateFailure = async (req, res) => {
    
 
     const updateData = {
-      failure_id: Number.parseInt(failure_id),
+      work_order_id: Number.parseInt(work_order_id),
       description,
       solution_text,
       responsible_area,
@@ -263,11 +276,11 @@ const updateFailure = async (req, res) => {
       closed_by,
     }
 
-    const updatedFailure = await checklistService.updateFailure(updateData)
+    const updatedWorkOrder = await checklistService.updateWorkOrder(updateData)
     res.status(200).json({
       success: true,
       message: "Falla actualizada exitosamente",
-      failure: updatedFailure,
+      workOrder: updatedWorkOrder,
     })
   } catch (error) {
     res.status(400).json({
@@ -1147,7 +1160,7 @@ const getChecklistByTypeHelper = async (checklistTypeId, checklistInstanceData) 
   });
 
   return {
-     ...checklistInstanceData, // Contains checklist_id, type, signatures, pending_failures
+     ...checklistInstanceData, // Contains checklist_id, type, signatures, pending_work_orders
      type: checklistTypeTemplate.toJSON(), // Ensure the type data is from the template
     items: combinedItems,
   };
@@ -1203,13 +1216,13 @@ const getChecklistHistoryByType = async (req, res) => {
 
 const { getChecklistDataForPDF } = require('../services/checklistService')
 
-const getFailuresByChecklistType = async (req, res) => {
+const getWorkOrdersByChecklistType = async (req, res) => {
   try {
     const { checklist_type_id } = req.params;
-    const failures = await checklistService.getFailuresByChecklistType({
+    const workOrders = await checklistService.getWorkOrdersByChecklistType({
       checklist_type_id: Number.parseInt(checklist_type_id),
     });
-    res.status(200).json(failures);
+    res.status(200).json(workOrders);
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -1328,7 +1341,7 @@ module.exports = {
   createChecklist,
   getChecklistById,
   submitResponses,
-  updateFailure,
+  updateWorkOrder,
   listObservations,
   signChecklist,
   getChecklistHistory,
@@ -1340,7 +1353,7 @@ module.exports = {
   getChecklistHistoryByType,
   getPendingFailures,
   getClosedFailures,
-  getFailuresByChecklistType,
+  getWorkOrdersByChecklistType,
   getChecklistTypeDetails,
   getParentItemsByChecklistType
 }

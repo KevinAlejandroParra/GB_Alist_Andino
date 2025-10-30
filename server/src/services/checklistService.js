@@ -3,7 +3,7 @@ const {
   ChecklistItem,
   ChecklistResponse,
   ChecklistSignature,
-  Failure,
+  WorkOrder,
   connection,
   Role,
   ChecklistType,
@@ -18,6 +18,7 @@ const {
   ChecklistQrItemAssociation
 } = require("../models");
 const { Sequelize } = require("../models");
+const workOrderService = require("./workOrderService");
 const Op = Sequelize.Op
 
 const getTodayNormalizedUTC = () => {
@@ -462,9 +463,9 @@ const getLatestChecklist = async ({ inspectableId, role_id, checklist_type_id })
       where: { checklist_id: checklist.checklist_id },
       include: [
           {
-              model: Failure, 
-              as: "failure",
-              include: [{ model: User, as: "failureCloser", attributes: ["user_id", "user_name"] }]
+              model: WorkOrder,
+              as: "workOrder",
+              include: [{ model: User, as: "closer", attributes: ["user_id", "user_name"] }]
           },
           { model: User, as: "respondedBy", attributes: ["user_id", "user_name"] },
           {
@@ -528,8 +529,8 @@ const getLatestChecklist = async ({ inspectableId, role_id, checklist_type_id })
               required: false,
               include: [
                 { model: User, as: "respondedBy", attributes: ["user_id", "user_name"] },
-                { model: Failure, as: "failure", required: false,
-                  include: [{ model: User, as: "failureCloser", attributes: ["user_id", "user_name"] }],
+                { model: WorkOrder, as: "workOrder", required: false,
+                  include: [{ model: User, as: "closer", attributes: ["user_id", "user_name"] }],
                 },
               ],
             },
@@ -542,8 +543,8 @@ const getLatestChecklist = async ({ inspectableId, role_id, checklist_type_id })
           required: false,
           include: [
             { model: User, as: "respondedBy", attributes: ["user_id", "user_name"] },
-            { model: Failure, as: "failure", required: false,
-              include: [{ model: User, as: "failureCloser", attributes: ["user_id", "user_name"] }],
+            { model: WorkOrder, as: "workOrder", required: false,
+              include: [{ model: User, as: "closer", attributes: ["user_id", "user_name"] }],
             },
           ],
         },
@@ -564,14 +565,14 @@ const getLatestChecklist = async ({ inspectableId, role_id, checklist_type_id })
     ],
   })
 
-  const pending_failures = await Failure.findAll({
+  const pending_work_orders = await WorkOrder.findAll({
     where: {
       status: 'pendiente'
     },
     include: [
       {
         model: ChecklistResponse,
-        as: 'response',
+        as: 'initialResponse',
         required: true,
         include: [
           {
@@ -603,7 +604,7 @@ const getLatestChecklist = async ({ inspectableId, role_id, checklist_type_id })
     ...checklist.toJSON(),
     items,
     signatures,
-    pending_failures
+    pending_work_orders
   }
 }
 
@@ -924,6 +925,26 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
         throw new Error(`Item with ID ${checklist_item_id} is not valid for this checklist.`);
       }
 
+      // VALIDACIÓN OBLIGATORIA: "No Cumple" requiere comentario y evidencia
+      if (response.response_type === "no_cumple" || value === "no cumple") {
+        if (!comment || comment.trim() === "") {
+          throw new Error(`El ítem "${item.question_text}" marcado como "No Cumple" requiere un comentario explicativo.`);
+        }
+        if (!evidence_url || evidence_url.trim() === "") {
+          throw new Error(`El ítem "${item.question_text}" marcado como "No Cumple" requiere evidencia fotográfica.`);
+        }
+      }
+
+      // VALIDACIÓN OBLIGATORIA: "Observación" requiere comentario y evidencia
+      if (response.response_type === "observaciones" || value === "observación") {
+        if (!comment || comment.trim() === "") {
+          throw new Error(`El ítem "${item.question_text}" marcado como "Observación" requiere un comentario explicativo.`);
+        }
+        if (!evidence_url || evidence_url.trim() === "") {
+          throw new Error(`El ítem "${item.question_text}" marcado como "Observación" requiere evidencia fotográfica.`);
+        }
+      }
+
       const responseData = {
           response_id: response_id || undefined,
           checklist_id: response.checklist_id || checklist_id,
@@ -1018,26 +1039,27 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
       }
       console.log('Upsert exitoso, response_id:', checklistResponse.response_id);
 
-      // Manejar fallas basado en response_compliance
+      // Manejar fallas basado en response_compliance - Integración real con workOrderService
       const hasFailure = responseData.response_compliance === "no cumple" || responseData.response_compliance === "observación";
       if (hasFailure) {
-        const severity = responseData.response_compliance === "no cumple" ? "crítica" : "leve";
-        await Failure.upsert(
-          {
-            response_id: checklistResponse.response_id,
-            description: comment || "Item does not meet criteria",
-            status: "pendiente",
-            reported_at: new Date(),
+        // CREAR/ACTUALIZAR WORKORDER AUTOMÁTICAMENTE
+        try {
+          await workOrderService.handleWorkOrderForResponse({
+            checklist_id: responseData.checklist_id,
+            checklist_item_id,
+            inspectable_id: responseData.inspectable_id,
             responded_by: responded_by,
-            severity: severity,
-          },
-          { transaction },
-        );
+            response_compliance: responseData.response_compliance,
+            comment: responseData.comment,
+            // ✅ NO enviar severity - se asigna automáticamente en workOrderService
+          }, transaction);
+          console.log(`WorkOrder creada/actualizada para item ${checklist_item_id} con severity automático`);
+        } catch (woError) {
+          console.error(`Error creando WorkOrder para item ${checklist_item_id}:`, woError);
+          // No lanzar error para no interrumpir el flujo principal
+        }
       } else {
-        await Failure.destroy({
-          where: { response_id: checklistResponse.response_id, status: "pendiente" },
-          transaction,
-        });
+        console.log(`No hay falla para item ${checklist_item_id}`);
       }
     }
 
@@ -1294,7 +1316,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
             type: definitiveChecklistType.toJSON(),
             items: items.sort(naturalSort),
             signatures: [],
-            pending_failures: [],
+            pending_work_orders: [],
         };
     }
 
@@ -1369,7 +1391,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
       ...checklistData,
       items,
       signatures,
-      pending_failures: [],
+      pending_work_orders: [],
     }
 
   } else if (definitiveChecklistType.type_category === 'static' || definitiveChecklistType.type_category === 'attraction') {
@@ -1458,14 +1480,14 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
     }) : [];
 
     const checklistData = checklist.toJSON();
-    const pendingFailures = await Failure.findAll({
+    const pendingFailures = await WorkOrder.findAll({
       where: {
         status: 'pendiente'
       },
       include: [
         {
           model: ChecklistResponse,
-          as: 'response',
+          as: 'initialResponse', // CORREGIDO: usar alias correcto del modelo
           required: true,
           include: [
             {
@@ -1497,7 +1519,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
       ...checklistData,
       items,
       signatures,
-      pending_failures: pendingFailures,
+      pending_work_orders: pendingFailures,
     };
 
   } else if (definitiveChecklistType.type_category === 'family') {
@@ -1523,7 +1545,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
                 type: definitiveChecklistType.toJSON(),
                 items: [],
                 signatures: [],
-                pending_failures: [],
+                pending_work_orders: [],
             };
         }
         const firstDeviceInspectable = devices[0].parentInspectable;
@@ -1560,7 +1582,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
         type: definitiveChecklistType.toJSON(),
         items: [],
         signatures: [],
-        pending_failures: [],
+        pending_work_orders: [],
       };
     }
 
@@ -1611,7 +1633,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
       type: definitiveChecklistType.toJSON(),
       items,
       signatures,
-      pending_failures: [],
+      pending_work_orders: [],
     };
   } else {
     throw new Error(`Checklist type category '${definitiveChecklistType.type_category}' is not supported by this function.`);
@@ -1775,7 +1797,7 @@ const getChecklistDataForPDF = async (checklistId) => {
           required: false,
           include: [
             { model: User, as: "respondedBy", attributes: ["user_id", "user_name"] },
-            { model: Failure, as: "failure", required: false }
+            { model: WorkOrder, as: "workOrder", required: false }
           ]
         }
       ]
@@ -1795,16 +1817,16 @@ const getChecklistDataForPDF = async (checklistId) => {
   }
 };
 
-const getFailuresByStatus = async ({ checklist_id, status }) => {
+const getWorkOrdersByStatus = async ({ checklist_id, status }) => {
   try {
-    const failures = await Failure.findAll({
+    const workOrders = await WorkOrder.findAll({
       where: {
         status
       },
       include: [
         {
           model: ChecklistResponse,
-          as: 'response',
+          as: 'initialResponse',
           required: true,
           where: {
             checklist_id
@@ -1818,55 +1840,57 @@ const getFailuresByStatus = async ({ checklist_id, status }) => {
           ]
         },
         {
-          model: User,
-          as: 'failureReporter',
-          attributes: ['user_id', 'user_name']
+            model: User,
+            as: 'reporter', // CORREGIDO: usar alias correcto del modelo
+            foreignKey: 'reported_by_id',
+            attributes: ['user_id', 'user_name']
         },
         {
           model: User,
-          as: 'failureCloser',
+          as: 'closer',
+          foreignKey: 'closed_by',
           attributes: ['user_id', 'user_name']
         }
       ],
       order: [['reported_at', 'DESC']]
     });
-    return failures;
+    return workOrders;
   } catch (error) {
-    console.error("getFailuresByStatus Service: Error:", error.message);
+    console.error("getWorkOrdersByStatus Service: Error:", error.message);
     throw error;
   }
 };
 
-const updateFailure = async (updateData) => {
-  const { failure_id, ...rest } = updateData;
+const updateWorkOrder = async (updateData) => {
+  const { work_order_id, ...rest } = updateData;
 
-  if (!failure_id) {
-    throw new Error("Se requiere el ID de la falla para actualizarla.");
+  if (!work_order_id) {
+    throw new Error("Se requiere el ID de la orden de trabajo para actualizarla.");
   }
 
-  const failure = await Failure.findByPk(failure_id);
+  const workOrder = await WorkOrder.findByPk(work_order_id);
 
-  if (!failure) {
-    throw new Error(`No se encontró una falla con el ID ${failure_id}.`);
+  if (!workOrder) {
+    throw new Error(`No se encontró una orden de trabajo con el ID ${work_order_id}.`);
   }
 
   // Si el estado cambia a 'resuelto', establecer la fecha de cierre
-  if (rest.status && rest.status === 'resuelto' && failure.status !== 'resuelto') {
+  if (rest.status && rest.status === 'resuelto' && workOrder.status !== 'resuelto') {
     rest.closed_at = new Date();
   }
 
-  const updatedFailure = await failure.update(rest);
+  const updatedWorkOrder = await workOrder.update(rest);
 
-  return updatedFailure;
+  return updatedWorkOrder;
 };
 
-const getFailuresByChecklistType = async ({ checklist_type_id }) => {
+const getWorkOrdersByChecklistType = async ({ checklist_type_id }) => {
   try {
-    const failures = await Failure.findAll({
+    const workOrders = await WorkOrder.findAll({
         include: [
             {
                 model: ChecklistResponse,
-                as: 'response',
+                as: 'initialResponse',
                 required: true,
                 include: [
                     {
@@ -1882,25 +1906,32 @@ const getFailuresByChecklistType = async ({ checklist_type_id }) => {
                         model: ChecklistItem,
                         as: 'checklistItem',
                         attributes: ['item_number', 'question_text']
+                    },
+                    {
+                        model: User,
+                        as: 'respondedBy',
+                        attributes: ['user_id', 'user_name']
                     }
                 ]
             },
             {
                 model: User,
-                as: 'failureReporter',
+                as: 'reporter', // CORREGIDO: usar alias definido en modelo
+                foreignKey: 'reported_by_id',
                 attributes: ['user_id', 'user_name']
             },
             {
                 model: User,
-                as: 'failureCloser',
+                as: 'closer',
+                foreignKey: 'closed_by',
                 attributes: ['user_id', 'user_name']
             }
         ],
         order: [['reported_at', 'DESC']]
     });
-    return failures;
+    return workOrders;
   } catch (error) {
-    console.error("getFailuresByChecklistType Service: Error:", error.message);
+    console.error("getWorkOrdersByChecklistType Service: Error:", error.message);
     throw error;
   }
 };
@@ -1914,8 +1945,8 @@ module.exports = {
   getLatestChecklistByType,
   getChecklistHistoryByType,
   getChecklistDataForPDF,
-  getFailuresByStatus,
-  updateFailure,
-  getFailuresByChecklistType,
+  getWorkOrdersByStatus,
+  updateWorkOrder,
+  getWorkOrdersByChecklistType,
   resetQrCodesForChecklist
 };
