@@ -26,7 +26,6 @@ const ChecklistModel = require("./checklist.js");
 const ChecklistItemModel = require("./checklist_item.js");
 const ChecklistResponseModel = require("./checklist_response.js");
 const ChecklistSignatureModel = require("./checklist_signature.js");
-const FailureModel = require("./failure.js");
 const MaintenanceActionModel = require("./maintenance_action.js");
 const RequisitionModel = require("./requisition.js");
 const RequisitionItemModel = require("./requisition_item.js");
@@ -52,7 +51,6 @@ const Checklist = ChecklistModel(connection, DataTypes);
 const ChecklistItem = ChecklistItemModel(connection, DataTypes);
 const ChecklistResponse = ChecklistResponseModel(connection, DataTypes);
 const ChecklistSignature = ChecklistSignatureModel(connection, DataTypes);
-const Failure = FailureModel(connection, DataTypes);
 const MaintenanceAction = MaintenanceActionModel(connection, DataTypes);
 const Requisition = RequisitionModel(connection, DataTypes);
 const RequisitionItem = RequisitionItemModel(connection, DataTypes);
@@ -72,7 +70,7 @@ const ChecklistQrItemAssociation = ChecklistQrItemAssociationModel(connection, D
 // Se crea un objeto 'models' para que las funciones 'associate' internas de los modelos puedan referenciarse entre sí.
 const models = {
       User, Role, Premise, ChecklistType, Checklist, ChecklistItem, ChecklistResponse,
-      ChecklistSignature, Failure, MaintenanceAction, Requisition, RequisitionItem,
+      ChecklistSignature, MaintenanceAction, Requisition, RequisitionItem,
       Part, Inventory, Inspectable, Device, Attraction, Family, Entity, Audit, WorkOrder,
       ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation
   };
@@ -96,7 +94,6 @@ module.exports = {
       ChecklistItem,
       ChecklistResponse,
       ChecklistSignature,
-      Failure,
       MaintenanceAction,
       Requisition,
       RequisitionItem,
