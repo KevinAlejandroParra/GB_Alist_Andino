@@ -189,12 +189,38 @@ export const useQrCode = (checklistId, checklistTypeId, user) => {
 
     } catch (error) {
       console.error('Error procesando escaneo QR:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.message || 'Error procesando el código QR',
-        confirmButtonText: 'Reintentar'
-      });
+      
+      // Si es un error de validación de QR (QR incorrecto), recargar modal automáticamente
+      if (error.message && error.message.includes('QR incorrecto')) {
+        // Cerrar modal actual y reabrirlo inmediatamente para permitir nuevo intento
+        setShowQrModal(false);
+        
+        // Mostrar error por un momento
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Reabrir modal automáticamente
+        setShowQrModal(true);
+        
+        // Mostrar mensaje de error de forma no bloqueante
+        Swal.fire({
+          icon: 'error',
+          title: 'QR Incorrecto',
+          text: error.message,
+          timer: 3000,
+          showConfirmButton: false,
+          toast: true,
+          position: 'top-end'
+        });
+      } else {
+        // Para otros tipos de errores, mostrar modal normal
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: error.message || 'Error procesando el código QR',
+          confirmButtonText: 'Reintentar'
+        });
+      }
+      
       return false;
     } finally {
       setIsLoadingQr(false);
