@@ -7,8 +7,8 @@ const premiseRoutes = require("./routes/premiseRoutes");
 const entityRoutes = require("./routes/entityRoutes");
 const roleRoutes = require("./routes/roleRoutes");
 const familyRoutes = require("./routes/familyRoutes");
-const deviceRoutes = require("./routes/deviceRoutes"); 
-const attractionRoutes = require("./routes/attractionRoutes"); 
+const deviceRoutes = require("./routes/deviceRoutes");
+const attractionRoutes = require("./routes/attractionRoutes");
 const inspectableRoutes = require("./routes/inspectableRoutes");
 const checklistRoutes = require("./routes/checklist.routes");
 const familyChecklistRoutes = require("./routes/familyChecklist.routes");
@@ -19,6 +19,10 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerFile = require('./swagger-output.json');
 const path = require("path");
 const cors = require('cors');
+
+// Importar configuración de Multer para uso global
+const multerConfig = require('./config/multerConfig');
+const upload = multerConfig; // Alias para compatibilidad
 
 // Configurar middleware en orden correcto
 app.use(cors({

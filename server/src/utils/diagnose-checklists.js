@@ -18,7 +18,7 @@ async function diagnoseChecklists() {
     if (problematicChecklists.length > 0) {
       console.log('\n=== CHECKLISTS PROBLEMÁTICOS ===');
       problematicChecklists.forEach(checklist => {
-        console.log(`ID: ${checklist.checklist_id}, checklist_type_id: ${checklist.checklist_type_id}, fecha: ${checklist.date}`);
+        console.log(`ID: ${checklist.checklist_id}, checklist_type_id: ${checklist.checklist_type_id}, createdAt: ${checklist.createdAt}`);
       });
     }
 
@@ -40,7 +40,7 @@ async function diagnoseChecklists() {
       console.log('\n=== CHECKLIST ID 4 ===');
       console.log(`ID: ${checklist4.checklist_id}`);
       console.log(`checklist_type_id: ${checklist4.checklist_type_id}`);
-      console.log(`Fecha: ${checklist4.date}`);
+      console.log(`createdAt: ${checklist4.createdAt}`);
       console.log(`Tiene tipo: ${!!checklist4.type}`);
       if (checklist4.type) {
         console.log(`Tipo: ${checklist4.type.name}`);

@@ -4,10 +4,10 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
     class MaintenanceAction extends Model {
         static associate(models) {
-            // Una acción de mantenimiento pertenece a una falla
-            MaintenanceAction.belongsTo(models.Failure, {
-                foreignKey: 'failure_id',
-                as: 'failure'
+            // Una acción de mantenimiento pertenece a una orden de trabajo
+            MaintenanceAction.belongsTo(models.WorkOrder, {
+                foreignKey: 'work_order_id',
+                as: 'workOrder'
             });
 
             // Una acción de mantenimiento es completada por un usuario
@@ -24,7 +24,7 @@ module.exports = (sequelize, DataTypes) => {
                 autoIncrement: true,
                 primaryKey: true,
             },
-            failure_id: {
+            work_order_id: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
             },
