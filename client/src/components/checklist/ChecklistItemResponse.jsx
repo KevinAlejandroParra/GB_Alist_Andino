@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import WorkOrderStatusIndicator from './WorkOrderStatusIndicator'
 
 export default function ChecklistItemResponse({
   item,
@@ -13,6 +14,9 @@ export default function ChecklistItemResponse({
   isLocked = false,
   handleMarkAllSiblings = null,
   checklistType = null,
+  // Props para WorkOrder
+  workOrder,
+  onWorkOrderClick,
 }) {
   const [showFileInput, setShowFileInput] = useState(false)
 
@@ -90,6 +94,16 @@ export default function ChecklistItemResponse({
             Observación
           </button>
         </div>
+
+        {/* Mostrar WorkOrderStatusIndicator si hay una OT pendiente */}
+        {workOrder && (
+          <WorkOrderStatusIndicator
+            workOrder={workOrder}
+            onClick={onWorkOrderClick}
+            size="md"
+            showDetails={true}
+          />
+        )}
 
         {itemResponse?.response_type && (itemResponse.response_type === "no_cumple" || itemResponse.response_type === "observaciones") && (
           <>
