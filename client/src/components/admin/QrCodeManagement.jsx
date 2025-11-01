@@ -273,7 +273,7 @@ export default function QrCodeManagement() {
                         </div>
 
                         <p className="text-sm text-gray-600 mb-2">
-                          Código: {qr.qr_code}
+                          Tipo: {qr.checklist_type_name || 'N/A'}
                         </p>
 
                         <div className="flex items-center space-x-4 text-sm text-gray-500">
@@ -309,6 +309,14 @@ export default function QrCodeManagement() {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Gestión de impresión de códigos QR */}
+          {qrCodes.length > 0 && !loadError && (
+            <QrPrintManager
+              qrCodes={qrCodes}
+              onRefresh={loadQrCodes}
+            />
           )}
 
           {/* Si no hay códigos QR y no hay error, mostrar pantalla de bienvenida */}
