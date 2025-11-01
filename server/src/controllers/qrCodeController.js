@@ -230,10 +230,27 @@ class QrCodeController {
       if (!this._ensureAdmin(res, req.user)) return;
 
       const qrCodes = await ChecklistQrCode.findAll({
+        include: [{
+          model: ChecklistType,
+          as: 'checklistType',
+          attributes: ['name']
+        }],
         order: [['createdAt', 'DESC']]
       });
 
-      res.json({ success: true, data: qrCodes });
+      // Generar imágenes base64 para cada código QR
+      const qrCodesWithImages = await Promise.all(
+        qrCodes.map(async (qrCode) => {
+          const qrImageBase64 = await this._generateQrImage(qrCode.qr_code);
+          return {
+            ...qrCode.toJSON(),
+            checklist_type_name: qrCode.checklistType ? qrCode.checklistType.name : 'Tipo desconocido',
+            qr_image_base64: qrImageBase64
+          };
+        })
+      );
+
+      res.json({ success: true, data: qrCodesWithImages });
 
     } catch (error) {
       console.error('Error obteniendo códigos QR:', error);
@@ -426,6 +443,57 @@ class QrCodeController {
 
     } catch (error) {
       console.error('Error generando códigos QR por particiones:', error);
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    }
+  }
+
+  // Generar PDF para impresión de códigos QR
+  generatePrintPdf = async (req, res) => {
+    try {
+      if (!this._ensureAdmin(res, req.user)) return;
+      
+      const { qr_codes, options = {} } = req.body;
+      
+      if (!qr_codes || !Array.isArray(qr_codes) || qr_codes.length === 0) {
+        return res.status(400).json({ success: false, message: 'Se requiere un array de códigos QR' });
+      }
+
+      // Agrupar códigos QR por checklist_type_name
+      const groupedQRCodes = qr_codes.reduce((acc, qr) => {
+        const typeName = qr.checklist_type_name || 'Tipo desconocido';
+        if (!acc[typeName]) {
+          acc[typeName] = [];
+        }
+        acc[typeName].push(qr);
+        return acc;
+      }, {});
+
+      // Crear contenido del PDF agrupado por tipo
+      let pdfText = `CÓDIGOS QR - ATRACTOS\n` +
+        `Generado: ${new Date().toLocaleDateString()}\n` +
+        `Total de códigos: ${qr_codes.length}\n\n`;
+
+      // Generar secciones por cada tipo de checklist
+      let index = 1;
+      for (const [typeName, typeCodes] of Object.entries(groupedQRCodes)) {
+        pdfText += `═ TIPO: ${typeName.toUpperCase()} ═\n`;
+        pdfText += `Cantidad: ${typeCodes.length} códigos\n\n`;
+        
+        typeCodes.forEach((qr) => {
+          pdfText += `${index}. ${qr.attraction_name}\n\n`;
+          index++;
+        });
+        
+        pdfText += '\n';
+      }
+
+      // Responder con el "PDF" como texto plano (en producción usarías una librería real de PDF)
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="codigos-qr-${new Date().toISOString().split('T')[0]}.pdf"`);
+      res.send(pdfText);
+
+    } catch (error) {
+      console.error('Error generando PDF:', error);
       res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }

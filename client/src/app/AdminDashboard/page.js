@@ -9,6 +9,7 @@ import UserManagement from '../../components/admin/UserManagement';
 import FamilyManagement from '../../components/admin/FamilyManagement';
 import DeviceManagement from '../../components/admin/DeviceManagement';
 import AttractionManagement from '../../components/admin/AttractionManagement';
+import QrCodeManagement from '../../components/admin/QrCodeManagement';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('users');
@@ -57,6 +58,8 @@ export default function AdminDashboard() {
         return <DeviceManagement />;
       case 'attractions':
         return <AttractionManagement />;
+      case 'qr-codes':
+        return <QrCodeManagement />;
       default:
         return <UserManagement />;
     }
@@ -74,7 +77,7 @@ export default function AdminDashboard() {
 
       <nav className="mb-6">
         <ul className="flex flex-wrap justify-center space-x-2 md:space-x-4">
-          {['users', 'premises', 'entities', 'roles', 'families', 'devices', 'attractions'].map((tab) => (
+          {['users', 'premises', 'entities', 'roles', 'families', 'devices', 'attractions', 'qr-codes'].map((tab) => (
             <li key={tab}>
               <button
                 className={`px-4 py-2 rounded-md transition-colors duration-200 ${
@@ -91,6 +94,7 @@ export default function AdminDashboard() {
                 {tab === 'families' && 'Gestión de Familias'}
                 {tab === 'devices' && 'Gestión de Dispositivos'}
                 {tab === 'attractions' && 'Gestión de Atracciones'}
+                {tab === 'qr-codes' && 'Códigos QR'}
               </button>
             </li>
           ))}

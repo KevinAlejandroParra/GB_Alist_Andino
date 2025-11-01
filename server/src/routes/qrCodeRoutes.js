@@ -39,4 +39,7 @@ router.get('/qr-codes/checklist/:checklist_id/authorization', verifyToken, qrCod
 // Validar código QR específico para un checklist
 router.get('/qr-codes/checklist/:checklist_id/validate/:qr_code', verifyToken, qrCodeController.validateQrCodeForChecklist);
 
+// Generar PDF para impresión de códigos QR (solo admins)
+router.post('/qr-codes/generate-pdf', verifyToken, qrCodeController.generatePrintPdf);
+
 module.exports = router;
