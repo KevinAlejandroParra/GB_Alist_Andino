@@ -4,6 +4,10 @@ import axiosInstance from '../../utils/axiosConfig';
 import Swal from 'sweetalert2';
 import GuidanceTextModal from './GuidanceTextModal';
 import CloseFailureModal from './CloseFailureModal';
+import RecurringFailureModal from './RecurringFailureModal';
+import WorkOrderStatusIndicator from './WorkOrderStatusIndicator';
+import ActiveFailuresList from './ActiveFailuresList';
+import { useWorkOrderDetection } from './hooks/useWorkOrderDetection';
 
 // Componente Memoizado para optimizar el rendimiento de las opciones de radio.
 const RadioOption = React.memo(({ value, label, color, isSelected, isDisabled, onChange }) => (
@@ -49,7 +53,7 @@ const RadioGroup = React.memo(({ uniqueId, currentResponse, itemDisabled, handle
   );
 });
 
-// Componente recursivo para renderizar ítems y sub-ítems
+// Componente mejorado para renderizar ítems con integración de WorkOrders
 const ChecklistItemRenderer = React.memo((props) => {
   const {
     item,
@@ -64,6 +68,9 @@ const ChecklistItemRenderer = React.memo((props) => {
     disabled = false,
     isItemUnlocked,
     onUnlockSection,
+    user,
+    activeWorkOrders, // ✅ NUEVO: Array de work orders activas
+    onRecurringFailureClick,
   } = props;
 
   const [showGuidanceModal, setShowGuidanceModal] = useState(false);
@@ -90,7 +97,41 @@ const ChecklistItemRenderer = React.memo((props) => {
             uniqueId={uniqueId}
             currentResponse={currentResponse}
             itemDisabled={itemDisabled}
-            handleResponseChange={handleResponseChange}
+            handleResponseChange={(id, field, value) => {
+              const workOrdersForItem = (activeWorkOrders || []).filter(wo => wo.checklist_item_id === item.checklist_item_id);
+
+              // NUEVO: Bloquear marcar como "cumple" si hay fallas activas.
+              if (field === 'response_compliance' && value === 'cumple' && workOrdersForItem.length > 0) {
+                Swal.fire({
+                  icon: 'error',
+                  title: 'Acción no permitida',
+                  text: 'Este ítem tiene fallas activas y no puede ser marcado como "Cumple". Resuelva las fallas primero.',
+                  confirmButtonColor: '#d33',
+                });
+                return; // Prevenir el cambio de estado.
+              }
+
+              // Lógica para fallas recurrentes
+              if (field === 'response_compliance' &&
+                  (value === 'no cumple' || value === 'observación') &&
+                  workOrdersForItem.length > 0) {
+                
+                handleResponseChange(id, field, value);
+                
+                const responseData = {
+                  uniqueId: id,
+                  response_compliance: value,
+                  comment: currentResponse?.comment || '',
+                  evidence_url: currentResponse?.evidence_url || ''
+                };
+                
+                onRecurringFailureClick(workOrdersForItem, responseData);
+                return;
+              }
+              
+              // Si no hay condiciones especiales, actualizar la respuesta.
+              handleResponseChange(id, field, value);
+            }}
           />
         );
       case 'numeric':
@@ -125,6 +166,11 @@ const ChecklistItemRenderer = React.memo((props) => {
         return null;
     }
   };
+
+  // ✅ NUEVO: Determinar si mostrar WorkOrderStatusIndicator (obsoleto, se usa ActiveFailuresList)
+  const shouldShowWorkOrder = activeWorkOrders && activeWorkOrders.length > 0 &&
+    (currentResponse?.response_compliance === 'no cumple' ||
+     currentResponse?.response_compliance === 'observación');
 
   return (
     <div
@@ -167,12 +213,31 @@ const ChecklistItemRenderer = React.memo((props) => {
         {(item.input_type === "section" || (config?.category === 'Atracción' && item.subItems?.length > 0)) && !isFamilyChecklist && (
           <button
             onClick={() => {
-              if (!itemDisabled && item.subItems?.length > 0) {
-                const firstSubItem = item.subItems[0];
-                const firstSubItemUniqueId = firstSubItem.unique_frontend_id || firstSubItem.checklist_item_id;
-                const responseTypeToApply = itemResponses[firstSubItemUniqueId]?.response_compliance || "cumple";
-                handleMarkAllSiblings(item.checklist_item_id, item.type?.family_id ? firstSubItem.inspectable_id_for_response : null, responseTypeToApply);
+              if (itemDisabled || !item.subItems?.length) return;
+
+              const firstSubItem = item.subItems[0];
+              const firstSubItemUniqueId = firstSubItem.unique_frontend_id || firstSubItem.checklist_item_id;
+              const responseTypeToApply = itemResponses[firstSubItemUniqueId]?.response_compliance || "cumple";
+
+              // Si la acción es marcar como "cumple", verificar que ningún hijo tenga fallas.
+              if (responseTypeToApply === 'cumple') {
+                const subItemWithFailure = item.subItems.find(subItem => 
+                  (activeWorkOrders || []).some(wo => wo.checklist_item_id === subItem.checklist_item_id)
+                );
+
+                if (subItemWithFailure) {
+                  Swal.fire({
+                    icon: 'error',
+                    title: 'Acción no permitida',
+                    text: `No se pueden marcar todos como "Cumple" porque el ítem "${subItemWithFailure.item_number}" (y posiblemente otros) tiene fallas activas.`,
+                    confirmButtonColor: '#d33',
+                  });
+                  return;
+                }
               }
+
+              // Si las validaciones pasan, proceder a marcar todos.
+              handleMarkAllSiblings(item.checklist_item_id, item.type?.family_id ? firstSubItem.inspectable_id_for_response : null, responseTypeToApply);
             }}
             className={`ml-auto px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-xs ${itemDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             disabled={itemDisabled || !item.subItems?.length}
@@ -218,14 +283,28 @@ const ChecklistItemRenderer = React.memo((props) => {
                 {currentResponse?.evidence_url && (
                   <div className="mt-2">
                     <p className="text-sm">Vista previa:</p>
-                    <img 
-                      src={getEvidenceUrl(currentResponse.evidence_url)} 
-                      alt="Evidencia" 
+                    <img
+                      src={getEvidenceUrl(currentResponse.evidence_url)}
+                      alt="Evidencia"
                       className="max-w-full h-auto max-h-32 rounded-md border"
                     />
                   </div>
                 )}
               </div>
+
+              {/* ✅ CORREGIDO: Lista de fallas activas (solo si hay work orders para ESTE ítem) */}
+              {(activeWorkOrders || []).filter(wo => wo.checklist_item_id === item.checklist_item_id).length > 0 && (
+                <div className="mt-4">
+                  <ActiveFailuresList
+                    workOrders={(activeWorkOrders || []).filter(wo => wo.checklist_item_id === item.checklist_item_id)}
+                    user={user}
+                    onUpdate={() => {
+                      // Callback para actualizar la lista de work orders después de acciones
+                      // Se actualizará automáticamente a través del hook en el componente padre
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -248,6 +327,9 @@ const ChecklistItemRenderer = React.memo((props) => {
               disabled={itemDisabled} // Los hijos heredan el estado de deshabilitado del padre
               isItemUnlocked={isItemUnlocked}
               onUnlockSection={onUnlockSection}
+              user={user}
+              activeWorkOrders={activeWorkOrders}
+              onRecurringFailureClick={onRecurringFailureClick}
             />
           ))}
         </div>
@@ -263,7 +345,7 @@ const ChecklistSection = (props) => {
     itemResponses,
     handleResponseChange,
     handleFileUpload,
-    getEvidenceUrl,
+    // getEvidenceUrl, // No longer used from props
     handleMarkAllSiblings,
     error,
     user,
@@ -274,10 +356,24 @@ const ChecklistSection = (props) => {
     isFamilyChecklist,
   } = props;
 
+  // Define a local, corrected version of getEvidenceUrl
+  const getEvidenceUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
+    return `${API_URL}${url}`;
+  };
   const [isLocked, setIsLocked] = useState(false);
   const [lockReason, setLockReason] = useState('');
   const [showCloseFailureModal, setShowCloseFailureModal] = useState(false);
   const [selectedFailure, setSelectedFailure] = useState(null);
+  
+  // Estados para manejo de fallas recurrentes
+  const [showRecurringFailureModal, setShowRecurringFailureModal] = useState(false);
+  const [selectedWorkOrder, setSelectedWorkOrder] = useState(null);
+
+  // Hook para detectar WorkOrders pendientes
+  const workOrderDetection = useWorkOrderDetection(checklist, checklist?.items, user);
 
   useEffect(() => {
     if (user && checklist?.signatures) {
@@ -297,8 +393,8 @@ const ChecklistSection = (props) => {
   const handleCloseFailureSubmit = async (failureId, solutionText, responsibleArea) => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
-      await axiosInstance.put(
-        `${API_URL}/api/checklists/failures/${failureId}`,
+await axiosInstance.put(
+        `${API_URL}/api/work-orders/${failureId}`,
         {
           solution_text: solutionText,
           responsible_area: responsibleArea,
@@ -314,6 +410,63 @@ const ChecklistSection = (props) => {
       console.error("Error cerrando falla:", err);
       Swal.fire("Error", `Error al cerrar la falla: ${err.message}`, "error");
     }
+  };
+
+  // ✅ NUEVA FUNCIÓN: Para manejar fallas recurrentes con múltiples work orders
+  const handleRecurringFailureClick = (workOrders, responseData) => {
+    // 🔍 DEBUG: Mostrar detección de falla recurrente
+    console.log('🚨 DEBUG: Falla recurrente detectada!', {
+      workOrdersCount: workOrders?.length || 0,
+      userAction: 'Usuario marcó respuesta en ítem con OT pendiente',
+      responseData
+    });
+    
+    // Convertir a array si es un solo objeto
+    const workOrdersArray = Array.isArray(workOrders) ? workOrders : [workOrders];
+    
+    // Añadir datos de la respuesta a cada work order para el modal
+    const workOrdersWithResponse = workOrdersArray.map(wo => ({
+      ...wo,
+      userResponse: responseData?.response_compliance,
+      userComment: responseData?.comment,
+      userEvidence: responseData?.evidence_url,
+      uniqueResponseId: responseData?.uniqueId
+    }));
+    
+    setSelectedWorkOrder(workOrdersWithResponse);
+    setShowRecurringFailureModal(true);
+  };
+
+  const handleRecurringFailureSuccess = (action, data, updatedResponseData) => {
+    // Si es mantener falla y hay datos actualizados, actualizar la respuesta
+    if (action === 'maintain' && updatedResponseData?.updated && selectedWorkOrder) {
+      // Actualizar los datos de respuesta en el estado del checklist
+      if (updatedResponseData.uniqueResponseId && updatedResponseData.comment) {
+        handleResponseChange(
+          updatedResponseData.uniqueResponseId,
+          "comment",
+          updatedResponseData.comment
+        );
+      }
+      
+      // Mostrar mensaje de éxito específico para mantener
+      Swal.fire(
+        '¡Falla Mantenida!',
+        'La falla ha sido mantenida y el comentario actualizado.',
+        'success'
+      );
+    } else {
+      // Para otras acciones, mostrar mensajes estándar
+      const messages = {
+        'new': 'Nueva falla creada exitosamente.',
+        'resolve': 'Falla resuelta exitosamente.'
+      };
+      
+      Swal.fire('¡Éxito!', messages[action] || 'Acción completada exitosamente.', 'success');
+    }
+    
+    // Actualizar la lista de WorkOrders (común para todas las acciones)
+    workOrderDetection.refreshWorkOrders();
   };
 
   if (error) {
@@ -370,22 +523,68 @@ const ChecklistSection = (props) => {
         />
       )}
 
-      {checklist.items?.map((item) => (
-        <ChecklistItemRenderer
-          key={item.unique_frontend_id || item.checklist_item_id}
-          item={item}
-          itemResponses={itemResponses}
-          handleResponseChange={handleResponseChange}
-          handleFileUpload={handleFileUpload}
-          getEvidenceUrl={getEvidenceUrl}
-          handleMarkAllSiblings={handleMarkAllSiblings}
-          isFamilyChecklist={isFamilyChecklist}
-          config={config}
-          disabled={disabled || isLocked}
-          isItemUnlocked={isItemUnlocked}
-          onUnlockSection={onUnlockSection}
+      {/* ✅ NUEVO: Modal de fallas recurrentes mejorado */}
+      {showRecurringFailureModal && selectedWorkOrder && (
+        <RecurringFailureModal
+          isOpen={showRecurringFailureModal}
+          onClose={() => {
+            // ✅ LIMPIAR ESTADO AL CERRAR MODAL
+            setShowRecurringFailureModal(false);
+            setSelectedWorkOrder(null);
+          }}
+          workOrders={selectedWorkOrder} // ✅ NUEVO: Pasar array de work orders
+          user={user}
+          onSuccess={handleRecurringFailureSuccess}
+          onWorkOrdersUpdate={() => {
+            workOrderDetection.refreshWorkOrders();
+          }}
+          responseData={{
+            userResponse: selectedWorkOrder[0]?.userResponse, // Usar primera work order para datos de respuesta
+            userComment: selectedWorkOrder[0]?.userComment,
+            userEvidence: selectedWorkOrder[0]?.userEvidence,
+            uniqueResponseId: selectedWorkOrder[0]?.uniqueResponseId
+          }}
         />
-      ))}
+      )}
+
+      {checklist.items?.map((item) => {
+        // ✅ NUEVO: Obtener todas las work orders activas para este ítem
+        const activeWorkOrders = workOrderDetection.getWorkOrderForItem(item);
+        
+        // 🔍 DEBUG: Mostrar qué ítems tienen OTs asignadas
+        if (activeWorkOrders && activeWorkOrders.length > 0) {
+          console.log(`🔍 DEBUG: Ítem "${item.item_number}" tiene ${activeWorkOrders.length} OT(s) activa(s):`, {
+            itemId: item.checklist_item_id,
+            itemNumber: item.item_number,
+            activeWorkOrdersCount: activeWorkOrders.length,
+            workOrders: activeWorkOrders.map(wo => ({
+              id: wo.id,
+              status: wo.status,
+              description: wo.description?.substring(0, 30) + '...'
+            }))
+          });
+        }
+        
+        return (
+          <ChecklistItemRenderer
+            key={item.unique_frontend_id || item.checklist_item_id}
+            item={item}
+            itemResponses={itemResponses}
+            handleResponseChange={handleResponseChange}
+            handleFileUpload={handleFileUpload}
+            getEvidenceUrl={getEvidenceUrl}
+            handleMarkAllSiblings={handleMarkAllSiblings}
+            isFamilyChecklist={isFamilyChecklist}
+            config={config}
+            disabled={disabled || isLocked}
+            isItemUnlocked={isItemUnlocked}
+            onUnlockSection={onUnlockSection}
+            user={user}
+            activeWorkOrders={activeWorkOrders} // ✅ NUEVO: Pasar array de work orders activas
+            onRecurringFailureClick={handleRecurringFailureClick}
+          />
+        );
+      })}
     </div>
   );
 };
