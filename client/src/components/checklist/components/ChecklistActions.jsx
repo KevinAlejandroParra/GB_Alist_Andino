@@ -19,15 +19,7 @@ export default function ChecklistActions({ onSign, onSave, onDownload, allowDown
       >
         {hasExistingResponses ? 'Actualizar' : 'Guardar'}
       </button>
-      {allowDownload && (
-        <button
-          onClick={onDownload}
-          disabled={disabled}
-          className={`px-4 py-2 bg-gray-600 text-white rounded-lg transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-700'}`}
-        >
-          Descargar PDF
-        </button>
-      )}
+
     </div>
   )
 }

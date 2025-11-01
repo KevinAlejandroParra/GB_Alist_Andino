@@ -67,7 +67,7 @@ export default function HistorySection({
                     onClick={() => toggleHistoricalChecklist(historyChecklist.checklist_id)}
                   >
                     <h3 className="text-lg font-medium text-gray-800">
-                      Checklist del {formatLocalDate(historyChecklist.date)}
+                      Checklist del {formatLocalDate(historyChecklist.createdAt)}
                     </h3>
                     <p className="text-sm text-gray-600">
                       Creado por: {historyChecklist.creator?.user_name || 'Desconocido'} el{' '}
@@ -75,13 +75,15 @@ export default function HistorySection({
                     </p>
                   </div>
                   <div className="flex items-center">
-                    <button
-                      onClick={() => handleDownload(historyChecklist.checklist_id, historyChecklist.date)}
-                      disabled={downloading === historyChecklist.checklist_id}
-                      className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm disabled:bg-gray-400"
-                    >
-                      {downloading === historyChecklist.checklist_id ? 'Descargando...' : 'Descargar'}
-                    </button>
+                    {user && user.role_id == 4 && (
+                      <button
+                        onClick={() => handleDownload(historyChecklist.checklist_id, historyChecklist.createdAt)}
+                        disabled={downloading === historyChecklist.checklist_id}
+                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm disabled:bg-gray-400"
+                      >
+                        {downloading === historyChecklist.checklist_id ? 'Descargando...' : 'Descargar'}
+                      </button>
+                    )}
                     <div
                       className="text-xl text-gray-500 ml-4 cursor-pointer"
                       onClick={() => toggleHistoricalChecklist(historyChecklist.checklist_id)}
