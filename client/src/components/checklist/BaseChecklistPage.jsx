@@ -201,8 +201,8 @@ export default function BaseChecklistPage({
       try {
         const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
         const [pendingRes, closedRes] = await Promise.all([
-          axiosInstance.get(`${API_URL}/api/checklists/failures/pending/${checklistData.checklist.checklist_id}`),
-          axiosInstance.get(`${API_URL}/api/checklists/failures/closed/${checklistData.checklist.checklist_id}`)
+          axiosInstance.get(`${API_URL}/api/work-orders/pending/checklist/${checklistData.checklist.checklist_id}`),
+          axiosInstance.get(`${API_URL}/api/work-orders/closed/checklist/${checklistData.checklist.checklist_id}`)
         ]);
 
         setPendingFailures(pendingRes.data);
@@ -291,6 +291,24 @@ export default function BaseChecklistPage({
       (success, errors) => {
         if (!success) {
           setShowValidationErrors(true);
+          
+          // Si hay errores específicos de validación, mostrarlos con SweetAlert
+          if (errors && errors.length > 0) {
+            const validationErrors = errors.filter(err =>
+              err.message?.includes('comentario') ||
+              err.message?.includes('evidencia')
+            );
+            
+            if (validationErrors.length > 0) {
+              const firstError = validationErrors[0];
+              Swal.fire({
+                title: "Campos obligatorios faltantes",
+                text: firstError.message || "Debe completar los campos obligatorios",
+                icon: "warning",
+                confirmButtonColor: "#7c3aed",
+              });
+            }
+          }
         } else {
           setShowValidationErrors(false);
           checklistData.refreshChecklistData();
@@ -376,6 +394,7 @@ export default function BaseChecklistPage({
               disabled={false}
               isItemUnlocked={qrManager.isItemUnlocked}
               onUnlockSection={(item) => qrManager.setShowQrModal(true)}
+              user={user}
             />
           </div>
 

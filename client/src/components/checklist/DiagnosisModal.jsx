@@ -39,7 +39,7 @@ export default function DiagnosisModal({ show, onClose, checklist }) {
               ×
             </button>
           </div>
-          <p className="text-gray-600 mt-2">Checklist: {checklist.type?.name} - {checklist.date}</p>
+          <p className="text-gray-600 mt-2">Checklist: {checklist.type?.name} - {checklist.createdAt}</p>
         </div>
 
         <div className="p-6">
