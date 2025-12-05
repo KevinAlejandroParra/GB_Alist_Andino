@@ -1,54 +1,66 @@
+'use strict';
+
 const express = require('express');
-const router = express.Router();
 const workOrderController = require('../controllers/workOrderController');
+
+const router = express.Router();
+
 const { verifyToken } = require('../middleware/authMiddleware');
 
-// Todas las rutas requieren autenticación
+// Aplicar autenticación a todas las rutas
 router.use(verifyToken);
 
 /**
- * ENDPOINTS PARA REEMPLAZAR LOS DUPLICADOS DE checklist.routes.js
+ * RUTAS DE ÓRDENES DE TRABAJO (OT)
+ * Prefijo: /api/work-orders
  */
 
-// Obtener OT pendientes por checklist específico
-router.get('/pending/checklist/:checklist_id', workOrderController.getPendingWorkOrdersByChecklist);
+// POST /api/work-orders - Crear nueva OT
+router.post('/', (req, res) => workOrderController.createWorkOrder(req, res));
 
-// Obtener OT cerradas por checklist específico  
-router.get('/closed/checklist/:checklist_id', workOrderController.getClosedWorkOrdersByChecklist);
+// GET /api/work-orders - Obtener lista de OT con filtros
+router.get('/', (req, res) => workOrderController.getWorkOrders(req, res));
 
-// Actualizar OT específica
-router.put('/:id', workOrderController.updateWorkOrder);
+// GET /api/work-orders/latest - Obtener la última OT creada por el usuario
+router.get('/latest', (req, res) => workOrderController.getLatestWorkOrderByUser(req, res));
 
-// Obtener OT por checklist type (ya existe pero optimizado)
-router.get('/by-type/:checklist_type_id', workOrderController.getWorkOrdersByChecklistType);
+// GET /api/work-orders/statistics - Obtener estadísticas de OT
+router.get('/statistics', (req, res) => workOrderController.getStatistics(req, res));
 
-// Obtener órdenes de trabajo pendientes (GENERAL)
-router.get('/pending', workOrderController.getPendingWorkOrders);
+// GET /api/work-orders/area/:area - Obtener OTs por área (TECNICA/OPERATIVA)
+router.get('/area/:area', (req, res) => workOrderController.getByArea(req, res));
 
-// Obtener una orden de trabajo específica
-router.get('/:id', workOrderController.getWorkOrderById);
+// GET /api/work-orders/:id - Obtener detalles de OT específica
+router.get('/:id', (req, res) => workOrderController.getWorkOrderById(req, res));
 
-// Crear una orden de trabajo manualmente
-router.post('/', workOrderController.createWorkOrder);
+// PUT /api/work-orders/:id/start - Iniciar trabajo en OT
+router.put('/:id/start', (req, res) => workOrderController.startWork(req, res));
 
-// Cerrar una orden de trabajo (actualizado)
-router.put('/:id/close', workOrderController.closeWorkOrder);
+// PUT /api/work-orders/:id/finish - Finalizar trabajo en OT
+router.put('/:id/finish', (req, res) => workOrderController.finishWork(req, res));
 
-// NUEVOS ENDPOINTS PARA MANEJO DE FALLAS RECURRENTES
+// PUT /api/work-orders/:id/tests - Registrar pruebas en OT
+router.put('/:id/tests', (req, res) => workOrderController.performTests(req, res));
 
-// Opción 1: Mantener falla recurrente (incrementar contador)
-router.put('/:id/maintain', workOrderController.maintainRecurringFailure);
+// PUT /api/work-orders/:id/resolve - Resolver OT (cierre final)
+router.put('/:id/resolve', (req, res) => workOrderController.resolveWorkOrder(req, res));
 
-// Opción 2: Crear nueva falla para el mismo ítem
-router.post('/new-failure', workOrderController.createNewFailureForSameItem);
+// PUT /api/work-orders/:id/cancel - Cancelar OT
+router.put('/:id/cancel', (req, res) => workOrderController.cancelWorkOrder(req, res));
 
-// Opción 3: Resolver falla recurrente
-router.put('/:id/resolve', workOrderController.resolveRecurringFailure);
+// POST /api/work-orders/:id/parts - Agregar un repuesto a una OT
+router.post('/:id/parts', (req, res) => workOrderController.addWorkOrderPart(req, res));
 
-// Obtener estadísticas de órdenes de trabajo
-router.get('/stats/overview', workOrderController.getWorkOrderStats);
+// POST /api/work-orders/:id/parts/multiple - Agregar múltiples repuestos a una OT
+router.post('/:id/parts/multiple', (req, res) => workOrderController.addMultipleParts(req, res));
 
-// Obtener órdenes de trabajo resueltas por checklist type
-router.get('/resolved/by-type/:checklist_type_id', workOrderController.getResolvedWorkOrdersByChecklistType);
+// GET /api/work-orders/:id/parts - Obtener repuestos de una OT
+router.get('/:id/parts', (req, res) => workOrderController.getWorkOrderParts(req, res));
+
+// DELETE /api/work-orders/:id/parts/:partId - Eliminar un repuesto de una OT
+router.delete('/:id/parts/:partId', (req, res) => workOrderController.removeWorkOrderPart(req, res));
+
+// PUT /api/work-orders/:id/update - Actualizar campos específicos de OT
+router.put('/:id/update', (req, res) => workOrderController.updateWorkOrderFields(req, res));
 
 module.exports = router;

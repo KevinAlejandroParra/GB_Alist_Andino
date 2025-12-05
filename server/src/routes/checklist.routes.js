@@ -25,6 +25,7 @@ const {
   getPendingFailures,
   getClosedFailures,
   getWorkOrdersByChecklistType,
+  getResolvedFailuresByChecklistType,
   getChecklistTypeDetails,
   getParentItemsByChecklistType // Importar el nuevo controlador
 } = require("../controllers/checklistController")
@@ -49,6 +50,7 @@ router.post("/:id/responses", verifyToken, submitResponses)
 router.get("/failures/pending/:checklist_id", verifyToken, getPendingFailures)
 router.get("/failures/closed/:checklist_id", verifyToken, getClosedFailures)
 router.get("/failures/by-type/:checklist_type_id", verifyToken, getWorkOrdersByChecklistType) // Nueva ruta para fallas por tipo
+router.get("/failures/resolved/by-type/:checklist_type_id", verifyToken, getResolvedFailuresByChecklistType) // Nueva ruta para fallas resueltas por tipo
 router.put("/failures/:id", verifyToken, updateWorkOrder)
 router.get("/:id/observations", verifyToken, listObservations)
 router.post("/:id/sign", verifyToken, signChecklist)

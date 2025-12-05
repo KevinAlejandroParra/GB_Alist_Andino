@@ -1,57 +1,29 @@
-
 'use strict';
 const { Model } = require('sequelize');
 
 module.exports = (sequelize, DataTypes) => {
   class WorkOrder extends Model {
     static associate(models) {
-      // Una orden de trabajo es reportada por un usuario.
+      // Relación con la orden de falla (1:1)
+      WorkOrder.belongsTo(models.FailureOrder, {
+        foreignKey: 'failure_order_id',
+        as: 'failureOrder'
+      });
+
+      // Relación con el usuario que resolvió
       WorkOrder.belongsTo(models.User, {
-        foreignKey: 'reported_by_id',
-        as: 'reporter'
+        foreignKey: 'resolved_by_id',
+        as: 'resolver'
       });
 
-      // Una orden de trabajo puede ser cerrada por un usuario.
-      WorkOrder.belongsTo(models.User, {
-        foreignKey: 'closed_by',
-        as: 'closer'
-      });
-
-      // Una orden de trabajo pertenece a un ítem inspeccionable específico.
-      WorkOrder.belongsTo(models.Inspectable, {
-        foreignKey: 'inspectable_id',
-        as: 'inspectable'
-      });
-
-      // Una orden de trabajo está ligada a un ítem específico del checklist.
-      WorkOrder.belongsTo(models.ChecklistItem, {
-        foreignKey: 'checklist_item_id',
-        as: 'checklistItem'
-      });
-
-      // Una orden de trabajo es generada por una única respuesta de checklist.
-      WorkOrder.belongsTo(models.ChecklistResponse, {
-        foreignKey: 'initial_response_id',
-        as: 'initialResponse'
-      });
-
-      // Una orden de trabajo puede ser cerrada por una respuesta de checklist.
-      WorkOrder.belongsTo(models.ChecklistResponse, {
-        foreignKey: 'closing_response_id',
-        as: 'closingResponse'
-      });
-
-      // Una orden de trabajo puede tener muchas requisiciones de partes.
-      WorkOrder.hasMany(models.Requisition, {
+      // Relación con repuestos utilizados (N:N a través de tabla intermedia)
+      WorkOrder.belongsToMany(models.Inventory, {
+        through: models.WorkOrderPart,
         foreignKey: 'work_order_id',
-        as: 'requisitions'
+        otherKey: 'inventory_id',
+        as: 'workOrderParts'
       });
 
-      // Una orden de trabajo pertenece a una requisición (si aplica)
-      WorkOrder.belongsTo(models.Requisition, {
-        foreignKey: 'work_order_id',
-        as: 'requisition'
-      });
     }
   }
 
@@ -64,92 +36,78 @@ module.exports = (sequelize, DataTypes) => {
     work_order_id: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true
+      unique: true,
+      comment: 'Identificador único de la orden de trabajo'
     },
+
+    // Estado del proceso de reparación
     status: {
-      type: DataTypes.ENUM('PENDIENTE', 'EN_PROCESO', 'RESUELTO', 'CERRADO'),
+      type: DataTypes.ENUM('EN_PROCESO', 'EN_PRUEBAS', 'RESUELTA', 'CANCELADO', 'PAUSADO'),
       allowNull: false,
-      defaultValue: 'PENDIENTE'
+      defaultValue: 'EN_PROCESO',
+      comment: 'Estado actual del trabajo de reparación'
     },
-    description: {
-      type: DataTypes.TEXT,
-      allowNull: true
-    },
-    resolution_details: {
-      type: DataTypes.TEXT,
-      allowNull: true
-    },
-    solution_text: {
-      type: DataTypes.TEXT,
-      allowNull: true
-    },
-    resolved_at: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
-    recurrence_count: {
-      type: DataTypes.INTEGER,
+
+    // Información del trabajo realizado
+    requiere_replacement: {
+      type: DataTypes.BOOLEAN,
       allowNull: false,
-      defaultValue: 1
+      defaultValue: false,
+      comment: 'Indica si se usaron repuestos en la reparación'
     },
-    severity: {
-      type: DataTypes.ENUM('leve', 'crítica'),
-      allowNull: true
+    activity_performed: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: 'Descripción detallada del trabajo realizado'
     },
-    responsible_area: {
-      type: DataTypes.ENUM('Técnico', 'Operación', 'Mixto'),
-      allowNull: true
-    },
-    evidence_solution_url: {
+    evidence_url: {
       type: DataTypes.STRING,
-      allowNull: true
+      allowNull: true,
+      comment: 'URL de la evidencia (imagen) de la solución'
     },
-    first_reported_date: {
+    closure_signature: {
+      type: DataTypes.STRING(1000),
+      allowNull: true,
+      comment: 'Firma digital para cierre de la orden de trabajo'
+    },
+
+    // Tiempos de trabajo (registrados manualmente)
+    start_time: {
       type: DataTypes.DATE,
-      allowNull: true
+      allowNull: true,
+      comment: 'Momento en que se inició el trabajo (marcado manualmente)'
     },
-    last_updated_date: {
+    end_time: {
       type: DataTypes.DATE,
-      allowNull: true
+      allowNull: true,
+      comment: 'Momento en que finalizó el trabajo (marcado manualmente)'
     },
-    reported_at: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
-    closed_at: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
-    reported_by_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    },
-    closed_by: {
-      type: DataTypes.INTEGER,
-      allowNull: true
-    },
-    inspectable_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    },
-    initial_response_id: {
+
+    // Relaciones principales
+    failure_order_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      unique: true
+      unique: true,
+      comment: 'ID de la orden de falla asociada (relación 1:1)'
     },
-    closing_response_id: {
+    resolved_by_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      unique: true
+      comment: 'ID del técnico/usuario que resolvió la falla'
     },
-    checklist_item_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    }
   }, {
     sequelize,
     modelName: 'WorkOrder',
-    tableName: 'WorkOrders',
+    tableName: 'work_orders',
+    comment: 'Tabla para órdenes de trabajo - proceso de reparación',
+    indexes: [
+      { fields: ['status'] },
+      { fields: ['failure_order_id'] },
+      { fields: ['resolved_by_id'] },
+      { fields: ['requiere_replacement'] },
+      { fields: ['closure_signature'] },
+      { fields: ['status', 'resolved_by_id'] }
+    ]
   });
 
   return WorkOrder;
