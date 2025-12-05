@@ -31,12 +31,6 @@ module.exports = {
                 type: Sequelize.TEXT,
                 allowNull: true,
             },
-            comment: {
-                type: Sequelize.STRING,
-            },
-            evidence_url: {
-                type: Sequelize.STRING,
-            },
             responded_by: {
                 type: Sequelize.INTEGER,
                 allowNull: false,

@@ -17,13 +17,25 @@ module.exports = {
             },
             checklist_id: {
                 type: Sequelize.INTEGER,
-                allowNull: false,
+                allowNull: true, // Ahora opcional para firmas de fallas
+            },
+            failure_order_id: {
+                type: Sequelize.INTEGER,
+                allowNull: true, // Para firmas de fallas
             },
             signed_at: {
                 type: Sequelize.DATE,
                 allowNull: false,
             },
             role_at_signature: {
+                type: Sequelize.STRING,
+                allowNull: false,
+            },
+            signature_type: {
+                type: Sequelize.STRING,
+                allowNull: false, // 'REPORT', 'RESOLUTION', 'CLOSE'
+            },
+            signed_by_name: {
                 type: Sequelize.STRING,
                 allowNull: false,
             },
