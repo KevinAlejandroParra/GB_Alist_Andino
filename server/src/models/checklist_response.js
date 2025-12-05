@@ -22,11 +22,6 @@ module.exports = (sequelize, DataTypes) => {
         as: 'respondedBy',
       });
 
-      // Una respuesta puede tener una orden de trabajo asociada.
-      ChecklistResponse.hasOne(models.WorkOrder, {
-        foreignKey: 'initial_response_id',
-        as: 'workOrder',
-      });
     }
   }
   ChecklistResponse.init(
@@ -55,12 +50,6 @@ module.exports = (sequelize, DataTypes) => {
       response_text: {
         type: DataTypes.TEXT,
         allowNull: true,
-      },
-      comment: {
-        type: DataTypes.STRING,
-      },
-      evidence_url: {
-        type: DataTypes.STRING,
       },
       responded_by: {
         type: DataTypes.INTEGER,

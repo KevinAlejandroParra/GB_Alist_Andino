@@ -10,11 +10,7 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'users'
             });
 
-            // Un premise puede tener muchos inventarios
-            Premise.hasMany(models.Inventory, {
-                foreignKey: 'location_id',
-                as: 'inventories'
-            });
+            // Asociación con inventarios eliminada - ya no existe relación
 
             // Un premise puede tener muchas entidades
             Premise.hasMany(models.Entity, {
