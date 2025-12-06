@@ -35,21 +35,23 @@ axiosInstance.interceptors.response.use(
       // Limpiar el token del localStorage
       localStorage.removeItem('authToken')
 
-      // Mostrar alerta personalizada
+      // Mostrar Sweet Alert personalizado para sesión caducada
       Swal.fire({
-        title: 'Sesión Caducada',
-        text: 'La sesión caducó, por favor vuelve a iniciar sesión',
+        title: 'Sesión caducada',
+        text: 'La sesión ha caducado, vuelve a iniciar sesión',
         icon: 'warning',
-        confirmButtonColor: '#7c3aed',
-        confirmButtonText: 'Ir a Login',
+        confirmButtonText: 'Ir a iniciar sesión',
+        confirmButtonColor: '#3085d6',
         allowOutsideClick: false,
         allowEscapeKey: false,
         customClass: {
           popup: 'rounded-2xl shadow-2xl',
           title: 'text-slate-800 font-bold',
           content: 'text-slate-600',
-          confirmButton: 'rounded-xl font-semibold px-6 py-3',
+          confirmButton: 'rounded-xl font-semibold px-6 py-3 hover:bg-blue-600 transition-colors',
         },
+        showCancelButton: false,
+        showDenyButton: false,
       }).then((result) => {
         if (result.isConfirmed) {
           // Redirigir a la página de login

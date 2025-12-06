@@ -14,7 +14,13 @@ export function AuthProvider({ children }) {
     if (token) {
       try {
         const decodedToken = jwtDecode(token);
-        setUser({ token, user_id: decodedToken.user_id, role_id: decodedToken.role_id });
+        setUser({
+          token,
+          user_id: decodedToken.user_id,
+          role_id: decodedToken.role_id,
+          user_name: decodedToken.user_name,
+          role_name: decodedToken.role_name
+        });
       } catch (error) {
         console.error("Error decoding token:", error);
         localStorage.removeItem('authToken');
@@ -44,7 +50,13 @@ export function AuthProvider({ children }) {
 
       localStorage.setItem('authToken', data.token);
       const decodedToken = jwtDecode(data.token);
-      setUser({ token: data.token, user_id: decodedToken.user_id, role_id: decodedToken.role_id });
+      setUser({
+        token: data.token,
+        user_id: decodedToken.user_id,
+        role_id: decodedToken.role_id,
+        user_name: decodedToken.user_name,
+        role_name: decodedToken.role_name
+      });
       return { success: true };
     } catch (error) {
       return { success: false, message: error.message };

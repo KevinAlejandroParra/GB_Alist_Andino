@@ -117,11 +117,23 @@ export default function UserProfile() {
     try {
       const authToken = localStorage.getItem("authToken")
       if (!authToken) {
-        showAlert(
-          "error",
-          "Error de autenticación",
-          "No se encontró token de autenticación. Por favor, inicia sesión nuevamente.",
-        )
+        // Sweet Alert personalizado para sesión caducada
+        Swal.fire({
+          title: 'Sesión caducada',
+          text: 'La sesión ha caducado, vuelve a iniciar sesión',
+          icon: 'warning',
+          confirmButtonText: 'Ir a iniciar sesión',
+          confirmButtonColor: '#3085d6',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+        }).then((result) => {
+          if (result.isConfirmed) {
+            // Limpiar datos de autenticación
+            localStorage.removeItem('authToken');
+            // Redirigir al login
+            window.location.href = '/login';
+          }
+        });
         setUpdating(false)
         return
       }
