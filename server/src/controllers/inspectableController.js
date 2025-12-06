@@ -6,59 +6,54 @@ const inspectableController = {
         try {
             const attractions = await Attraction.findAll({
                 include: [
-                    { model: Inspectable, as: "inspectable", include: [{ model: Premise, as: "premise" }] },
-                    { 
-                        model: ChecklistType, as: "checklistType", 
-                        required: false, 
-                        attributes: ['checklist_type_id'], // Usar checklist_type_id como ID
-                        where: { attraction_id: { [require('sequelize').Op.col]: 'Attraction.ins_id' } } 
-                    }
+                    { model: Inspectable, as: "parentInspectable", include: [{ model: Premise, as: "premise" }] }
                 ],
             });
             const devices = await Device.findAll({
                 include: [
-                    { model: Inspectable, as: "inspectable", include: [{ model: Premise, as: "premise" }] },
-                    { 
-                        model: ChecklistType, as: "checklistType", 
-                        required: false, 
-                        attributes: ['checklist_type_id'], // Usar checklist_type_id como ID
-                        where: { family_id: { [require('sequelize').Op.col]: 'Device.family_id' } } 
-                    }
+                    { model: Inspectable, as: "parentInspectable", include: [{ model: Premise, as: "premise" }] }
                 ],
             });
 
             const allInspectables = [];
 
             attractions.forEach(attraction => {
-                if (attraction.inspectable) {
+                if (attraction.parentInspectable) {
                     allInspectables.push({
-                        inspectable_id: attraction.inspectable.ins_id,
-                        inspectable_name: attraction.inspectable.name,
-                        inspectable_type: attraction.inspectable.type_code,
-                        location: attraction.inspectable.premise.premise_name,
-                        premise_id: attraction.inspectable.premise_id,
-                        default_checklist_type_id: attraction.checklistType ? attraction.checklistType.checklist_type_id : null, // Usar checklist_type_id
+                        inspectable_id: attraction.parentInspectable.ins_id,
+                        inspectable_name: attraction.parentInspectable.name,
+                        inspectable_type: attraction.parentInspectable.type_code,
+                        location: attraction.parentInspectable.premise ? attraction.parentInspectable.premise.premise_name : 'Sin ubicación',
+                        premise_id: attraction.parentInspectable.premise_id,
+                        default_checklist_type_id: null // No disponible en esta consulta simplificada
                     });
                 }
             });
 
             devices.forEach(device => {
-                if (device.inspectable) {
+                if (device.parentInspectable) {
                     allInspectables.push({
-                        inspectable_id: device.inspectable.ins_id,
-                        inspectable_name: device.inspectable.name,
-                        inspectable_type: device.inspectable.type_code,
-                        location: device.inspectable.premise.premise_name,
-                        premise_id: device.inspectable.premise_id,
-                        default_checklist_type_id: device.checklistType ? device.checklistType.checklist_type_id : null, // Usar checklist_type_id
+                        inspectable_id: device.parentInspectable.ins_id,
+                        inspectable_name: device.parentInspectable.name,
+                        inspectable_type: device.parentInspectable.type_code,
+                        location: device.parentInspectable.premise ? device.parentInspectable.premise.premise_name : 'Sin ubicación',
+                        premise_id: device.parentInspectable.premise_id,
+                        default_checklist_type_id: null // No disponible en esta consulta simplificada
                     });
                 }
             });
 
-            res.status(200).json(allInspectables);
+            res.status(200).json({
+                success: true,
+                data: allInspectables
+            });
         } catch (error) {
             console.error("Error al obtener todos los inspectables:", error);
-            res.status(500).json({ message: "Error interno del servidor al obtener inspectables.", error: error.message });
+            res.status(500).json({
+                success: false,
+                message: "Error interno del servidor al obtener inspectables.",
+                error: error.message
+            });
         }
     },
 

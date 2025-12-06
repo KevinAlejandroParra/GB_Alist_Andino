@@ -421,7 +421,18 @@ static async changeUserState(req, res) {
 static async loginUser(req, res) {
     const { user_email, user_password } = req.body;
     try {
-        const user = await User.findOne({ where: { user_email } });
+        // Obtener usuario con información de rol
+        const user = await User.findOne({
+            where: { user_email },
+            include: [
+                {
+                    model: Role,
+                    as: 'role',
+                    attributes: ['role_name']
+                }
+            ]
+        });
+        
         if (!user) {
             return res.status(401).json({
                 success: false,
@@ -440,7 +451,15 @@ static async loginUser(req, res) {
                 message: 'Credenciales inválidas'
             });
         }
-        const token = jwt.sign({ user_id: user.user_id, role_id: user.role_id }, process.env.JWT_KEY, { expiresIn: '1h' });
+        
+        // Incluir user_name y role_name en el JWT
+        const token = jwt.sign({
+            user_id: user.user_id,
+            role_id: user.role_id,
+            user_name: user.user_name,
+            role_name: user.role?.role_name || null
+        }, process.env.JWT_KEY, { expiresIn: '1h' });
+        
         res.status(200).json({
             success: true,
             token,

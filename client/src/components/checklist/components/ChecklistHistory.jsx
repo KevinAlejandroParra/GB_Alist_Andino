@@ -19,7 +19,7 @@ export default function ChecklistHistory({
         <HistorySection
           historicalChecklists={historicalChecklists}
           expandedHistoricalChecklists={expandedHistoricalChecklists}
-          toggleHistoricalChecklist={onToggleExpand}
+          onToggleExpand={onToggleExpand}
         />
       )}
     </div>

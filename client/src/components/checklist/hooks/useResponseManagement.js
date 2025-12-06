@@ -90,7 +90,7 @@ export function useResponseManagement(checklist) {
           const existingResponse = item.responses?.[0]
 
           if (existingResponse) {
-            if (existingResponse.response_compliance || existingResponse.response_numeric || existingResponse.response_text || existingResponse.comment) {
+            if (existingResponse.response_compliance || existingResponse.response_numeric || existingResponse.response_text) {
               hasResponses = true
             }
           }
@@ -101,11 +101,13 @@ export function useResponseManagement(checklist) {
           if (existingResponse) {
             if (item.input_type === 'radio' || item.input_type === 'boolean') {
               value = existingResponse.response_compliance
-              if (value === 'cumple') {
+              const v = String(value || '').toLowerCase().trim();
+              
+              if (v === 'cumple') {
                 response_type = 'cumple'
-              } else if (value === 'no cumple') {
+              } else if (v === 'no_cumple' || v === 'no cumple' || v.includes('no cumple')) {
                 response_type = 'no_cumple'
-              } else if (value === 'observación') {
+              } else if (v === 'observaciones' || v === 'observacion' || v === 'observación' || v.includes('observ')) {
                 response_type = 'observaciones'
               }
             } else if (item.input_type === 'numeric') {
@@ -119,8 +121,6 @@ export function useResponseManagement(checklist) {
             response_id: existingResponse?.response_id || null,
             value: value,
             response_compliance: item.input_type === 'radio' ? value : undefined,
-            comment: existingResponse?.comment ?? "",
-            evidence_url: existingResponse?.evidence_url ?? "",
             checklist_item_id: item.checklist_item_id,
             inspectable_id: item.inspectable_id_for_response,
             response_type: response_type,
@@ -167,14 +167,20 @@ export function useResponseManagement(checklist) {
         switch (value) {
           case "cumple":
             newResponse.response_type = "cumple";
-            newResponse.comment = "";
-            newResponse.evidence_url = "";
+            break;
+          case "no_cumple":
+            newResponse.response_type = "no_cumple";
+            break;
+          case "observaciones":
+            newResponse.response_type = "observaciones";
             break;
           case "no cumple":
             newResponse.response_type = "no_cumple";
+            newResponse.value = "no_cumple"; // Normalizar valor
             break;
           case "observación":
             newResponse.response_type = "observaciones";
+            newResponse.value = "observaciones"; // Normalizar valor
             break;
           default:
             newResponse.response_type = null;
@@ -200,6 +206,7 @@ export function useResponseManagement(checklist) {
         return "no_cumple";
       case "observacion":
       case "observaciones":
+      case "observación":
         return "observaciones";
       default:
         return "cumple";
@@ -221,24 +228,26 @@ export function useResponseManagement(checklist) {
       switch (responseType) {
         case "cumple":
           response_compliance = "cumple";
+          value = "cumple";
           break;
         case "no_cumple":
-          response_compliance = "no cumple";
+          response_compliance = "no_cumple";
+          value = "no_cumple";
           break;
         case "observaciones":
-          response_compliance = "observación";
+          response_compliance = "observaciones";
+          value = "observaciones";
           break;
         default:
           response_compliance = "cumple";
+          value = "cumple";
       }
 
       const newResponse = {
         ...currentResponse,
         response_type: responseType,
         response_compliance: response_compliance,
-        value: response_compliance,
-        comment: responseType === "cumple" ? "" : currentResponse.comment || "",
-        evidence_url: responseType === "cumple" ? "" : currentResponse.evidence_url || "",
+        value: value,
         checklist_item_id: item.checklist_item_id,
         inspectable_id: item.inspectable_id_for_response || currentResponse.inspectable_id
       };
@@ -284,27 +293,30 @@ export function useResponseManagement(checklist) {
         const currentResponse = prevResponses[siblingId] || {};
         
         let response_compliance;
+        let value = responseType;
         switch (responseType) {
           case "cumple":
             response_compliance = "cumple";
+            value = "cumple";
             break;
           case "no_cumple":
-            response_compliance = "no cumple";
+            response_compliance = "no_cumple";
+            value = "no_cumple";
             break;
           case "observaciones":
-            response_compliance = "observación";
+            response_compliance = "observaciones";
+            value = "observaciones";
             break;
           default:
             response_compliance = "cumple";
+            value = "cumple";
         }
 
         batchUpdates[siblingId] = {
           ...currentResponse,
           response_type: responseType,
           response_compliance,
-          value: response_compliance,
-          comment: responseType === "cumple" ? "" : currentResponse.comment || "",
-          evidence_url: responseType === "cumple" ? "" : currentResponse.evidence_url || "",
+          value: value,
           checklist_item_id: sibling.checklist_item_id,
           inspectable_id: inspectableId || sibling.inspectable_id_for_response || currentResponse.inspectable_id
         };
@@ -353,52 +365,10 @@ export function useResponseManagement(checklist) {
         continue;
       }
       
-      // Validar "no cumple" - requiere comentario y evidencia
       if (response.response_type === "no_cumple") {
-        if (!response.comment || response.comment.trim() === "") {
-          validationFailed = true;
-          Swal.fire({
-            title: "Comentario obligatorio",
-            text: `El ítem "${item.question_text}" marcado como "No Cumple" requiere un comentario explicativo.`,
-            icon: "warning",
-            confirmButtonColor: "#7c3aed",
-          });
-          break;
-        }
-        if (!response.evidence_url || response.evidence_url.trim() === "") {
-          validationFailed = true;
-          Swal.fire({
-            title: "Evidencia obligatoria",
-            text: `El ítem "${item.question_text}" marcado como "No Cumple" requiere evidencia fotográfica.`,
-            icon: "warning",
-            confirmButtonColor: "#7c3aed",
-          });
-          break;
-        }
       }
 
-      // Validar "observación" - requiere comentario y evidencia
       if (response.response_type === "observaciones") {
-        if (!response.comment || response.comment.trim() === "") {
-          validationFailed = true;
-          Swal.fire({
-            title: "Comentario obligatorio",
-            text: `El ítem "${item.question_text}" marcado como "Observación" requiere un comentario explicativo.`,
-            icon: "warning",
-            confirmButtonColor: "#7c3aed",
-          });
-          break;
-        }
-        if (!response.evidence_url || response.evidence_url.trim() === "") {
-          validationFailed = true;
-          Swal.fire({
-            title: "Evidencia obligatoria",
-            text: `El ítem "${item.question_text}" marcado como "Observación" requiere evidencia fotográfica.`,
-            icon: "warning",
-            confirmButtonColor: "#7c3aed",
-          });
-          break;
-        }
       }
 
       if (checklist.type?.type_category === 'family' && !response.inspectable_id) {
@@ -417,8 +387,6 @@ export function useResponseManagement(checklist) {
         checklist_item_id: response.checklist_item_id,
         response_id: response.response_id,
         value: response.value,
-        comment: response.comment || null,
-        evidence_url: response.evidence_url || null,
         inspectable_id: response.inspectable_id,
         response_type: response.response_type,
       });
@@ -456,7 +424,12 @@ export function useResponseManagement(checklist) {
     });
 
     resetModifications();
-    if (onSuccess) onSuccess(true);
+
+    // ✅ NUEVO: Actualizar estado hasExistingResponses después de guardar exitosamente
+    setHasExistingResponses(true);
+
+    // ✅ MODIFICADO: Retornar las respuestas guardadas
+    if (onSuccess) onSuccess(true, null, responsesToSend);
 
   } catch (error) {
     console.error('Error al guardar:', error);
@@ -469,6 +442,44 @@ export function useResponseManagement(checklist) {
   }
   }, [itemResponses, checklist, resetModifications, allItemsMap]);
 
+  /**
+   * Actualiza los IDs de respuesta después de guardar exitosamente
+   */
+  const updateResponseIds = useCallback((savedResponses) => {
+    setItemResponses(prevResponses => {
+      const updatedResponses = { ...prevResponses };
+      
+      savedResponses.forEach(savedResponse => {
+        const itemId = Object.keys(updatedResponses).find(key =>
+          updatedResponses[key].checklist_item_id === savedResponse.checklist_item_id &&
+          updatedResponses[key].inspectable_id === savedResponse.inspectable_id
+        );
+        
+        if (itemId) {
+          updatedResponses[itemId] = {
+            ...updatedResponses[itemId],
+            response_id: savedResponse.response_id
+          };
+        }
+      });
+      
+      return updatedResponses;
+    });
+  }, []);
+
+  /**
+   * Fuerza la actualización del estado hasExistingResponses
+   */
+  const forceUpdateExistingResponses = useCallback(() => {
+    const hasResponses = Object.keys(itemResponses).some(itemId => {
+      const response = itemResponses[itemId];
+      return response && (
+        response.value !== null && response.value !== undefined && response.value !== ''
+      );
+    });
+    setHasExistingResponses(hasResponses);
+  }, [itemResponses]);
+
   return {
     itemResponses,
     modifiedResponses,
@@ -478,6 +489,8 @@ export function useResponseManagement(checklist) {
     handleResponseTypeChange,
     handleMarkAllSiblings,
     resetModifications,
-    saveResponses
+    saveResponses,
+    updateResponseIds,
+    forceUpdateExistingResponses
   }
 }

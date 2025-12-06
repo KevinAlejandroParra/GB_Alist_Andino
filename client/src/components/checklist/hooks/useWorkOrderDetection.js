@@ -16,32 +16,49 @@ export function useWorkOrderDetection(checklist, items, user) {
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
-      const checklistTypeId = checklist?.type?.type_id || checklist?.type?.id || checklist?.checklist_type_id || checklist?.type_id;
-      
-      const params = checklistTypeId ? { checklist_type_id: checklistTypeId } : {};
-      
-      const response = await axiosInstance.get(`${API_URL}/api/work-orders/pending`, {
+
+      // Extraer todos los checklist_item_ids de los items (incluyendo subitems)
+      const getAllItemIds = (itemsArray) => {
+        const ids = [];
+        itemsArray.forEach(item => {
+          if (item.checklist_item_id) {
+            ids.push(item.checklist_item_id);
+          }
+          if (item.subItems && item.subItems.length > 0) {
+            ids.push(...getAllItemIds(item.subItems));
+          }
+        });
+        return ids;
+      };
+
+      const allItemIds = getAllItemIds(items);
+
+      if (allItemIds.length === 0) {
+        setWorkOrders([]);
+        return;
+      }
+
+      console.log(`🔍 Buscando fallas para ${allItemIds.length} items: [${allItemIds.join(', ')}]`);
+
+      // Buscar fallas activas (PENDIENTE, EN_REPARACION, ESPERANDO_REPUESTO) para estos checklist_item_ids
+      const response = await axiosInstance.get(`${API_URL}/api/failures/by-items`, {
         headers: { Authorization: `Bearer ${user.token}` },
-        params
+        params: { item_ids: allItemIds.join(','), status: 'active' }
       });
 
-      let pendingWorkOrders = Array.isArray(response.data) ? response.data : (response.data?.data && Array.isArray(response.data.data)) ? response.data.data : [];
+      let failureOrders = Array.isArray(response.data) ? response.data : (response.data?.data && Array.isArray(response.data.data)) ? response.data.data : [];
 
-      const activeWorkOrders = pendingWorkOrders.filter(wo => 
-        wo.status === 'PENDIENTE' || wo.status === 'EN_PROCESO'
-      );
-      
-      // --- NUEVO LOG 2: ÓRDENES DE TRABAJO ---
-      console.log('--- ÓRDENES DE TRABAJO (OTs) ACTIVAS EN ESTE CHECKLIST ---');
-      activeWorkOrders.forEach(wo => {
-        console.log(`OT ID: ${wo.id} -> Asignada a Checklist Item ID: ${wo.checklist_item_id}`);
+      console.log('--- ÓRDENES DE FALLA (OFs) ACTIVAS ---');
+      console.log(`Total de fallas activas encontradas: ${failureOrders.length}`);
+      failureOrders.forEach(fo => {
+        console.log(`OF ID: ${fo.id} (${fo.failure_order_id}) -> Item ID: ${fo.checklist_item_id} - Status: ${fo.status}`);
       });
-      // --- FIN NUEVO LOG 2 ---
 
-      setWorkOrders(activeWorkOrders);
+      setWorkOrders(failureOrders);
     } catch (err) {
-      console.error('Error cargando órdenes de trabajo:', err);
-      setError(err.message || 'Error al cargar órdenes de trabajo');
+      console.error('Error cargando órdenes de falla:', err);
+      setError(err.message || 'Error al cargar órdenes de falla');
+      setWorkOrders([]);
     } finally {
       setLoading(false);
     }
@@ -49,34 +66,26 @@ export function useWorkOrderDetection(checklist, items, user) {
 
   const getWorkOrderForItem = useCallback((item) => {
     if (!item) return [];
-  
+
     if (item.subItems && item.subItems.length > 0) {
       const workOrdersForChildren = item.subItems.flatMap(subItem => {
         const foundWorkOrders = workOrders.filter(wo => wo.checklist_item_id === subItem.checklist_item_id);
-        // --- NUEVO LOG 3: ASOCIACIÓN ---
         if (foundWorkOrders.length > 0) {
-            console.log(`--- ASOCIACIÓN ENCONTRADA ---`);
-            foundWorkOrders.forEach(fwo => {
-                console.log(`Esta falla (OT ID: ${fwo.id}) pertenece al ítem HIJO: ${subItem.item_number} (ID: ${subItem.checklist_item_id})`);
-            });
+          console.log(`✅ Fallas encontradas para ítem ${subItem.item_number} (ID: ${subItem.checklist_item_id}):`, foundWorkOrders.length);
         }
-        // --- FIN NUEVO LOG 3 ---
         return foundWorkOrders;
       });
       return workOrdersForChildren;
     }
-  
+
     const itemWorkOrders = workOrders.filter(wo => {
       const match = wo.checklist_item_id === item.checklist_item_id;
-      // --- NUEVO LOG 3: ASOCIACIÓN ---
       if (match) {
-        console.log(`--- ASOCIACIÓN ENCONTRADA ---`);
-        console.log(`Esta falla (OT ID: ${wo.id}) pertenece al ítem HIJO: ${item.item_number} (ID: ${item.checklist_item_id})`);
+        console.log(`✅ Falla encontrada para ítem ${item.item_number} (ID: ${item.checklist_item_id})`);
       }
-      // --- FIN NUEVO LOG 3 ---
       return match;
     });
-  
+
     return itemWorkOrders;
   }, [workOrders]);
 
@@ -88,8 +97,11 @@ export function useWorkOrderDetection(checklist, items, user) {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
       const response = await axiosInstance.put(
-        `${API_URL}/api/work-orders/${workOrderId}/maintain`,
-        { recurrence_reason: reason },
+        `${API_URL}/api/failures/${workOrderId}`,
+        {
+          notes: reason || 'Falla mantenida como recurrente',
+          status: 'PENDIENTE'
+        },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
       await loadWorkOrders();
@@ -104,8 +116,15 @@ export function useWorkOrderDetection(checklist, items, user) {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
       const response = await axiosInstance.post(
-        `${API_URL}/api/work-orders/new-failure`,
-        failureData,
+        `${API_URL}/api/failures`,
+        {
+          checklistResponseId: failureData.checklist_item_id,
+          initialResponseId: failureData.checklist_item_id,
+          description: failureData.description,
+          priorityLevel: failureData.severity === 'crítica' ? 'HIGH' : 'NORMAL',
+          reported_by_id: failureData.reported_by_id,
+          requiresReplacement: false
+        },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
       await loadWorkOrders();
@@ -120,8 +139,11 @@ export function useWorkOrderDetection(checklist, items, user) {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
       const response = await axiosInstance.put(
-        `${API_URL}/api/work-orders/${workOrderId}/resolve`,
-        resolutionData,
+        `${API_URL}/api/failures/${workOrderId}/close`,
+        {
+          resolutionDetails: resolutionData.solution_text || 'Resuelto sin detalles adicionales',
+          closedBy: resolutionData.closedBy
+        },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
       setWorkOrders(prev => prev.filter(wo => wo.id !== workOrderId));
@@ -145,9 +167,16 @@ export function useWorkOrderDetection(checklist, items, user) {
   const closeWorkOrder = useCallback(async (workOrderId, resolutionData) => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
-      await axiosInstance.put(`${API_URL}/api/work-orders/${workOrderId}/close`, resolutionData, {
-        headers: { Authorization: `Bearer ${user.token}` }
-      });
+      await axiosInstance.put(
+        `${API_URL}/api/failures/${workOrderId}/close`,
+        {
+          resolutionDetails: resolutionData.resolutionDetails || 'Orden cerrada',
+          closedBy: resolutionData.closedBy || user?.user_id
+        },
+        {
+          headers: { Authorization: `Bearer ${user.token}` }
+        }
+      );
       setWorkOrders(prev => prev.filter(wo => wo.id !== workOrderId));
       return { success: true };
     } catch (err) {
@@ -158,19 +187,17 @@ export function useWorkOrderDetection(checklist, items, user) {
 
   useEffect(() => {
     if (items && items.length > 0) {
-        // --- NUEVO LOG 1: ESTRUCTURA DE ÍTEMS ---
-        console.log('--- ESTRUCTURA DE ÍTEMS (PADRES E HIJOS) ---');
-        items.forEach(item => {
-          if (item.subItems && item.subItems.length > 0) {
-            console.log(`PADRE: ${item.item_number} (ID: ${item.checklist_item_id})`);
-            item.subItems.forEach(subItem => {
-              console.log(`  HIJO: ${subItem.item_number} (ID: ${subItem.checklist_item_id})`);
-            });
-          } else {
-            console.log(`ÍTEM (sin hijos): ${item.item_number} (ID: ${item.checklist_item_id})`);
-          }
-        });
-        // --- FIN NUEVO LOG 1 ---
+      console.log('--- ESTRUCTURA DE ÍTEMS (PADRES E HIJOS) ---');
+      items.forEach(item => {
+        if (item.subItems && item.subItems.length > 0) {
+          console.log(`PADRE: ${item.item_number} (ID: ${item.checklist_item_id})`);
+          item.subItems.forEach(subItem => {
+            console.log(`  HIJO: ${subItem.item_number} (ID: ${subItem.checklist_item_id})`);
+          });
+        } else {
+          console.log(`ÍTEM (sin hijos): ${item.item_number} (ID: ${item.checklist_item_id})`);
+        }
+      });
     }
     loadWorkOrders();
   }, [loadWorkOrders, items]);

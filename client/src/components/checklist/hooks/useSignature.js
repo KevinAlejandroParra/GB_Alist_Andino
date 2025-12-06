@@ -9,7 +9,7 @@ import axiosInstance from '../../../utils/axiosConfig'
  * @param {Function} onSuccess - Callback después de firma exitosa
  * @returns {Object} - Estado y funciones para firma
  */
-export function useSignature(user, checklist, onSuccess) {
+export function useSignature(user, checklist, onSuccess, hasExistingResponses = false) {
   const [showSignaturePad, setShowSignaturePad] = useState(false)
 
   /**
@@ -26,8 +26,26 @@ export function useSignature(user, checklist, onSuccess) {
       })
       return
     }
+
+    // Verificar si las respuestas han sido guardadas
+    if (!hasExistingResponses) {
+      Swal.fire({
+        title: "⚠️ Guardar Checklist Requerido",
+        text: "Debes guardar las respuestas del checklist antes de poder firmarlo. Si no se han enviado las firmas, no será posible guardar la firma.",
+        icon: "warning",
+        confirmButtonColor: "#7c3aed",
+        confirmButtonText: "Entendido",
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          content: "text-slate-600",
+        },
+      })
+      return
+    }
+    
     setShowSignaturePad(true)
-  }, [checklist])
+  }, [checklist, hasExistingResponses])
 
   /**
    * Maneja el guardado de la firma
