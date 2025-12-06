@@ -1,5 +1,7 @@
 "use client";
 import { useState } from 'react';
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faEye, faEyeSlash, faUser, faEnvelope, faLock, faIdCard, faPhone } from "@fortawesome/free-solid-svg-icons";
 
 export default function Register() {
   const [document, setDocument] = useState('');
@@ -10,6 +12,7 @@ export default function Register() {
   const [image, setImage] = useState('');
   const [role, setRole] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
 
@@ -68,9 +71,42 @@ export default function Register() {
           <label>Email:</label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </div>
-        <div>
+        <div style={{ position: 'relative' }}>
           <label>Contraseña:</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              style={{
+                width: '100%',
+                paddingRight: '40px',
+                padding: '8px 12px',
+                border: '1px solid #ccc',
+                borderRadius: '4px'
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
+            </button>
+          </div>
         </div>
         <div>
           <label>Imagen:</label>

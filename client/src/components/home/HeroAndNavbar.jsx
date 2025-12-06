@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { motion, AnimatePresence } from 'framer-motion';
+import Swal from 'sweetalert2';
 
 const HeroandNavbar = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -9,7 +10,6 @@ const HeroandNavbar = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Fetch user data 
   const fetchUserData = async (token) => {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API}/api/users/protected`, {
@@ -17,7 +17,26 @@ const HeroandNavbar = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
+      if (response.status === 401) {
+        Swal.fire({
+          title: 'Sesión caducada',
+          text: 'La sesión ha caducado, vuelve a iniciar sesión',
+          icon: 'warning',
+          confirmButtonText: 'Ir a iniciar sesión',
+          confirmButtonColor: '#3085d6',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+        }).then((result) => {
+          if (result.isConfirmed) {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userData');
+            window.location.href = '/login';
+          }
+        });
+        return null;
+      }
+
       if (response.ok) {
         const data = await response.json();
         return data.user;
@@ -29,19 +48,19 @@ const HeroandNavbar = () => {
     }
   };
 
-  
   useEffect(() => {
     const checkAuth = async () => {
       const authToken = localStorage?.getItem('authToken');
-      
+
       if (authToken) {
         try {
           const userData = await fetchUserData(authToken);
-          
+
           if (userData) {
             setUser(userData);
             setIsAuthenticated(true);
             localStorage.setItem('userData', JSON.stringify(userData));
+            console.log('User data fetched:', userData);
           } else {
             localStorage?.removeItem('authToken');
             localStorage?.removeItem('userData');
@@ -57,7 +76,6 @@ const HeroandNavbar = () => {
 
   const handleLogout = async () => {
     try {
-      // llamada al logout API endpoint
       await fetch('/api/users/logout', {
         method: 'POST',
         headers: {
@@ -79,7 +97,7 @@ const HeroandNavbar = () => {
   const redirectToLogin = () => {
     window.location.href = '/login';
   };
-    const redirectToEdit = () => {
+  const redirectToEdit = () => {
     window.location.href = '/Profile';
   };
 
@@ -87,7 +105,7 @@ const HeroandNavbar = () => {
     try {
       const decoded = jwtDecode(localStorage.getItem('authToken'));
       const role_id = decoded.role_id;
-  
+
       if (isAuthenticated) {
         if (role_id === 1 || role_id === 2) {
           window.location.href = '/AdminDashboard';
@@ -100,6 +118,24 @@ const HeroandNavbar = () => {
       window.location.href = '/dashboard';
     }
   };
+
+  const goToAdminDashboard = () => {
+    window.location.href = '/AdminDashboard';
+  };
+
+  const goToChecklistManagement = () => {
+    console.log('Navegando a gestión de checklists para usuario:', user);
+    console.log('Rol desde user?.role_id:', user?.role_id);
+    try {
+      const decoded = jwtDecode(localStorage.getItem('authToken'));
+      console.log('Rol desde token decodificado:', decoded?.role_id);
+      console.log('Token completo decodificado:', decoded);
+    } catch (error) {
+      console.error('Error decodificando token:', error);
+    }
+    window.location.href = '/dashboard';
+  };
+
   const navItems = [
     { name: 'Inicio', href: '#home', icon: 'fas fa-home' },
     { name: 'Características', href: '#features', icon: 'fas fa-star' },
@@ -107,9 +143,24 @@ const HeroandNavbar = () => {
     { name: 'Soporte', href: '#support', icon: 'fas fa-headset' }
   ];
 
+  // Función para obtener el rol desde el token como fallback
+  const getRoleFromToken = () => {
+    try {
+      const decoded = jwtDecode(localStorage.getItem('authToken'));
+      return decoded?.role_id;
+    } catch (error) {
+      console.error('Error decodificando token:', error);
+      return null;
+    }
+  };
+
+  // Verificar si el usuario es admin o soporte
+  const isAdminOrSupport = () => {
+    return user?.role_id === 1 || user?.role_id === 2 || getRoleFromToken() === 1 || getRoleFromToken() === 2;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 relative overflow-hidden">
-      {/* Elementos flotantes en el background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
           animate={{
@@ -151,8 +202,7 @@ const HeroandNavbar = () => {
         />
       </div>
 
-      {/* Navbar */}
-      <motion.nav 
+      <motion.nav
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
@@ -161,18 +211,15 @@ const HeroandNavbar = () => {
         <div className="backdrop-blur-xl bg-white/5 border-b border-white/10 shadow-2xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-4">
-              {/* Logo */}
-              <motion.div 
+              <motion.div
                 whileHover={{ scale: 1.05 }}
                 className="flex items-center space-x-3"
               >
-                
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
                   ALIST GBX
                 </h1>
               </motion.div>
 
-              {/* Desktop Navigation */}
               <div className="hidden md:flex items-center space-x-2">
                 {navItems.map((item, index) => (
                   <motion.a
@@ -181,7 +228,7 @@ const HeroandNavbar = () => {
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 * index, duration: 0.5 }}
-                    whileHover={{ 
+                    whileHover={{
                       scale: 1.05,
                       backgroundColor: 'rgba(255,255,255,0.1)'
                     }}
@@ -193,7 +240,6 @@ const HeroandNavbar = () => {
                 ))}
               </div>
 
-              {/* Auth Section */}
               <div className="flex items-center space-x-4">
                 {!isAuthenticated ? (
                   <motion.button
@@ -228,7 +274,7 @@ const HeroandNavbar = () => {
                           <i className="fas fa-user text-white text-sm"></i>
                         </div>
                         <span className="hidden sm:block text-sm font-medium">Perfil</span>
-                        <motion.i 
+                        <motion.i
                           animate={{ rotate: showProfileMenu ? 180 : 0 }}
                           className="fas fa-chevron-down text-xs"
                         />
@@ -240,7 +286,7 @@ const HeroandNavbar = () => {
                             initial={{ opacity: 0, y: -10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                            className="absolute right-0 mt-2 w-56 bg-white/10 backdrop-blur-xl rounded-xl border border-white/20 shadow-2xl py-2"
+                            className="absolute right-0 mt-2 w-56 bg-gradient-to-r from-purple-900 to-purple-900/90 backdrop-blur-xl rounded-xl border border-white/20 shadow-2xl py-2"
                           >
                             <div className="px-4 py-3 border-b border-white/20">
                               <p className="text-white font-semibold text-sm">
@@ -250,6 +296,30 @@ const HeroandNavbar = () => {
                                 {user?.user_email || user?.email || ''}
                               </p>
                             </div>
+                            
+                            {/* Usar rol del token como fallback si no está en user */}
+                            {(user?.role_id === 1 || getRoleFromToken() === 1) && (
+                              <motion.button
+                                whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
+                                onClick={goToChecklistManagement}
+                                className="w-full text-left px-4 py-2 text-gray-300 hover:text-white flex items-center space-x-3 transition-colors"
+                              >
+                                <i className="fas fa-clipboard-list text-yellow-400 w-4"></i>
+                                <span className="text-sm">Gestión de Checklists</span>
+                              </motion.button>
+                            )}
+                            
+                            {(user?.role_id === 1 || user?.role_id === 2 || getRoleFromToken() === 1 || getRoleFromToken() === 2) && (
+                              <motion.button
+                                whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
+                                onClick={goToAdminDashboard}
+                                className="w-full text-left px-4 py-2 text-gray-300 hover:text-white flex items-center space-x-3 transition-colors"
+                              >
+                                <i className="fas fa-cogs text-purple-400 w-4"></i>
+                                <span className="text-sm">Gestión Administrativa</span>
+                              </motion.button>
+                            )}
+                            
                             <motion.button
                               whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
                               onClick={redirectToEdit}
@@ -258,14 +328,19 @@ const HeroandNavbar = () => {
                               <i className="fas fa-pen-alt text-green-500 w-4"></i>
                               <span className="text-sm">Editar Perfil</span>
                             </motion.button>
-                            <motion.button
-                              whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
-                              onClick={goToWorkspace}
-                              className="w-full text-left px-4 py-2 text-gray-300 hover:text-white flex items-center space-x-3 transition-colors"
-                            >
-                              <i className="fas fa-tachometer-alt text-blue-400 w-4"></i>
-                              <span className="text-sm">Dashboard</span>
-                            </motion.button>
+                            
+                            {/* Dashboard solo para usuarios no admin/soporte */}
+                            {!isAdminOrSupport() && (
+                              <motion.button
+                                whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
+                                onClick={goToWorkspace}
+                                className="w-full text-left px-4 py-2 text-gray-300 hover:text-white flex items-center space-x-3 transition-colors"
+                              >
+                                <i className="fas fa-tachometer-alt text-blue-400 w-4"></i>
+                                <span className="text-sm">Dashboard</span>
+                              </motion.button>
+                            )}
+                            
                             <motion.button
                               whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
                               onClick={handleLogout}
@@ -281,7 +356,6 @@ const HeroandNavbar = () => {
                   </div>
                 )}
 
-                {/* Mobile menu button */}
                 <button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                   className="md:hidden text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
@@ -292,7 +366,6 @@ const HeroandNavbar = () => {
             </div>
           </div>
 
-          {/* Mobile Navigation */}
           <AnimatePresence>
             {isMobileMenuOpen && (
               <motion.div
@@ -320,18 +393,15 @@ const HeroandNavbar = () => {
         </div>
       </motion.nav>
 
-      {/* Hero Content */}
       <div className="relative z-10 pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center min-h-[80vh]">
-            {/* Left Content */}
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.3 }}
               className="space-y-8 text-center lg:text-left"
             >
-              {/* contenido informativo */}
               <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -342,7 +412,7 @@ const HeroandNavbar = () => {
                 <span>Sistema de mantenimiento avanzado para Gamebox</span>
               </motion.div>
 
-              <motion.h1 
+              <motion.h1
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.4 }}
@@ -357,13 +427,13 @@ const HeroandNavbar = () => {
                 <span className="text-white">Inteligente</span>
               </motion.h1>
 
-              <motion.p 
+              <motion.p
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.6 }}
                 className="text-lg lg:text-xl text-gray-300 leading-relaxed max-w-2xl mx-auto lg:mx-0"
               >
-                Optimiza y centraliza todas tus operaciones de mantenimiento con nuestra plataforma avanzada. 
+                Optimiza y centraliza todas tus operaciones de mantenimiento con nuestra plataforma avanzada.
                 Control total, eficiencia máxima.
               </motion.p>
 
@@ -380,7 +450,7 @@ const HeroandNavbar = () => {
                   className="group bg-white text-gray-900 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-100 transition-all duration-300 flex items-center justify-center space-x-3 shadow-2xl"
                 >
                   <span>Comenzar ahora</span>
-                  <motion.i 
+                  <motion.i
                     className="fas fa-arrow-right"
                     animate={{ x: [0, 5, 0] }}
                     transition={{ duration: 2, repeat: Infinity }}
@@ -397,7 +467,6 @@ const HeroandNavbar = () => {
                 </motion.button>
               </motion.div>
 
-              {/* Stats */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -419,7 +488,6 @@ const HeroandNavbar = () => {
               </motion.div>
             </motion.div>
 
-            {/* Modelos */}
             <motion.div
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
@@ -427,13 +495,11 @@ const HeroandNavbar = () => {
               className="relative flex justify-center lg:justify-end"
             >
               <div className="relative">
-                {/* Glassmorphism Card Container */}
                 <motion.div
                   whileHover={{ y: -10 }}
                   transition={{ duration: 0.3 }}
                   className="relative bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl "
                 >
-                  {/* Imagen */}
                   <div className="w-full max-w-3xl mx-auto ">
                     <motion.img
                       initial={{ scale: 0.8, opacity: 0 }}
@@ -450,7 +516,6 @@ const HeroandNavbar = () => {
                     />
                   </div>
 
-                  {/* Floating Info Cards */}
                   <motion.div
                     initial={{ opacity: 0, x: -30 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -486,7 +551,6 @@ const HeroandNavbar = () => {
                   </motion.div>
                 </motion.div>
 
-                {/* Decorative Elements */}
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
@@ -503,10 +567,9 @@ const HeroandNavbar = () => {
         </div>
       </div>
 
-      {/* FontAwesome CDN */}
-      <link 
-        rel="stylesheet" 
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" 
+      <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
       />
     </div>
   );

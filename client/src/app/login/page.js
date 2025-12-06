@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faLock, faHome, faUser, faIdCard, faPhone, faMapMarkerAlt } from "@fortawesome/free-solid-svg-icons";
+import { faEnvelope, faLock, faHome, faUser, faIdCard, faPhone, faMapMarkerAlt, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -13,6 +13,9 @@ export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [direction, setDirection] = useState(1);
   const [premises, setPremises] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
 
   // Configuración de formularios con react-hook-form
   const loginForm = useForm({
@@ -180,7 +183,7 @@ useEffect(() => {
           user_phone: data.telefono,
           premise_id: parseInt(data.sede), 
           user_password: data.password,
-          role_id: 9 
+          role_id: 4 // Anfitrion como rol por defecto
         }),
       });
   
@@ -191,11 +194,11 @@ useEffect(() => {
       }
   
       await Swal.fire({
-        title: '<div class="flex flex-col items-center"><i class="fas fa-check-circle text-5xl mb-3 text-purple-400"></i><span class="text-white text-2xl font-bold">¡Éxito!</span></div>',
+        title: '<div class="flex flex-col items-center"><i class="fas fa-check-circle text-5xl mb-3 text-green-400"></i><span class="text-white text-2xl font-bold">¡Éxito!</span></div>',
         html: '<div class="text-white/80 mb-4">Usuario registrado correctamente</div>',
-        background: 'rgba(99, 102, 241, 0.15)', 
+        background: 'rgba(34, 197, 94, 0.15)',
         backdrop: `
-          rgba(59, 130, 246, 0.1)
+          rgba(34, 197, 94, 0.1)
           url("/images/glass-texture.png")
           center center
           no-repeat
@@ -207,19 +210,19 @@ useEffect(() => {
         customClass: {
           container: 'backdrop-blur-sm',
           popup: `
-            backdrop-blur-xl 
-            rounded-2xl 
-            border border-cyan-200/20 
-            shadow-[0_10px_50px_rgba(167,139,250,0.3)]
-            bg-gradient-to-br from-blue-500/10 to-purple-500/10
+            backdrop-blur-xl
+            rounded-2xl
+            border border-green-200/20
+            shadow-[0_10px_50px_rgba(34,197,94,0.3)]
+            bg-gradient-to-br from-green-500/10 to-teal-500/10
           `,
-          title: 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-400',
+          title: 'text-transparent bg-clip-text bg-gradient-to-r from-green-300 to-teal-400',
           htmlContainer: 'text-white/90',
           confirmButton: `
-            bg-gradient-to-r from-blue-400 to-purple-500 
-            text-white font-medium rounded-xl 
-            hover:from-blue-500 hover:to-purple-600 
-            focus:outline-none focus:ring-2 focus:ring-cyan-300 
+            bg-gradient-to-r from-green-400 to-teal-500
+            text-white font-medium rounded-xl
+            hover:from-green-500 hover:to-teal-600
+            focus:outline-none focus:ring-2 focus:ring-green-300
             transition-all duration-300
             shadow-lg
           `,
@@ -232,6 +235,14 @@ useEffect(() => {
         timerProgressBar: false,
         grow: 'row'
       });
+      
+      // Resetear estados después del registro exitoso
+      setIsLoading(false);
+      registerForm.reset();
+      setShowRegisterPassword(false);
+      setShowRegisterConfirmPassword(false);
+      
+      // Cambiar al formulario de login
       toggleAuthMode(true);
   
     } // En el frontend, modifica el catch:
@@ -466,18 +477,27 @@ useEffect(() => {
                       <div className="absolute inset-y-0 left-0 pt-6 pl-4 flex items-center pointer-events-none">
                         <FontAwesomeIcon icon={faLock} className="text-white" />
                       </div>
-                      <input
-                        {...loginForm.register('password', { 
-                          required: 'La contraseña es requerida',
-                          minLength: {
-                            value: 8,
-                            message: 'La contraseña debe tener al menos 8 caracteres'
-                          }
-                        })}
-                        type="password"
-                        placeholder="••••••••••"
-                        className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
-                      />
+                      <div className="relative">
+                        <input
+                          {...loginForm.register('password', {
+                            required: 'La contraseña es requerida',
+                            minLength: {
+                              value: 8,
+                              message: 'La contraseña debe tener al menos 8 caracteres'
+                            }
+                          })}
+                          type={showPassword ? "text" : "password"}
+                          placeholder="••••••••••"
+                          className="w-full pl-12 pr-12 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-0 pr-4 flex items-center text-white/70 hover:text-white transition-colors duration-200"
+                        >
+                          <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
+                        </button>
+                      </div>
                       {loginForm.formState.errors.password && (
                         <motion.p
                           initial={{ opacity: 0, y: -10 }}
@@ -766,18 +786,27 @@ useEffect(() => {
                         <div className="absolute inset-y-0 left-0 pt-6 pl-4 flex items-center pointer-events-none">
                           <FontAwesomeIcon icon={faLock} className="text-white" />
                         </div>
-                        <input
-                          {...registerForm.register('password', { 
-                            required: 'La contraseña es requerida',
-                            minLength: {
-                              value: 6,
-                              message: 'La contraseña debe tener al menos 6 caracteres'
-                            }
-                          })}
-                          type="password"
-                          placeholder="••••••••••"
-                          className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300"
-                        />
+                        <div className="relative">
+                          <input
+                            {...registerForm.register('password', {
+                              required: 'La contraseña es requerida',
+                              minLength: {
+                                value: 6,
+                                message: 'La contraseña debe tener al menos 6 caracteres'
+                              }
+                            })}
+                            type={showRegisterPassword ? "text" : "password"}
+                            placeholder="••••••••••"
+                            className="w-full pl-12 pr-12 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-white/70 hover:text-white transition-colors duration-200"
+                          >
+                            <FontAwesomeIcon icon={showRegisterPassword ? faEyeSlash : faEye} />
+                          </button>
+                        </div>
                         {registerForm.formState.errors.password && (
                           <motion.p
                             initial={{ opacity: 0, y: -10 }}
@@ -793,14 +822,23 @@ useEffect(() => {
                         <div className="absolute inset-y-0 left-0 pt-6 pl-4 flex items-center pointer-events-none">
                           <FontAwesomeIcon icon={faLock} className="text-white" />
                         </div>
-                        <input
-                          {...registerForm.register('confirmPassword', { 
-                            required: 'Debes confirmar la contraseña'
-                          })}
-                          type="password"
-                          placeholder="••••••••••"
-                          className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300"
-                        />
+                        <div className="relative">
+                          <input
+                            {...registerForm.register('confirmPassword', {
+                              required: 'Debes confirmar la contraseña'
+                            })}
+                            type={showRegisterConfirmPassword ? "text" : "password"}
+                            placeholder="••••••••••"
+                            className="w-full pl-12 pr-12 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowRegisterConfirmPassword(!showRegisterConfirmPassword)}
+                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-white/70 hover:text-white transition-colors duration-200"
+                          >
+                            <FontAwesomeIcon icon={showRegisterConfirmPassword ? faEyeSlash : faEye} />
+                          </button>
+                        </div>
                         {registerForm.formState.errors.confirmPassword && (
                           <motion.p
                             initial={{ opacity: 0, y: -10 }}
