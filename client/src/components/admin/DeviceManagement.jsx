@@ -34,6 +34,8 @@ const DeviceManagement = () => {
                 axios.get(`${API_BASE_URL}/api/families`),
                 axios.get(`${API_BASE_URL}/api/premises`),
             ]);
+            
+            // La respuesta del backend devuelve directamente los dispositivos
             setDevices(devicesResponse.data);
             setFamilies(familiesResponse.data);
             setPremises(premisesResponse.data.data);
@@ -94,10 +96,10 @@ const DeviceManagement = () => {
     const handleEditClick = (device) => {
         setEditingDevice({
             ...device,
-            name: device.inspectable?.name || '',
-            description: device.inspectable?.description || '',
-            premise_id: device.inspectable?.premise_id || '',
-            photo_url: device.inspectable?.photo_url ? `${API_BASE_URL}${device.inspectable.photo_url}` : '', 
+            name: device.parentInspectable?.name || '',
+            description: device.parentInspectable?.description || '',
+            premise_id: device.parentInspectable?.premise_id || '',
+            photo_url: device.parentInspectable?.photo_url ? `${API_BASE_URL}${device.parentInspectable.photo_url}` : '', 
         });
         setEditingDevicePhoto(null); 
     };
@@ -107,20 +109,10 @@ const DeviceManagement = () => {
         try {
             const formData = new FormData();
             for (const key in editingDevice) {
-                if (key === 'photo_url') {
+                if (key === 'photo_url' || key === 'family' || key === 'parentInspectable') {
                     continue; 
                 }
-                if (key !== 'inspectable' && key !== 'family' && key !== 'relatedAttractions' && key !== 'name' && key !== 'description' && key !== 'premise_id') {
-                    formData.append(key, editingDevice[key]);
-                }
-            }
-
-            formData.append('name', editingDevice.name);
-            formData.append('description', editingDevice.description);
-            formData.append('premise_id', editingDevice.premise_id);
-
-            if (editingDevicePhoto) {
-                formData.append('photo', editingDevicePhoto);
+                formData.append(key, editingDevice[key]);
             }
 
             const response = await axios.put(`${API_BASE_URL}/api/devices/${editingDevice.ins_id}`, formData, {
@@ -128,7 +120,11 @@ const DeviceManagement = () => {
                     'Content-Type': 'multipart/form-data',
                 },
             });
-            setDevices(devices.map((dev) => (dev.ins_id === editingDevice.ins_id ? response.data.device : dev)));
+            
+            // Actualizar la lista local con los nuevos datos
+            const updatedDevice = response.data.device;
+            setDevices(devices.map((dev) => (dev.ins_id === editingDevice.ins_id ? updatedDevice : dev)));
+            
             setEditingDevice(null);
             setEditingDevicePhoto(null);
             setError(null);
@@ -284,14 +280,14 @@ const DeviceManagement = () => {
                     {devices.map((device) => (
                         <li key={device.ins_id} className="flex justify-between items-center p-3 border rounded-md bg-gray-50">
                             <div>
-                                <p className="font-semibold">{device.inspectable?.name} ({device.brand})</p>
-                                <p className="text-sm text-gray-600">Descripción: {device.inspectable?.description}</p>
+                                <p className="font-semibold">{device.parentInspectable?.name || 'Sin nombre'} ({device.brand})</p>
+                                <p className="text-sm text-gray-600">Descripción: {device.parentInspectable?.description || 'Sin descripción'}</p>
                                 <p className="text-sm text-gray-600">Familia: {getFamilyName(device.family_id)}</p>
-                                <p className="text-sm text-gray-600">Premisa: {getPremiseName(device.inspectable?.premise_id)}</p>
+                                <p className="text-sm text-gray-600">Sede: {getPremiseName(device.parentInspectable?.premise_id)}</p>
                                 <p className="text-sm text-gray-600">Público: {device.public_flag}</p>
-                                <p className="text-sm text-gray-600">Llegada: {new Date(device.arrival_date).toLocaleDateString()}</p>
-                                {device.inspectable?.photo_url && (
-                                    <img src={`${API_BASE_URL}${device.inspectable.photo_url}`} alt="Foto de identificación" className="w-20 h-20 object-cover mt-2 rounded" />
+                                <p className="text-sm text-gray-600">Llegada: {device.arrival_date ? new Date(device.arrival_date).toLocaleDateString() : 'Sin fecha'}</p>
+                                {device.parentInspectable?.photo_url && (
+                                    <img src={`${API_BASE_URL}${device.parentInspectable.photo_url}`} alt="Foto de identificación" className="w-20 h-20 object-cover mt-2 rounded" />
                                 )}
                             </div>
                             <div>
@@ -324,7 +320,7 @@ const DeviceManagement = () => {
                                     type="text"
                                     id="edit_device_name"
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                    value={editingDevice.name}
+                                    value={editingDevice.name || ''}
                                     onChange={(e) => setEditingDevice({ ...editingDevice, name: e.target.value })}
                                     required
                                 />
@@ -335,7 +331,7 @@ const DeviceManagement = () => {
                                     type="text"
                                     id="edit_device_description"
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                    value={editingDevice.description}
+                                    value={editingDevice.description || ''}
                                     onChange={(e) => setEditingDevice({ ...editingDevice, description: e.target.value })}
                                     required
                                 />
@@ -345,7 +341,7 @@ const DeviceManagement = () => {
                                 <select
                                     id="edit_device_family"
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                    value={editingDevice.family_id}
+                                    value={editingDevice.family_id || ''}
                                     onChange={(e) => setEditingDevice({ ...editingDevice, family_id: e.target.value })}
                                     required
                                 >
@@ -362,7 +358,7 @@ const DeviceManagement = () => {
                                 <select
                                     id="edit_device_premise"
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                    value={editingDevice.premise_id}
+                                    value={editingDevice.premise_id || ''}
                                     onChange={(e) =>
                                         setEditingDevice({
                                             ...editingDevice,

@@ -119,8 +119,8 @@ export default function UserProfile() {
       if (!authToken) {
         // Sweet Alert personalizado para sesión caducada
         Swal.fire({
-          title: 'Sesión caducada',
-          text: 'La sesión ha caducado, vuelve a iniciar sesión',
+          title: 'Autenticación requerida',
+          text: 'Por favor, inicia sesión para continuar',
           icon: 'warning',
           confirmButtonText: 'Ir a iniciar sesión',
           confirmButtonColor: '#3085d6',
@@ -327,14 +327,14 @@ export default function UserProfile() {
       ></div>
 
       <div className="container mx-auto max-w-7xl relative z-10 px-4 sm:px-6 lg:px-8">
-  <div className="flex flex-col sm:flex-row items-center justify-between mb-8 pt-6">
-    
-    {/* Home button */}
-    <div className="fixed top-4 left-4 sm:top-6 sm:left-6 z-40 p-2 rounded-full text-white shadow-lg bg-white/10">
-      <Link href="/">
-        <i className="fas fa-home text-xl sm:text-2xl"></i>
-      </Link>
-      </div>         
+        <div className="flex flex-col sm:flex-row items-center justify-between mb-8 pt-6">
+
+          {/* Home button */}
+          <div className="fixed top-4 left-4 sm:top-6 sm:left-6 z-40 p-2 rounded-full text-white shadow-lg bg-white/10">
+            <Link href="/">
+              <i className="fas fa-home text-xl sm:text-2xl"></i>
+            </Link>
+          </div>
           {/* Título centrado */}
           <div className="text-center flex-1">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 drop-shadow-2xl">Perfil de Usuario</h1>

@@ -5,9 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from '../../../../components/ProtectedRoute';
 import { useAuth } from '../../../../components/AuthContext';
 import ChecklistHeader from '../../../../components/checklist/components/ChecklistHeader';
-import FailureList from '../../../../components/checklist/FailureList';
+import OptimizedActiveFailuresList from '../../../../components/checklist/OptimizedActiveFailuresList';
 import HistorySection from '../../../../components/checklist/HistorySection';
-import ResolvedFailuresHistory from '../../../../components/checklist/ResolvedFailuresHistory';
+import OptimizedResolvedFailuresHistory from '../../../../components/checklist/OptimizedResolvedFailuresHistory';
 import axiosInstance from '../../../../utils/axiosConfig';
 import { formatLocalDate, formatLocalDateTime } from '../../../../utils/dateUtils';
 
@@ -32,15 +32,20 @@ export default function ChecklistDetailPage() {
       setLoading(true);
       
       const [typeResponse, historyResponse, failuresResponse, resolvedFailuresResponse] = await Promise.all([
-        axiosInstance.get(`/api/checklist-types/${checklistTypeId}`),
+        axiosInstance.get(`/api/checklists/type/${checklistTypeId}/details`),
         axiosInstance.get(`/api/checklists/type/${checklistTypeId}/history`),
-        axiosInstance.get(`/api/work-orders/by-type/${checklistTypeId}`),
-        axiosInstance.get(`/api/work-orders/resolved/by-type/${checklistTypeId}`)
+        axiosInstance.get(`/api/checklists/failures/by-type/${checklistTypeId}`),
+        axiosInstance.get(`/api/checklists/failures/resolved/by-type/${checklistTypeId}`)
       ]);
 
       setChecklistType(typeResponse.data);
-      setFailures(failuresResponse.data?.data || []);
-      setResolvedFailures(resolvedFailuresResponse.data?.data || []);
+      
+      // Manejar estructura de datos de fallas
+      const failuresData = failuresResponse.data?.rows || failuresResponse.data || [];
+      const resolvedFailuresData = resolvedFailuresResponse.data?.rows || resolvedFailuresResponse.data || [];
+      
+      setFailures(failuresData);
+      setResolvedFailures(resolvedFailuresData);
       
       if (historyResponse.data && historyResponse.data.length > 0) {
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -230,14 +235,14 @@ export default function ChecklistDetailPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Fallas Activas ({failures.length})</h2>
             <p className="text-sm text-gray-600 mb-4">Fallas reportadas que aún están pendientes de resolución o en proceso.</p>
-            <FailureList failures={failures} />
+            <OptimizedActiveFailuresList failures={failures} user={user} onUpdate={fetchChecklistData} />
           </div>
 
           {/* Historial de Fallas Resueltas */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Fallas Resueltas ({resolvedFailures.length})</h2>
             <p className="text-sm text-gray-600 mb-4">Historial completo de fallas que han sido resueltas o cerradas.</p>
-            <ResolvedFailuresHistory resolvedFailures={resolvedFailures} />
+            <OptimizedResolvedFailuresHistory resolvedFailures={resolvedFailures} />
           </div>
 
           {/* Historial de Checklists */}

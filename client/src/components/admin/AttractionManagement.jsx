@@ -72,7 +72,7 @@ const AttractionManagement = () => {
             });
             setNewAttractionPhoto(null);
             setError(null);
-            fetchData(); 
+            fetchData();
         } catch (err) {
             console.error("Error creating attraction:", err);
             setError("Error al crear la atracción.");
@@ -82,12 +82,12 @@ const AttractionManagement = () => {
     const handleEditClick = (attraction) => {
         setEditingAttraction({
             ...attraction,
-            name: attraction.inspectable?.name || '',
-            description: attraction.inspectable?.description || '',
-            premise_id: attraction.inspectable?.premise_id || '',
-            photo_url: attraction.inspectable?.photo_url ? `${API_BASE_URL}${attraction.inspectable.photo_url}` : '', 
+            name: attraction.parentInspectable?.name || '',
+            description: attraction.parentInspectable?.description || '',
+            premise_id: attraction.parentInspectable?.premise_id || '',
+            photo_url: attraction.parentInspectable?.photo_url ? `${API_BASE_URL}${attraction.parentInspectable.photo_url}` : '',
         });
-        setEditingAttractionPhoto(null); 
+        setEditingAttractionPhoto(null);
     };
 
     const handleUpdateAttraction = async (e) => {
@@ -97,9 +97,9 @@ const AttractionManagement = () => {
 
             for (const key in editingAttraction) {
                 if (key === 'photo_url' && editingAttractionPhoto) {
-                    continue; 
+                    continue;
                 }
-                if (key !== 'inspectable' && key !== 'name' && key !== 'description' && key !== 'premise_id') {
+                if (key !== 'parentInspectable' && key !== 'inspectable' && key !== 'name' && key !== 'description' && key !== 'premise_id') {
                     formData.append(key, editingAttraction[key]);
                 }
             }
@@ -217,7 +217,7 @@ const AttractionManagement = () => {
                             required
                         />
                     </div>
-                    <div> 
+                    <div>
                         <label htmlFor="new_attraction_photo" className="block text-sm font-medium text-gray-700">Subir Foto</label>
                         <input
                             type="file"
@@ -245,13 +245,13 @@ const AttractionManagement = () => {
                     {attractions.map((attraction) => (
                         <li key={attraction.ins_id} className="flex justify-between items-center p-3 border rounded-md bg-gray-50">
                             <div>
-                                <p className="font-semibold">{attraction.inspectable?.name}</p>
-                                <p className="text-sm text-gray-600">Descripción: {attraction.inspectable?.description}</p>
-                                <p className="text-sm text-gray-600">Premisa: {getPremiseName(attraction.inspectable?.premise_id)}</p>
+                                <p className="font-semibold">{attraction.parentInspectable?.name}</p>
+                                <p className="text-sm text-gray-600">Descripción: {attraction.parentInspectable?.description}</p>
+                                <p className="text-sm text-gray-600">Premisa: {getPremiseName(attraction.parentInspectable?.premise_id)}</p>
                                 <p className="text-sm text-gray-600">Público: {attraction.public_flag}</p>
                                 <p className="text-sm text-gray-600">Capacidad: {attraction.capacity}</p>
-                                {attraction.inspectable?.photo_url && (
-                                    <img src={`${API_BASE_URL}${attraction.inspectable.photo_url}`} alt="Foto de identificación" className="w-20 h-20 object-cover mt-2 rounded" />
+                                {attraction.parentInspectable?.photo_url && (
+                                    <img src={`${API_BASE_URL}${attraction.parentInspectable.photo_url}`} alt="Foto de identificación" className="w-20 h-20 object-cover mt-2 rounded" />
                                 )}
                             </div>
                             <div>
