@@ -10,7 +10,7 @@ Maneja cambios en las respuestas de ítems individuales.
 
 **Parámetros:**
 - `itemId`: ID único del ítem del checklist
-- `field`: Campo que se está modificando ('response_compliance', 'comment', 'evidence_url', etc.)
+- `field`: Campo que se está modificando ('response_compliance', etc.)
 - `value`: Nuevo valor para el campo
 
 **Funcionalidad:**

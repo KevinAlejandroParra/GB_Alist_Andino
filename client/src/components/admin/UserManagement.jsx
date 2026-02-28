@@ -15,6 +15,12 @@ export default function UserManagement() {
         premise_id: '',
         entity_id: '',
     });
+    
+    // Estados para paginación
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalUsers, setTotalUsers] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
+    const usersPerPage = 10;
 
     const URL_API = `${process.env.NEXT_PUBLIC_API}`; 
 
@@ -22,7 +28,7 @@ export default function UserManagement() {
         fetchData();
     }, []);
 
-    const fetchData = async () => {
+    const fetchData = async (page = 1) => {
         setLoading(true);
         try {
             const token = localStorage.getItem('authToken');
@@ -31,7 +37,7 @@ export default function UserManagement() {
             };
 
             const [usersRes, rolesRes, premisesRes, entitiesRes] = await Promise.all([
-                fetch(`${URL_API}/api/users`, { headers }),
+                fetch(`${URL_API}/api/users?page=${page}`, { headers }),
                 fetch(`${URL_API}/api/roles`, { headers }),
                 fetch(`${URL_API}/api/premises`, { headers }),
                 fetch(`${URL_API}/api/entities`, { headers }),
@@ -50,6 +56,11 @@ export default function UserManagement() {
             setRoles(rolesData.data);
             setPremises(premisesData.data);
             setEntities(entitiesData.data);
+            
+            // Actualizar datos de paginación
+            setTotalUsers(usersData.total);
+            setTotalPages(Math.ceil(usersData.total / usersPerPage));
+            setCurrentPage(page);
 
         } catch (err) {
             setError(err.message);
@@ -100,7 +111,7 @@ export default function UserManagement() {
                 entity_id: '',
             });
             setCurrentUser(null);
-            fetchData(); 
+            fetchData(currentPage); // Recargar la página actual
         } catch (err) {
             setError(err.message);
         } finally {
@@ -125,12 +136,142 @@ export default function UserManagement() {
             if (!response.ok) {
                 throw new Error('Error al cambiar el estado del usuario');
             }
-            fetchData(); 
+            fetchData(currentPage); // Recargar la página actual
         } catch (err) {
             setError(err.message);
         } finally {
             setLoading(false);
         }
+    };
+
+    // Funciones para manejar la paginación
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= totalPages) {
+            fetchData(newPage);
+        }
+    };
+
+    const renderPagination = () => {
+        const pageNumbers = [];
+        const maxVisiblePages = 5;
+        
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+        
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(i);
+        }
+
+        return (
+            <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4">
+                <div className="flex flex-1 justify-between sm:hidden">
+                    <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Anterior
+                    </button>
+                    <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Siguiente
+                    </button>
+                </div>
+                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                    <div>
+                        <p className="text-sm text-gray-700">
+                            Mostrando{' '}
+                            <span className="font-medium">{((currentPage - 1) * usersPerPage) + 1}</span>
+                            {' '}a{' '}
+                            <span className="font-medium">
+                                {Math.min(currentPage * usersPerPage, totalUsers)}
+                            </span>
+                            {' '}de{' '}
+                            <span className="font-medium">{totalUsers}</span>
+                            {' '}resultados
+                        </p>
+                    </div>
+                    <div>
+                        <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                            <button
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span className="sr-only">Anterior</span>
+                                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                                </svg>
+                            </button>
+                            
+                            {startPage > 1 && (
+                                <>
+                                    <button
+                                        onClick={() => handlePageChange(1)}
+                                        className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                                    >
+                                        1
+                                    </button>
+                                    {startPage > 2 && (
+                                        <span className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-inset ring-gray-300">
+                                            ...
+                                        </span>
+                                    )}
+                                </>
+                            )}
+                            
+                            {pageNumbers.map((page) => (
+                                <button
+                                    key={page}
+                                    onClick={() => handlePageChange(page)}
+                                    className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                                        page === currentPage
+                                            ? 'z-10 bg-purple-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600'
+                                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
+                                    }`}
+                                >
+                                    {page}
+                                </button>
+                            ))}
+                            
+                            {endPage < totalPages && (
+                                <>
+                                    {endPage < totalPages - 1 && (
+                                        <span className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-inset ring-gray-300">
+                                            ...
+                                        </span>
+                                    )}
+                                    <button
+                                        onClick={() => handlePageChange(totalPages)}
+                                        className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                                    >
+                                        {totalPages}
+                                    </button>
+                                </>
+                            )}
+                            
+                            <button
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span className="sr-only">Siguiente</span>
+                                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                                </svg>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     if (loading) return <p>Cargando datos...</p>;
@@ -261,6 +402,9 @@ export default function UserManagement() {
                     </tbody>
                 </table>
             </div>
+            
+            {/* Componente de paginación */}
+            {totalPages > 1 && renderPagination()}
         </div>
     );
 }

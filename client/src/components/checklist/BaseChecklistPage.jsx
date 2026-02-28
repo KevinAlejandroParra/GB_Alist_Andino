@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -22,8 +22,13 @@ import { useSignature } from './hooks/useSignature';
 import { useChecklistValidation } from './hooks/useChecklistValidation';
 import { useChecklistActions } from './hooks/useChecklistActions';
 import { useQrCode } from './hooks/useQrCode';
+import useFailureRequisitionSystem from './hooks/useFailureRequisitionSystem';
 import QrScannerModal from './QrScannerModal';
 import QrUnlockBar from './QrUnlockBar';
+
+import CreateFailureWithRequisitionModal from './CreateFailureWithRequisitionModal';
+import WorkOrderPartsManager from './WorkOrderPartsManager';
+import InventorySearchModal from './InventorySearchModal';
 import axiosInstance from '../../utils/axiosConfig';
 
 export default function BaseChecklistPage({
@@ -37,8 +42,9 @@ export default function BaseChecklistPage({
   preselectedEntity = null,
   customActions = [],
 }) {
-  const [pendingFailures, setPendingFailures] = useState([]);
-  const [closedFailures, setClosedFailures] = useState([]);
+  // Estados obsoletos eliminados - ahora usa useWorkOrderDetection
+  const [showCreateFailureModal, setShowCreateFailureModal] = useState(false);
+  const [showInventorySearchModal, setShowInventorySearchModal] = useState(false);
   const router = useRouter();
   const { user } = useAuth();
   const [showValidationErrors, setShowValidationErrors] = useState(false);
@@ -83,6 +89,12 @@ export default function BaseChecklistPage({
   }, [originalChecklistData]);
 
   const responseManager = useResponseManagement(checklistData.checklist);
+
+  // Hook para el sistema de fallas y requisiciones (mover arriba antes de su uso)
+  const failureSystem = useFailureRequisitionSystem(user);
+
+  // ✅ NUEVO: Mostrar indicador de fallas pendientes
+  const pendingFailuresCount = failureSystem.pendingFailures.length;
 
   // Memoizar los parámetros de QR para evitar re-creaciones innecesarias
   const qrParams = useMemo(() => ({
@@ -164,7 +176,7 @@ export default function BaseChecklistPage({
         sig => sig.role_id === 7 || sig.role_at_signature === '7' || sig.role?.role_name === 'Tecnico de mantenimiento'
       );
       const hasOperationsSignature = checklistData.checklist.signatures.some(
-        sig => sig.role_id === 4 || sig.role_at_signature === '4' || sig.role?.role_name === 'Jefe de Operaciones'
+        sig => sig.role_id === 2 || sig.role_at_signature === '2' || sig.role?.role_name === 'Soporte'
       );
 
       if (hasTechnicalSignature && hasOperationsSignature) {
@@ -193,82 +205,20 @@ export default function BaseChecklistPage({
     qrManager.updateProgressFromResponses
   ]);
 
-  // Cargar fallas cuando el checklist cambia
-  useEffect(() => {
-    const fetchFailures = async () => {
-      if (!checklistData.checklist?.checklist_id || !user || !user.token) return;
-
-      try {
-        const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
-        const [pendingRes, closedRes] = await Promise.all([
-          axiosInstance.get(`${API_URL}/api/work-orders/pending/checklist/${checklistData.checklist.checklist_id}`),
-          axiosInstance.get(`${API_URL}/api/work-orders/closed/checklist/${checklistData.checklist.checklist_id}`)
-        ]);
-
-        setPendingFailures(pendingRes.data);
-        setClosedFailures(closedRes.data);
-      } catch (error) {
-        console.error("Error al cargar las fallas:", error);
-      }
-    };
-
-    fetchFailures();
-  }, [checklistData.checklist?.checklist_id, user]);
-
-  const handleCloseFailure = useCallback(async (failureId, solutionText, responsibleArea) => {
-    if (!user || !user.token || !user.user_id) {
-      alert('No estás autenticado. Por favor, inicia sesión de nuevo.');
-      return;
-    }
-
-    try {
-      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
-      await axiosInstance.put(
-        `${API_URL}/api/checklists/failures/${failureId}`,
-        {
-          solution_text: solutionText,
-          responsible_area: responsibleArea,
-          status: "resuelto",
-          closed_by: user.user_id,
-        }
-      );
-
-      // Actualizar las listas de fallas
-      setPendingFailures(prev => prev.filter(f => f.failure_id !== failureId));
-      const closedFailure = pendingFailures.find(f => f.failure_id === failureId);
-      if (closedFailure) {
-        setClosedFailures(prev => [...prev, {
-          ...closedFailure,
-          status: "resuelto",
-          solution_text: solutionText,
-          responsible_area: responsibleArea,
-          closed_by: user.user_id
-        }]);
-      }
-    } catch (error) {
-      console.error("Error al cerrar la falla:", error);
-      throw error;
-    }
-  }, [user]);
 
   const validation = useChecklistValidation(config);
   const { handleFileUpload } = useFileUpload(user);
   const { handleDownloadPdf } = useChecklistActions(config, user, checklistTypeId);
 
-  // Función para obtener la URL completa de la evidencia
-  const getEvidenceUrl = useCallback((filePath) => {
-    if (!filePath) return '';
-    const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
-    return `${API_URL}${filePath}`;
-  }, []);
-  
+
   const signatureManager = useSignature(
     user,
     checklistData.checklist,
     () => {
       originalChecklistData.refreshChecklistData();
       responseManager.resetModifications();
-    }
+    },
+    responseManager.hasExistingResponses
   );
 
   const handleSave = useCallback(async () => {
@@ -282,39 +232,69 @@ export default function BaseChecklistPage({
       return;
     }
 
-    await responseManager.saveResponses(
-      dynamicConfig,
-      user,
-      checklistTypeId,
-      signatureManager.signature,
-      validation,
-      (success, errors) => {
-        if (!success) {
-          setShowValidationErrors(true);
-          
-          // Si hay errores específicos de validación, mostrarlos con SweetAlert
-          if (errors && errors.length > 0) {
-            const validationErrors = errors.filter(err =>
-              err.message?.includes('comentario') ||
-              err.message?.includes('evidencia')
-            );
-            
-            if (validationErrors.length > 0) {
-              const firstError = validationErrors[0];
+    const handleSaveSuccess = (success, errors, savedResponses) => {
+      if (success && savedResponses) {
+        responseManager.updateResponseIds(savedResponses);
+
+        responseManager.forceUpdateExistingResponses();
+
+        // Después de guardar exitosamente, crear fallas pendientes
+        if (failureSystem.pendingFailures.length > 0) {
+          try {
+            console.log('🔧 Creando fallas pendientes después de guardar checklist...');
+            console.log('📄 Respuestas guardadas:', savedResponses);
+            console.log('⏳ Fallas pendientes:', failureSystem.pendingFailures);
+            const failureResult = failureSystem.createPendingFailuresAfterSave(savedResponses, user);
+
+            if (failureResult.success) {
+              if (failureResult.created.length > 0) {
+                Swal.fire({
+                  title: "¡Checklist y Fallas Creadas!",
+                  text: `Checklist guardado exitosamente. Se crearon ${failureResult.created.length} falla(s) automáticamente.`,
+                  icon: "success",
+                  confirmButtonColor: "#7c3aed",
+                });
+              }
+            } else {
+              // Mostrar errores pero no bloquear el flujo
+              console.error('Errores creando algunas fallas:', failureResult.errors);
               Swal.fire({
-                title: "Campos obligatorios faltantes",
-                text: firstError.message || "Debe completar los campos obligatorios",
+                title: "Checklist Guardado",
+                text: `El checklist se guardó correctamente, pero hubo errores creando algunas fallas. Revisa la consola para más detalles.`,
                 icon: "warning",
-                confirmButtonColor: "#7c3aed",
+                confirmButtonColor: "#f59e0b",
               });
             }
+          } catch (error) {
+            console.error('Error creando fallas pendientes:', error);
+            Swal.fire({
+              title: "Checklist Guardado",
+              text: "El checklist se guardó correctamente, pero hubo un error procesando las fallas pendientes.",
+              icon: "warning",
+              confirmButtonColor: "#f59e0b",
+            });
           }
-        } else {
-          setShowValidationErrors(false);
-          checklistData.refreshChecklistData();
         }
       }
-    );
+    };
+
+    try {
+      responseManager.saveResponses(
+        dynamicConfig,
+        user,
+        checklistTypeId,
+        signatureManager.signature,
+        validation,
+        handleSaveSuccess
+      );
+    } catch (error) {
+      console.error('Error al guardar:', error);
+      Swal.fire({
+        title: 'Error',
+        text: error.response?.data?.message || 'No se pudo guardar el checklist',
+        icon: 'error'
+      });
+    }
   }, [
     config,
     checklistData.checklist?.checklist_id,
@@ -323,8 +303,19 @@ export default function BaseChecklistPage({
     signatureManager.signature,
     validation,
     responseManager.saveResponses,
-    originalChecklistData.refreshChecklistData
+    responseManager.updateResponseIds,
+    responseManager.forceUpdateExistingResponses,
+    originalChecklistData.refreshChecklistData,
+    failureSystem
   ]);
+
+  const handleCreateFailureSuccess = (data) => {
+    if (data.action === 'open_requisition_modal') {
+      setShowInventorySearchModal(true);
+    } else {
+      window.location.reload();
+    }
+  };
 
   if (checklistData.loading || !user) {
     return (
@@ -368,6 +359,33 @@ export default function BaseChecklistPage({
         <ChecklistHeader pageTitle={pageTitle} breadcrumbItems={breadcrumbItems} />
 
         <div className="space-y-6">
+          {/* ✅ NUEVO: Mostrar indicador de fallas pendientes */}
+          {pendingFailuresCount > 0 && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="flex items-center space-x-3">
+                <div className="text-orange-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h5 className="text-sm font-medium text-orange-800">
+                    {pendingFailuresCount} Falla{pendingFailuresCount > 1 ? 's' : ''} Programada{pendingFailuresCount > 1 ? 's' : ''}
+                  </h5>
+                  <p className="text-sm text-orange-700">
+                    Se crear{pendingFailuresCount > 1 ? 'án' : 'á'} automáticamente después de enviar el checklist
+                  </p>
+                </div>
+                <button
+                  onClick={() => failureSystem.clearPendingFailures()}
+                  className="text-orange-600 hover:text-orange-800 text-sm underline"
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Mostrar historial de escaneos QR si existe */}
           <QrScanHistory
             qrScans={qrManager.qrScans}
@@ -387,10 +405,9 @@ export default function BaseChecklistPage({
               hasExistingResponses={responseManager.hasExistingResponses}
               handleResponseChange={handleResponseChangeWithQrUpdate}
               handleResponseTypeChange={responseManager.handleResponseTypeChange}
-              handleFileUpload={(itemId, file) => handleFileUpload(itemId, file, (uploadedItemId, filePath) => handleResponseChangeWithQrUpdate(uploadedItemId, 'evidence_url', filePath))}
+              handleFileUpload={() => { }}
               handleMarkAllSiblings={responseManager.handleMarkAllSiblings}
               config={config}
-              getEvidenceUrl={getEvidenceUrl}
               disabled={false}
               isItemUnlocked={qrManager.isItemUnlocked}
               onUnlockSection={(item) => qrManager.setShowQrModal(true)}
@@ -403,16 +420,26 @@ export default function BaseChecklistPage({
             onSave={handleSave}
             onDownload={handleDownloadPdf}
             allowDownload={config.allowDownload}
-            customActions={config.customActions}
+            customActions={[
+              ...(config.customActions || []),
+              {
+                label: '🔧 Nueva Falla con Repuesto',
+                onClick: () => setShowCreateFailureModal(true),
+                className: 'bg-blue-600 hover:bg-blue-700'
+              },
+              {
+                label: '📋 Ver Mis Fallas',
+                onClick: () => router.push('/tecnico/fallas'),
+                className: 'bg-purple-600 hover:bg-purple-700'
+              }
+            ]}
             disabled={isLocked || qrManager.isQrRequired}
             hasExistingResponses={responseManager.hasExistingResponses}
           />
 
-         {/* Mostrar la lista de firmas existentes */}
-         <SignatureList signatures={checklistData.checklist?.signatures} />
+          {/* Mostrar la lista de firmas existentes */}
+          <SignatureList signatures={checklistData.checklist?.signatures} />
         </div>
-
-
 
         {signatureManager.showSignaturePad && (
           <SignaturePad
@@ -423,21 +450,47 @@ export default function BaseChecklistPage({
         )}
 
         {showValidationErrors && (
-           <ValidationErrors
-             errors={validation.errors}
-             onClose={() => setShowValidationErrors(false)}
-           />
-         )}
+          <ValidationErrors
+            errors={validation.errors}
+            onClose={() => setShowValidationErrors(false)}
+          />
+        )}
 
-         {/* Modal de escáner QR para checklists de atracción */}
-         <QrScannerModal
-           show={qrManager.showQrModal}
-           onClose={qrManager.isQrRequired ? null : () => qrManager.setShowQrModal(false)}
-           onScanSuccess={qrManager.handleQrScanSuccess}
-           checklistTypeId={checklistTypeId}
-           checklistId={checklistData.checklist?.checklist_id}
-           title="📱 Escanear Código QR de Autorización"
-         />
+        {/* Modal de escáner QR para checklists de atracción */}
+        <QrScannerModal
+          show={qrManager.showQrModal}
+          onClose={qrManager.isQrRequired ? null : () => qrManager.setShowQrModal(false)}
+          onScanSuccess={qrManager.handleQrScanSuccess}
+          checklistTypeId={checklistTypeId}
+          checklistId={checklistData.checklist?.checklist_id}
+          title="📱 Escanear Código QR de Autorización"
+        />
+        {/* Modal para crear falla con requisición */}
+        <CreateFailureWithRequisitionModal
+          show={showCreateFailureModal}
+          onClose={() => setShowCreateFailureModal(false)}
+          onSuccess={handleCreateFailureSuccess}
+          checklistResponseId={null}
+          checklistItemId={null}
+          inspectableId={checklistData.checklist?.inspectable_id}
+          checklistData={checklistData}
+          responseManager={responseManager}
+          failureSystem={failureSystem}
+          user={user}
+          checklistTypeId={checklistTypeId}
+        />
+
+        {/* Modal de búsqueda de inventario */}
+        {showInventorySearchModal && (
+          <InventorySearchModal
+            show={showInventorySearchModal}
+            onClose={() => setShowInventorySearchModal(false)}
+            onPartSelected={(part) => { }}
+            onPartNotFound={() => { }}
+            workOrderId={null}
+            allowMultiple={true}
+          />
+        )}
 
       </div>
     </ProtectedRoute>

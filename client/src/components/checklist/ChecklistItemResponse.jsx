@@ -21,19 +21,32 @@ export default function ChecklistItemResponse({
   const [showFileInput, setShowFileInput] = useState(false)
 
   const responseBadgeClass = (value) => {
-    switch (value) {
-      case "cumple":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "no_cumple":
-        return "bg-red-100 text-red-800 border-red-200"
-      case "observaciones":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
-    }
+    // Normalizar el valor de entrada para asegurar coincidencia
+    const v = String(value || '').toLowerCase().trim();
+    
+    if (v === 'cumple') return "bg-green-100 text-green-800 border-green-200";
+    
+    if (v.includes('no_cumple') || v.includes('no cumple')) 
+      return "bg-red-100 text-red-800 border-red-200";
+      
+    if (v.includes('observ')) 
+      return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      
+    return "bg-gray-100 text-gray-800 border-gray-200";
   }
 
-  const canUploadEvidence = !isLocked && (itemResponse?.response_type === "no_cumple" || itemResponse?.response_type === "observaciones")
+  // Helper para normalizar el tipo de respuesta actual
+  const getNormalizedResponseType = () => {
+    // Intentar obtener el tipo de respuesta, o el valor si el tipo no está definido
+    const v = String(itemResponse?.response_type || itemResponse?.value || '').toLowerCase().trim();
+    if (v === 'cumple') return 'cumple';
+    if (v.includes('no') && v.includes('cumple')) return 'no_cumple';
+    if (v.includes('observ')) return 'observaciones';
+    return v;
+  };
+  
+  const currentNormalizedType = getNormalizedResponseType();
+  const canUploadEvidence = !isLocked && (currentNormalizedType === "no_cumple" || currentNormalizedType === "observaciones")
 
   return (
     <div className="bg-white rounded-xl border-2 border-gray-100 p-4 space-y-4">
@@ -64,7 +77,7 @@ export default function ChecklistItemResponse({
             onClick={() => handleResponseTypeChange(item.checklist_item_id, "cumple")}
             disabled={isLocked}
             className={`px-4 py-2 rounded-lg border ${
-              itemResponse?.response_type === "cumple"
+              currentNormalizedType === "cumple"
                 ? "bg-green-100 text-green-800 border-green-200"
                 : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
             } transition-colors duration-200`}
@@ -75,7 +88,7 @@ export default function ChecklistItemResponse({
             onClick={() => handleResponseTypeChange(item.checklist_item_id, "no_cumple")}
             disabled={isLocked}
             className={`px-4 py-2 rounded-lg border ${
-              itemResponse?.response_type === "no_cumple"
+              currentNormalizedType === "no_cumple"
                 ? "bg-red-100 text-red-800 border-red-200"
                 : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
             } transition-colors duration-200`}
@@ -86,7 +99,7 @@ export default function ChecklistItemResponse({
             onClick={() => handleResponseTypeChange(item.checklist_item_id, "observaciones")}
             disabled={isLocked}
             className={`px-4 py-2 rounded-lg border ${
-              itemResponse?.response_type === "observaciones"
+              currentNormalizedType === "observaciones"
                 ? "bg-yellow-100 text-yellow-800 border-yellow-200"
                 : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
             } transition-colors duration-200`}
@@ -105,88 +118,19 @@ export default function ChecklistItemResponse({
           />
         )}
 
-        {itemResponse?.response_type && (itemResponse.response_type === "no_cumple" || itemResponse.response_type === "observaciones") && (
-          <>
-            <div>
-              <textarea
-                value={itemResponse?.comment || ""}
-                onChange={(e) =>
-                  handleResponseChange(item.checklist_item_id, "comment", e.target.value)
-                }
-                disabled={isLocked}
-                placeholder="Agregar comentario..."
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                rows={3}
-              />
-            </div>
-
-            {canUploadEvidence && (
-              <div>
-                {showFileInput ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      onChange={(e) =>
-                        handleFileUpload(item.checklist_item_id, e.target.files[0])
-                      }
-                      accept="image/*"
-                      className="flex-1"
-                    />
-                    <button
-                      onClick={() => setShowFileInput(false)}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setShowFileInput(true)}
-                      className="flex items-center px-4 py-2 text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors duration-200"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                        />
-                      </svg>
-                      Subir Evidencia
-                    </button>
-                    {itemResponse?.evidence_url && (
-                      <div className="flex items-center gap-2">
-                        <img
-                          src={getEvidenceUrl(itemResponse.evidence_url)}
-                          alt="Evidencia"
-                          className="w-20 h-20 object-cover rounded-lg border border-gray-200"
-                        />
-                        <a
-                          href={getEvidenceUrl(itemResponse.evidence_url)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center px-4 py-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors duration-200"
-                        >
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                            />
-                          </svg>
-                          Ver Evidencia
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                )}
+        {itemResponse?.response_type && (currentNormalizedType === "no_cumple" || currentNormalizedType === "observaciones") && (
+          <div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-start space-x-2">
+                <svg className="w-4 h-4 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-blue-700">
+                  Los comentarios y evidencia se capturarán en el modal de fallas al seleccionar "observación" o "no cumple".
+                </p>
               </div>
-            )}
-          </>
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -6,7 +6,7 @@ import { useAuth } from '../AuthContext' // Importar el hook de autenticación
 export default function HistorySection({
   historicalChecklists,
   expandedHistoricalChecklists,
-  toggleHistoricalChecklist,
+  onToggleExpand,
 }) {
   const { user } = useAuth() // Obtener el usuario del contexto
   const [downloading, setDownloading] = React.useState(null) // Estado para feedback de descarga
@@ -21,7 +21,7 @@ export default function HistorySection({
 
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API}/api/checklists/${checklistId}/download-pdf`,
+        `${process.env.NEXT_PUBLIC_API}/api/checklists/${checklistId}/download`,
         {
           headers: {
             Authorization: `Bearer ${user.token}`,
@@ -64,7 +64,7 @@ export default function HistorySection({
                 <div className="p-4 flex justify-between items-center bg-gray-50 rounded-t-lg">
                   <div
                     className="flex-grow cursor-pointer"
-                    onClick={() => toggleHistoricalChecklist(historyChecklist.checklist_id)}
+                    onClick={() => onToggleExpand(historyChecklist.checklist_id)}
                   >
                     <h3 className="text-lg font-medium text-gray-800">
                       Checklist del {formatLocalDate(historyChecklist.createdAt)}
@@ -75,7 +75,7 @@ export default function HistorySection({
                     </p>
                   </div>
                   <div className="flex items-center">
-                    {user && user.role_id == 4 && (
+                    {user && user.role_id == 1 && (
                       <button
                         onClick={() => handleDownload(historyChecklist.checklist_id, historyChecklist.createdAt)}
                         disabled={downloading === historyChecklist.checklist_id}
@@ -86,7 +86,7 @@ export default function HistorySection({
                     )}
                     <div
                       className="text-xl text-gray-500 ml-4 cursor-pointer"
-                      onClick={() => toggleHistoricalChecklist(historyChecklist.checklist_id)}
+                      onClick={() => onToggleExpand(historyChecklist.checklist_id)}
                     >
                       {expandedHistoricalChecklists[historyChecklist.checklist_id] ? '▲' : '▼'}
                     </div>
