@@ -15,7 +15,7 @@ module.exports = {
         unique: true,
         comment: 'Identificador único de la orden de falla'
       },
-      
+
       // Información básica de la falla
       description: {
         type: Sequelize.TEXT,
@@ -27,7 +27,7 @@ module.exports = {
         allowNull: true,
         comment: 'URL de la evidencia (imagen) de la falla'
       },
-      
+
       is_recurring: {
         type: Sequelize.BOOLEAN,
         allowNull: false,
@@ -40,12 +40,34 @@ module.exports = {
         defaultValue: 1,
         comment: 'Número de veces que se ha reportado esta falla recurrente'
       },
-      closure_signature: {
+      report_signature: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+        comment: 'Firma digital del usuario al reportar la falla'
+      },
+
+      admin_signature: {
         type: Sequelize.TEXT('long'),
         allowNull: true,
-        comment: 'Firma digital para cierre de la falla'
+        comment: 'Firma digital del administrador que aprueba la falla'
       },
-      
+      admin_signature_by_id: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'users',
+          key: 'user_id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL',
+        comment: 'ID del usuario administrador que firmó la falla'
+      },
+      admin_signature_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+        comment: 'Fecha y hora de la firma del administrador'
+      },
+
       // Asignación y categorización
       assigned_to: {
         type: Sequelize.ENUM('TECNICA', 'OPERATIVA'),
@@ -65,7 +87,7 @@ module.exports = {
         defaultValue: 'LEVE',
         comment: 'Nivel de severidad/urgencia de la falla'
       },
-      
+
       // Relaciones
       reported_by_id: {
         type: Sequelize.INTEGER,
@@ -100,7 +122,7 @@ module.exports = {
         onDelete: 'CASCADE',
         comment: 'ID del ítem del checklist donde se reportó la falla. NULL si fue reporte independiente.'
       },
-      
+
       // Campos de auditoría
       createdAt: {
         allowNull: false,
@@ -158,11 +180,20 @@ module.exports = {
     });
 
     await queryInterface.addIndex('failure_orders', {
-      name: 'idx_failure_orders_recurring_count',
+      name: 'idx_failure_orders_recurrence_count',
       fields: ['recurrence_count']
     });
 
-   
+    // ✅ NUEVO: Índices para firma del administrador
+    await queryInterface.addIndex('failure_orders', {
+      name: 'idx_failure_orders_admin_signature_by',
+      fields: ['admin_signature_by_id']
+    });
+
+    await queryInterface.addIndex('failure_orders', {
+      name: 'idx_failure_orders_admin_signature_at',
+      fields: ['admin_signature_at']
+    });
 
     // Índices compuestos para consultas frecuentes
     await queryInterface.addIndex('failure_orders', {
@@ -178,13 +209,13 @@ module.exports = {
     } catch (error) {
       console.log('Foreign key constraint already removed or not found');
     }
-    
+
     try {
       await queryInterface.removeConstraint('failure_orders', 'failure_orders_ibfk_2');
     } catch (error) {
       console.log('Foreign key constraint already removed or not found');
     }
-    
+
     try {
       await queryInterface.removeConstraint('failure_orders', 'failure_orders_ibfk_3');
     } catch (error) {
@@ -201,12 +232,14 @@ module.exports = {
       'idx_failure_orders_checklist_item_id',
       'idx_failure_orders_created_at',
       'idx_failure_orders_is_recurring',
-      'idx_failure_orders_recurring_count',
+      'idx_failure_orders_recurrence_count',
+      'idx_failure_orders_admin_signature_by',
+      'idx_failure_orders_admin_signature_at',
       'idx_failure_orders_assigned_severity',
       'idx_failure_orders_type_severity',
       'idx_failure_orders_recurring_status'
     ];
-    
+
     for (const indexName of indices) {
       try {
         await queryInterface.removeIndex('failure_orders', indexName);
@@ -214,7 +247,7 @@ module.exports = {
         console.log(`Índice ${indexName} no existe o ya fue eliminado`);
       }
     }
-    
+
     // Eliminar la tabla failure_orders al final
     await queryInterface.dropTable('failure_orders');
   }

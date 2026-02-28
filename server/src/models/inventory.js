@@ -52,11 +52,6 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: false,
                 comment: 'Categoría del repuesto'
             },
-            image_url: {
-                type: DataTypes.STRING,
-                allowNull: true,
-                comment: 'URL de la imagen del repuesto'
-            },
             createdAt: {
                 type: DataTypes.DATE,
                 defaultValue: DataTypes.NOW,

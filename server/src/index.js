@@ -14,6 +14,10 @@ const checklistRoutes = require("./routes/checklist.routes");
 const familyChecklistRoutes = require("./routes/familyChecklist.routes");
 const checklistTypeRoutes = require("./routes/checklistTypeRoutes");
 const workOrderRoutes = require("./routes/workOrderRoutes");
+const failureRoutes = require("./routes/failureRoutes");
+const failureRequisitionRoutes = require("./routes/failureRequisitionRoutes");
+const inventoryRoutes = require("./routes/inventoryRoutes");
+const requisitionRoutes = require("./routes/requisitionRoutes");
 const qrCodeRoutes = require("./routes/qrCodeRoutes");
 const swaggerUi = require('swagger-ui-express');
 const swaggerFile = require('./swagger-output.json');
@@ -26,23 +30,15 @@ const upload = multerConfig; // Alias para compatibilidad
 
 // Configurar middleware en orden correcto
 app.use(cors({
-  origin: "*",
+  origin: ["https://tfdbsvwq-3000.use2.devtunnels.ms"],
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 }));
 
 // Configurar body parsing DESPUÉS de CORS
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
-
-// Headers adicionales para CORS y tipos de contenido
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  next();
-});
 app.use(express.static(path.join(__dirname, "../public"), {
    setHeaders: (res, path) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -77,6 +73,11 @@ app.use("/api/checklists", checklistRoutes);
 app.use("/api/checklists", familyChecklistRoutes);
 app.use("/api", checklistTypeRoutes);
 app.use("/api/work-orders", workOrderRoutes);
+app.use("/api/failures", failureRoutes);
+app.use("/api/checklists/failures", failureRoutes);
+app.use("/api", failureRequisitionRoutes);
+app.use("/api/inventory", inventoryRoutes);
+app.use("/api/requisitions", requisitionRoutes);
 app.use("/api", qrCodeRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 

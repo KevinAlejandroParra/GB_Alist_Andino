@@ -9,20 +9,26 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'reported_by_id',
         as: 'reporter'
       });
-  
+
       // Relación con el ítem del checklist
       FailureOrder.belongsTo(models.ChecklistItem, {
         foreignKey: 'checklist_item_id',
         as: 'checklistItem',
         onDelete: 'CASCADE'
       });
-  
+
       // Relación con el inspectable (atracción/dispositivo/área afectada)
       FailureOrder.belongsTo(models.Inspectable, {
         foreignKey: 'affected_id',
         as: 'affectedInspectable'
       });
-  
+
+      FailureOrder.belongsTo(models.User, {
+        foreignKey: 'admin_signature_by_id',
+        as: 'adminSigner',
+        onDelete: 'SET NULL'
+      });
+
       // Relación con la orden de trabajo (1:1 - si existe)
       FailureOrder.hasOne(models.WorkOrder, {
         foreignKey: 'failure_order_id',
@@ -69,11 +75,29 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 1,
       comment: 'Número de veces que se ha reportado esta falla recurrente'
     },
-    // ✅ NUEVO: Campo de firma para cierre
-    closure_signature: {
-      type: DataTypes.STRING(1000),
+    
+    // ✅ NUEVO: Campo de firma para reporte
+    report_signature: {
+      type: DataTypes.TEXT,
       allowNull: true,
-      comment: 'Firma digital para cierre de la falla'
+      comment: 'Firma digital del usuario al reportar la falla'
+    },
+    
+    // ✅ NUEVO: Campos de firma del administrador
+    admin_signature: {
+      type: DataTypes.TEXT('long'),
+      allowNull: true,
+      comment: 'Firma digital del administrador que aprueba la falla'
+    },
+    admin_signature_by_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'ID del usuario administrador que firmó la falla'
+    },
+    admin_signature_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Fecha y hora de la firma del administrador'
     },
 
     // Asignación y categorización
@@ -128,7 +152,10 @@ module.exports = (sequelize, DataTypes) => {
       // ✅ NUEVO: Índices para campos de recurrencia
       { fields: ['is_recurring'] },
       { fields: ['recurrence_count'] },
-      { fields: ['closure_signature'] },
+      // ✅ NUEVO: Índices para firma del administrador
+      { fields: ['admin_signature_by_id'] },
+      { fields: ['admin_signature_at'] },
+
       { fields: ['assigned_to', 'severity'] },
       { fields: ['type_maintenance', 'severity'] },
       { fields: ['is_recurring', 'severity'] }

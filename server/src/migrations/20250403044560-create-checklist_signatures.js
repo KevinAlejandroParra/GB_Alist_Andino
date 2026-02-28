@@ -14,34 +14,55 @@ module.exports = {
             user_id: {
                 type: Sequelize.INTEGER,
                 allowNull: false,
+                references: {
+                    model: 'users',
+                    key: 'user_id'
+                },
+                onUpdate: 'CASCADE',
+                onDelete: 'CASCADE',
+                comment: 'ID del usuario que firma'
             },
             checklist_id: {
                 type: Sequelize.INTEGER,
-                allowNull: true, // Ahora opcional para firmas de fallas
+                allowNull: false,
+                references: {
+                    model: 'checklists',
+                    key: 'checklist_id'
+                },
+                onUpdate: 'CASCADE',
+                onDelete: 'CASCADE',
+                comment: 'ID del checklist que se está firmando'
             },
-            failure_order_id: {
+            role_id: {
                 type: Sequelize.INTEGER,
-                allowNull: true, // Para firmas de fallas
+                allowNull: false,
+                references: {
+                    model: 'roles',
+                    key: 'role_id'
+                },
+                onUpdate: 'CASCADE',
+                onDelete: 'RESTRICT',
+                comment: 'ID del rol del usuario al momento de firmar'
             },
             signed_at: {
                 type: Sequelize.DATE,
                 allowNull: false,
-            },
-            role_at_signature: {
-                type: Sequelize.STRING,
-                allowNull: false,
-            },
-            signature_type: {
-                type: Sequelize.STRING,
-                allowNull: false, // 'REPORT', 'RESOLUTION', 'CLOSE'
+                comment: 'Fecha y hora de la firma'
             },
             signed_by_name: {
                 type: Sequelize.STRING,
                 allowNull: false,
+                comment: 'Nombre del firmante'
+            },
+            signature_image: {
+                type: DataTypes.TEXT('long'),
+                allowNull: true,
+                comment: 'Imagen de la firma digital'
             },
             digital_token: {
                 type: DataTypes.TEXT('long'),
                 allowNull: true,
+                comment: 'Token único de verificación de la firma'
             },
             createdAt: {
                 type: Sequelize.DATE,
@@ -54,6 +75,22 @@ module.exports = {
                 onUpdate: Sequelize.NOW,
                 allowNull: false,
             },
+        });
+
+        // Índices para optimizar consultas
+        await queryInterface.addIndex("checklist_signatures", {
+            name: 'idx_checklist_signatures_checklist_id',
+            fields: ['checklist_id']
+        });
+
+        await queryInterface.addIndex("checklist_signatures", {
+            name: 'idx_checklist_signatures_user_id',
+            fields: ['user_id']
+        });
+
+        await queryInterface.addIndex("checklist_signatures", {
+            name: 'idx_checklist_signatures_role_id',
+            fields: ['role_id']
         });
     },
     async down(queryInterface, Sequelize) {

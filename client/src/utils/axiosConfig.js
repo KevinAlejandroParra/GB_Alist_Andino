@@ -23,22 +23,17 @@ axiosInstance.interceptors.request.use(
   }
 )
 
-// Interceptor de respuesta para manejar errores 401
 axiosInstance.interceptors.response.use(
   (response) => {
-    // Si la respuesta es exitosa, simplemente la devolvemos
     return response
   },
   (error) => {
-    // Verificar si el error es 401 (token expirado o inválido)
     if (error.response?.status === 401) {
-      // Limpiar el token del localStorage
       localStorage.removeItem('authToken')
 
-      // Mostrar Sweet Alert personalizado para sesión caducada
       Swal.fire({
-        title: 'Sesión caducada',
-        text: 'La sesión ha caducado, vuelve a iniciar sesión',
+        title: 'Autenticación requerida',
+        text: 'Por favor, inicia sesión para continuar',
         icon: 'warning',
         confirmButtonText: 'Ir a iniciar sesión',
         confirmButtonColor: '#3085d6',
@@ -54,16 +49,13 @@ axiosInstance.interceptors.response.use(
         showDenyButton: false,
       }).then((result) => {
         if (result.isConfirmed) {
-          // Redirigir a la página de login
           window.location.href = '/login'
         }
       })
 
-      // Retornar una promesa rechazada para evitar que el código continúe
       return Promise.reject(error)
     }
 
-    // Para otros errores, simplemente los rechazamos
     return Promise.reject(error)
   }
 )

@@ -4,16 +4,10 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
     class ChecklistSignature extends Model {
         static associate(models) {
-            // Una firma pertenece a un checklist (opcional)
+            // Una firma pertenece a un checklist
             ChecklistSignature.belongsTo(models.Checklist, {
                 foreignKey: 'checklist_id',
                 as: 'checklist'
-            });
-
-            // Una firma puede pertenecer a una orden de falla (opcional)
-            ChecklistSignature.belongsTo(models.FailureOrder, {
-                foreignKey: 'failure_order_id',
-                as: 'failureOrder'
             });
 
             // Una firma pertenece a un usuario
@@ -22,9 +16,9 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'user'
             });
 
-            // Una firma puede pertenecer a un rol
+            // Una firma pertenece a un rol
             ChecklistSignature.belongsTo(models.Role, {
-                foreignKey: 'role_at_signature',
+                foreignKey: 'role_id',
                 as: 'role'
             });
         }
@@ -39,34 +33,37 @@ module.exports = (sequelize, DataTypes) => {
             user_id: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
+                comment: 'ID del usuario que firma'
             },
             checklist_id: {
                 type: DataTypes.INTEGER,
-                allowNull: true, // Puede ser null para firmas de fallas
+                allowNull: false,
+                comment: 'ID del checklist que se está firmando'
             },
-            failure_order_id: {
+            role_id: {
                 type: DataTypes.INTEGER,
-                allowNull: true, // Para firmas de fallas
-            },
-            signature_type: {
-                type: DataTypes.ENUM('REPORT', 'RESOLUTION', 'CLOSE'),
-                allowNull: true, // Tipo de firma para fallas
+                allowNull: false,
+                comment: 'ID del rol del usuario al momento de firmar'
             },
             signed_at: {
                 type: DataTypes.DATE,
                 allowNull: false,
+                comment: 'Fecha y hora de la firma'
             },
             signed_by_name: {
                 type: DataTypes.STRING,
-                allowNull: false, // Nombre del firmante
-            },
-            role_at_signature: {
-                type: DataTypes.STRING,
                 allowNull: false,
+                comment: 'Nombre del firmante'
+            },
+            signature_image: {
+                type: DataTypes.TEXT('long'),
+                allowNull: true,
+                comment: 'Imagen de la firma digital'
             },
             digital_token: {
                 type: DataTypes.TEXT('long'),
                 allowNull: true,
+                comment: 'Token único de verificación de la firma'
             },
             createdAt: {
                 type: DataTypes.DATE,
@@ -85,6 +82,7 @@ module.exports = (sequelize, DataTypes) => {
             modelName: "ChecklistSignature",
             timestamps: true,
             tableName: "checklist_signatures",
+            comment: 'Tabla para firmas de checklists completados'
         }
     );
     return ChecklistSignature;
