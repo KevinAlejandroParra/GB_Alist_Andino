@@ -27,7 +27,7 @@ const {
   getWorkOrdersByChecklistType,
   getResolvedFailuresByChecklistType,
   getChecklistTypeDetails,
-  getParentItemsByChecklistType // Importar el nuevo controlador
+  getParentItemsByChecklistType
 } = require("../controllers/checklistController")
 
 // Importar funciones de diagnóstico (temporal para debugging)
@@ -37,24 +37,24 @@ const { diagnoseChecklists, fixProblematicChecklists } = require("../utils/diagn
 router.post("/:inspectableId/ensure", verifyToken, ensureChecklistInstance)
 router.get("/:inspectableId/latest", verifyToken, getLatestChecklist)
 router.get("/:inspectableId/history", verifyToken, getChecklistHistory)
-router.get("/type/:checklistTypeId", verifyToken, getChecklistByType) // Nueva ruta para obtener checklist por tipo
+router.get("/type/:checklistTypeId", verifyToken, getChecklistByType)
 router.get("/type/:checklistTypeId/latest", verifyToken, getLatestChecklistByType)
-router.get("/type/:checklistTypeId/create", verifyToken, createChecklist) // Nueva ruta para crear instancias
-router.get("/type/:checklistTypeId/history", verifyToken, getChecklistHistoryByType) // Nueva ruta para el historial por tipo
-router.get("/type/:checklistTypeId/details", verifyToken, getChecklistTypeDetails) // Nueva ruta para obtener detalles del tipo de checklist
-router.get("/type/:checklistTypeId/parent-items", verifyToken, getParentItemsByChecklistType) // Nueva ruta para obtener items padre ordenados
+router.get("/type/:checklistTypeId/create", verifyToken, createChecklist)
+router.get("/type/:checklistTypeId/history", verifyToken, getChecklistHistoryByType)
+router.get("/type/:checklistTypeId/details", verifyToken, getChecklistTypeDetails)
+router.get("/type/:checklistTypeId/parent-items", verifyToken, getParentItemsByChecklistType)
 
 // Rutas para respuestas, fallas, etc.
 router.get("/:id", verifyToken, getChecklistById) // Nueva ruta para obtener checklist por ID
 router.post("/:id/responses", verifyToken, submitResponses)
 router.get("/failures/pending/:checklist_id", verifyToken, getPendingFailures)
 router.get("/failures/closed/:checklist_id", verifyToken, getClosedFailures)
-router.get("/failures/by-type/:checklist_type_id", verifyToken, getWorkOrdersByChecklistType) // Nueva ruta para fallas por tipo
-router.get("/failures/resolved/by-type/:checklist_type_id", verifyToken, getResolvedFailuresByChecklistType) // Nueva ruta para fallas resueltas por tipo
+router.get("/failures/by-type/:checklist_type_id", verifyToken, getWorkOrdersByChecklistType)
+router.get("/failures/resolved/by-type/:checklist_type_id", verifyToken, getResolvedFailuresByChecklistType)
 router.put("/failures/:id", verifyToken, updateWorkOrder)
 router.get("/:id/observations", verifyToken, listObservations)
 router.post("/:id/sign", verifyToken, signChecklist)
-router.get("/:id/download-pdf", verifyToken, downloadChecklistPDF)
+router.get("/:id/download", verifyToken, downloadChecklistPDF)
 
 
 // Rutas de diagnóstico (temporal para debugging)

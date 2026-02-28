@@ -23,7 +23,7 @@ module.exports = {
   description: 'Check list semanal de operacion para la familia Video',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
-  role_id: 8, // Corresponde a anfitrión
+  role_id: 4, // Corresponde a anfitrión
   family_name: 'Video',
   dynamic_items: 'device', 
   items: subItemTemplates, 

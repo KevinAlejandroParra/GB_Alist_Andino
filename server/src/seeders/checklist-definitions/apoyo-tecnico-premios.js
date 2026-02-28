@@ -30,7 +30,7 @@ module.exports = {
   description: 'Incluyen conteo de jugadas, premios y configuración de toy box, work zone y toy box XL.',
   frequency: 'semanal',
   version_label: 'V1 Static Premios SEP 2025 BY: Alejandro Parra',
-  role_id: 7, // Corresponde a "Tecnico de mantenimiento"
+  role_id: 3, // Corresponde a "Técnico de mantenimiento"
   specific_inspectable_names: ["Toy Box 1", "Toy Box 2", "Toy Box 3", "Toy Box 4", "Toy Box XL", "work zone"],
   dynamic_items: false, 
   items: items,

@@ -64,6 +64,12 @@ module.exports = {
         } else if (definition.specific_inspectable_names && definition.specific_inspectable_names.length > 0) {
             type_category = 'specific';
             // Los inspectables específicos se manejarán en la tabla de unión
+        } else if ((definition.attraction_name === null || definition.attraction_name === undefined) && 
+                   (definition.family_name === null || definition.family_name === undefined) && 
+                   (!definition.specific_inspectable_names || definition.specific_inspectable_names.length === 0)) {
+          // Checklist genérico sin asociación específica
+          type_category = 'static';
+          associated_id = null;
         } else {
           console.log(`Skipping checklist type "${definition.name}" because it has no valid association (attraction, family, or specific inspectables).`);
           continue;

@@ -23,7 +23,7 @@ module.exports = {
   description: 'Check list para la familia Apoyo, diseñado para anfitriones que supervisan el estado y funcionamiento de los dispositivos asignados.',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
-  role_id: 8, // Corresponde a "Anfitriones"
+  role_id: 4, // Corresponde a "Anfitriones"
   family_name: 'Apoyo',
   dynamic_items: 'device', 
   items: subItemTemplates, 

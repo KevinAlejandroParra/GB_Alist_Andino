@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { User } = require('../models'); 
+const { User } = require('../models');
 
 const verifyToken = async (req, res, next) => {
     try {
@@ -13,27 +13,22 @@ const verifyToken = async (req, res, next) => {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_KEY);
-        req.user = decoded; 
+        req.user = decoded;
         next();
     } catch (error) {
         return res.status(401).json({
             success: false,
-            message: "Token inválido o expirado"
+            message: "Token inválido"
         });
     }
 };
 
-// Middleware para verificar roles
 const checkRole = (roles) => {
     return async (req, res, next) => {
         try {
-            console.log('Verificando rol para el user_id:', req.user.user_id); 
-
             const user = await User.findOne({ where: { user_id: req.user.user_id } });
-            console.log('Usuario encontrado:', user); 
 
             if (!user || !roles.includes(Number(user.role_id))) {
-                console.log('Rol del usuario:', user ? user.role_id : 'Usuario no encontrado'); // Imprimir el rol del usuario
                 return res.status(403).json({
                     success: false,
                     message: 'Acceso denegado. Rol no autorizado.'
@@ -41,7 +36,6 @@ const checkRole = (roles) => {
             }
             next();
         } catch (error) {
-            console.error('Error al verificar rol:', error); // Imprimir el error
             return res.status(500).json({
                 success: false,
                 message: 'Error al verificar rol',

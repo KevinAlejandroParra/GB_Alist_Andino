@@ -73,136 +73,47 @@ const playgroundItems = [
   },
   {
     id: 2,
-    question_text: "DESLIZADEROS",
-    children: [
-      {
-        id: 2.1,
-        question_text:
-          "VERIFIQUE ESTADO DE LA LAMINA PLÁSTICA DE LOS DELIZADEROS (NO DEBEN EXISTIR ROTURAS) HE IDENTIFICAR SI EXISTE ALGUN RIESGO PARA LOS VISITANTES",
-        guidance_text: "Inspeccionar láminas plásticas buscando roturas o riesgos para usuarios",
-      },
-      {
-        id: 2.2,
-        question_text: "REVISE EL ESTADO Y TENSIONE DEL LAZO GUÍA (PARA ASCENDER O DESCENDER)",
-        guidance_text: "Verificar estado y tensión adecuada del lazo guía de ascenso/descenso",
-      },
-      {
-        id: 2.3,
-        question_text: "REVISE EN GENERAL LA TORNILLERIA Y AJUSTELA SI ES NECESARIO",
-        guidance_text: "Inspeccionar y ajustar toda la tornillería de los deslizaderos",
-      },
-    ],
-  },
-  {
-    id: 3,
-    question_text: "TOBOGAN ESPIRAL",
-    children: [
-      {
-        id: 3.1,
-        question_text: "VERIFIQUE LA ESTABILIDAD DE LA ESTRUCTURA",
-        guidance_text: "Comprobar que la estructura del tobogán esté estable y firme",
-      },
-      {
-        id: 3.2,
-        question_text: "REVISE LAS UNIONES DE LOS TOBOGANES",
-        guidance_text: "Inspeccionar todas las uniones entre secciones del tobogán",
-      },
-      {
-        id: 3.3,
-        question_text: "REVISE EN GENERAL TORNILLERIA COMPLETA Y AJUSTADA",
-        guidance_text: "Verificar que toda la tornillería esté completa y bien ajustada",
-      },
-      {
-        id: 3.4,
-        question_text: "VERIFIQUE ESTADO Y UBICACIÓN DE LA COLCHONETA DE LA SALIDA",
-        guidance_text: "Revisar estado y posición correcta de colchoneta en la salida",
-      },
-      {
-        id: 3.5,
-        question_text: "VERIFIQUE ESTADO DE LA FIBRA DEL TOBOGAN, NO DEBEN EXISTIR FISURAS",
-        guidance_text: "Inspeccionar fibra del tobogán buscando fisuras o daños",
-      },
-      {
-        id: 3.6,
-        question_text: "VERIFICAR QUE LOS TUBOS DE SOPORTE ESTEN FORRADOS CORRECTAMENTE",
-        guidance_text: "Comprobar que el forrado de tubos de soporte esté en buen estado",
-      },
-    ],
-  },
-  {
-    id: 4,
-    question_text: "ELEMENTOS INTERACTIVOS BOXEADORES",
-    children: [
-      {
-        id: 4.1,
-        question_text: "VERIFIQUE FIJACION GENERAL Y ESTADO DE CADA BOXEADOR",
-        guidance_text: "Revisar fijación y estado general de todos los boxeadores",
-      },
-      {
-        id: 4.2,
-        question_text: "VERIFICAR LA COSTURA DE LA REATA CON RESPECTO A LA LONA",
-        guidance_text: "Inspeccionar costuras entre reata y lona buscando desgaste",
-      },
-      {
-        id: 4.3,
-        question_text: "VERIFICAR EL DESGASTE DEL ACOPLE Y QUE SE ENCUENTRE BIEN CERRADO, HALANDO",
-        guidance_text: "Probar acople halando para verificar cierre y desgaste",
-      },
-    ],
-  },
-  {
-    id: 5,
-    question_text: "ELEMENTOS INTERACTIVOS BONGOS",
-    children: [
-      {
-        id: 5.1,
-        question_text: "VERIFIQUE FIJACION AL PISO DE CADA BONGO",
-        guidance_text: "Comprobar que cada bongo esté firmemente fijado al piso",
-      },
-      {
-        id: 5.2,
-        question_text: "REVISE ESTADO GENERAL DE CADA BONGO: TUBO, PINTURA Y FIBRA",
-        guidance_text: "Inspeccionar tubo, pintura y fibra de cada bongo",
-      },
-            {
-        id: 5.3,
-        question_text: "COMPRUEBE LA ADECUADA FIJACION DE LOS SOPORTES SUPERIORES",
-        guidance_text: "Verificar fijación segura de todos los soportes superiores",
-      },
-    ],
-  },
-  {
-    id: 6,
     question_text: "CANGUROS",
     children: [
       {
-        id: 6.1,
+        id: 2.1,
         question_text: "REVISAR ESTRUCTURA (NINGUN ELEMENTO DEBE ESTAR SUELTO O FLOJO)",
         guidance_text: "Inspeccionar estructura completa buscando elementos sueltos",
       },
       {
-        id: 6.2,
+        id: 2.2,
         question_text: "REVISAR EL BUEN ESTADO DE LOS PLATOS DONDE LOS NIÑOS SE PARAN",
         guidance_text: "Verificar estado de plataformas donde se paran los niños",
       },
       {
-        id: 6.3,
+        id: 2.3,
         question_text: "REVISAR Y COMPROBAR QUE LOS CANGUROS RESORTAN",
         guidance_text: "Probar funcionamiento del sistema de resorte de cada canguro",
       },
     ],
   },
   {
-    id: 7,
+    id: 3,
+    question_text: "PISCINA DE PELOTAS",
+    children: [
+      {
+        id: 3.1,
+        question_text: "VERIFIQUE EL ESTADO Y ASEO DE LAS PELOTAS, PROTECTORES Y CERRAMIENTO",
+        guidance_text: "Inspeccionar estado y limpieza de pelotas, protectores y cerramiento",
+      },
+    ],
+  },
+  {
+    id: 4,
     question_text: "PLATAFORMAS",
     children: [
       {
-        id: 7.1,
+        id: 4.1,
         question_text: "VERIFIQUE EL ESTADO, AJUSTE Y ASEO DE LAS PLATAFORMAS PLASTICAS O TIPO REJILLA",
         guidance_text: "Revisar estado, ajuste y limpieza de plataformas plásticas",
       },
       {
-        id: 7.2,
+        id: 4.2,
         question_text:
           "VERIFIQUE EL PERFECTO ACOLCHADO DE LAS PLATAFORMAS DE LOS ASCENSORES NO DEBEN EXISTIR PARTES EXPUESTAS",
         guidance_text: "Comprobar acolchado completo sin partes expuestas en ascensores",
@@ -210,24 +121,113 @@ const playgroundItems = [
     ],
   },
   {
+    id: 5,
+    question_text: "DESLIZADEROS",
+    children: [
+      {
+        id: 5.1,
+        question_text:
+          "VERIFIQUE ESTADO DE LA LAMINA PLÁSTICA DE LOS DELIZADEROS (NO DEBEN EXISTIR ROTURAS) HE IDENTIFICAR SI EXISTE ALGUN RIESGO PARA LOS VISITANTES",
+        guidance_text: "Inspeccionar láminas plásticas buscando roturas o riesgos para usuarios",
+      },
+      {
+        id: 5.2,
+        question_text: "REVISE EL ESTADO Y TENSIONE DEL LAZO GUÍA (PARA ASCENDER O DESCENDER)",
+        guidance_text: "Verificar estado y tensión adecuada del lazo guía de ascenso/descenso",
+      },
+      {
+        id: 5.3,
+        question_text: "REVISE EN GENERAL LA TORNILLERIA Y AJUSTELA SI ES NECESARIO",
+        guidance_text: "Inspeccionar y ajustar toda la tornillería de los deslizaderos",
+      },
+    ],
+  },
+  {
+    id: 6,
+    question_text: "ELEMENTOS INTERACTIVOS BONGOS",
+    children: [
+      {
+        id: 6.1,
+        question_text: "VERIFIQUE FIJACION AL PISO DE CADA BONGO",
+        guidance_text: "Comprobar que cada bongo esté firmemente fijado al piso",
+      },
+      {
+        id: 6.2,
+        question_text: "REVISE ESTADO GENERAL DE CADA BONGO: TUBO, PINTURA Y FIBRA",
+        guidance_text: "Inspeccionar tubo, pintura y fibra de cada bongo",
+      },
+      {
+        id: 6.3,
+        question_text: "COMPRUEBE LA ADECUADA FIJACION DE LOS SOPORTES SUPERIORES",
+        guidance_text: "Verificar fijación segura de todos los soportes superiores",
+      },
+    ],
+  },
+  {
+    id: 7,
+    question_text: "ELEMENTOS INTERACTIVOS BOXEADORES",
+    children: [
+      {
+        id: 7.1,
+        question_text: "VERIFIQUE FIJACION GENERAL Y ESTADO DE CADA BOXEADOR",
+        guidance_text: "Revisar fijación y estado general de todos los boxeadores",
+      },
+      {
+        id: 7.2,
+        question_text: "VERIFICAR LA COSTURA DE LA REATA CON RESPECTO A LA LONA",
+        guidance_text: "Inspeccionar costuras entre reata y lona buscando desgaste",
+      },
+      {
+        id: 7.3,
+        question_text: "VERIFICAR EL DESGASTE DEL ACOPLE Y QUE SE ENCUENTRE BIEN CERRADO, HALANDO",
+        guidance_text: "Probar acople halando para verificar cierre y desgaste",
+      },
+    ],
+  },
+  {
     id: 8,
-    question_text: "PISCINA DE PELOTAS",
+    question_text: "PISO EN REATA - MALLA - PUENTES DE MADERA Y PASOS DE ATILA",
     children: [
       {
         id: 8.1,
-        question_text: "VERIFIQUE EL ESTADO Y ASEO DE LAS PELOTAS, PROTECTORES Y CERRAMIENTO",
-        guidance_text: "Inspeccionar estado y limpieza de pelotas, protectores y cerramiento",
+        question_text: "VERIFIQUE ASEO, AJUSTE Y ESTADO DE CADA ELEMENTO DE ESTOS PASOS",
+        guidance_text: "Revisar limpieza, ajuste y estado de reata, malla y puentes",
       },
     ],
   },
   {
     id: 9,
-    question_text: "PISO EN REATA - MALLA - PUENTES DE MADERA Y PASOS DE ATILA",
+    question_text: "TOBOGAN ESPIRAL",
     children: [
       {
         id: 9.1,
-        question_text: "VERIFIQUE ASEO, AJUSTE Y ESTADO DE CADA ELEMENTO DE ESTOS PASOS",
-        guidance_text: "Revisar limpieza, ajuste y estado de reata, malla y puentes",
+        question_text: "VERIFIQUE LA ESTABILIDAD DE LA ESTRUCTURA",
+        guidance_text: "Comprobar que la estructura del tobogán esté estable y firme",
+      },
+      {
+        id: 9.2,
+        question_text: "REVISE LAS UNIONES DE LOS TOBOGANES",
+        guidance_text: "Inspeccionar todas las uniones entre secciones del tobogán",
+      },
+      {
+        id: 9.3,
+        question_text: "REVISE EN GENERAL TORNILLERIA COMPLETA Y AJUSTADA",
+        guidance_text: "Verificar que toda la tornillería esté completa y bien ajustada",
+      },
+      {
+        id: 9.4,
+        question_text: "VERIFIQUE ESTADO Y UBICACIÓN DE LA COLCHONETA DE LA SALIDA",
+        guidance_text: "Revisar estado y posición correcta de colchoneta en la salida",
+      },
+      {
+        id: 9.5,
+        question_text: "VERIFIQUE ESTADO DE LA FIBRA DEL TOBOGAN, NO DEBEN EXISTIR FISURAS",
+        guidance_text: "Inspeccionar fibra del tobogán buscando fisuras o daños",
+      },
+      {
+        id: 9.6,
+        question_text: "VERIFICAR QUE LOS TUBOS DE SOPORTE ESTEN FORRADOS CORRECTAMENTE",
+        guidance_text: "Comprobar que el forrado de tubos de soporte esté en buen estado",
       },
     ],
   },
@@ -308,7 +308,7 @@ module.exports = {
   description: "Check list diario de mantenimiento para la atracción Congo a cargo del técnico",
   frequency: "diario",
   version_label: "V1 SEP 2025 BY: Alejandro Parra",
-  role_id: 7, // Corresponde a "Tecnico de mantenimiento"
+  role_id: 3, // Corresponde a "Tecnico de mantenimiento"
   attraction_name: "Congo", // Nombre del inspectable para buscar su ID
   premise_id: 2, // ID del local al que pertenece la atracción
   items: transformItems(playgroundItems),

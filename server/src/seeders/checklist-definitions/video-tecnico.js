@@ -23,7 +23,7 @@ module.exports = {
   description: 'Check list semanal de mantenimiento para la familia Video',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
-  role_id: 7, // Corresponde a "Tecnico de mantenimiento"
+  role_id: 3, // Corresponde a "Tecnico de mantenimiento"
   family_name: 'Video',
   dynamic_items: 'device', 
   items: subItemTemplates, 

@@ -2,67 +2,36 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
+    // Primero limpiar la tabla para evitar duplicados
+    await queryInterface.bulkDelete('roles', null, {});
+    
+    // Insertar los nuevos roles
     await queryInterface.bulkInsert('roles', [
       {
         role_id: 1,
-        role_name: 'Regulador',
-        role_description: 'Regulador de la plataforma (Desarrollador de alist_andino)',
+        role_name: 'Administrador',
+        role_description: 'Administradores de los parques, pueden ver todo y interactuar con los datos',
         createdAt: new Date(),
         updatedAt: new Date()
       },
       {
         role_id: 2,
-        role_name: 'Jefe de Mantenimiento',
-        role_description: 'Jefe de mantenimiento de la plataforma (product manager)',
+        role_name: 'Soporte',
+        role_description: 'Asistente de TI, acceso total y asigna permisos, como asistente de los admins',
         createdAt: new Date(),
         updatedAt: new Date()
       },
       {
         role_id: 3,
-        role_name: 'Direccion de Operaciones',
-        role_description: 'Direccion de operaciones de Game Box',
+        role_name: 'Tecnico',
+        role_description: 'Técnicos de mantenimiento',
         createdAt: new Date(),
         updatedAt: new Date()
       },
       {
         role_id: 4,
-        role_name: 'Jefe de Operaciones',
-        role_description: 'Jefe de operaciones de Game Box (Jefe de area administrativa de Game Box Andino)',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        role_id: 5,
-        role_name: 'Direccion de Copass',
-        role_description: 'Direccion de copass de Game Box Andino',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        role_id: 6,
-        role_name: 'Tecnico de Copass',
-        role_description: 'Tecnico de copass de Game Box Andino',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        role_id: 7,
-        role_name: 'Tecnico de mantenimiento',
-        role_description: 'Tecnico de mantenimiento de Game Box Andino',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        role_id: 8,
         role_name: 'Anfitrion',
-        role_description: 'Anfitrion de Game Box Andino',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        role_id: 9,
-        role_name: 'Invitado',
-        role_description: 'Invitado de Game Box Andino',
+        role_description: 'Que manejan el área operativa del parque',
         createdAt: new Date(),
         updatedAt: new Date()
       }

@@ -3,7 +3,7 @@ module.exports = {
   description: "Check List diario de mantenimiento para la atracción Baby House",
   frequency: "diario",
   version_label: "V1 SEP 2025 - BY: Alejandro Parra",
-  role_id: 7, // Corresponde a "Tecnico de mantenimiento"
+  role_id: 3, // Corresponde a "Tecnico de mantenimiento"
   attraction_name: "Baby House", // Nombre del inspectable para buscar su ID
   // Agrega specific_inspectable_names si este checklist es para inspectables específicos
   specific_inspectable_names: ["Baby House (Atracción)"], 
@@ -106,71 +106,13 @@ module.exports = {
     },
     {
       item_number: "2",
-      question_text: "CASA INTERACTIVA",
+      question_text: "ARBOL PAJARO QQ",
       input_type: "section",
       children: [
         {
           item_number: "2.1",
-          question_text: "INSPECCIONE EL ASEO Y ESTADO DE LOS ESCALONES (TAPIZADO Y ESTRUCTURA)",
-          guidance_text: "Revisar que el tapizado esté limpio, sin roturas y bien adherido a la estructura",
-          input_type: "radio",
-          allow_comment: true,
-        },
-        {
-          item_number: "2.2",
-          question_text: "REVISE ASEO Y ESTADO DE LA RAMPA DE DESCENSO Y SUS LATERALES",
-          guidance_text: "Verificar superficie lisa, limpia y que los laterales estén seguros",
-          input_type: "radio",
-          allow_comment: true,
-        },
-        {
-          item_number: "2.3",
-          question_text:
-            "VERIFIQUE EL ESTADO Y TENSION DE LA MALLA DEL CERRAMIENTO TENIENDO EN CUENTA LA SEPARACION CON RESPECTO AL TUBO",
-          guidance_text: "Inspeccionar malla perimetral, tensión adecuada y distancia de seguridad",
-          input_type: "radio",
-          allow_comment: true,
-        },
-        {
-          item_number: "2.4",
-          question_text: "VERIFIQUE ASEO Y ESTADO DE LAS COSTURAS DE LA ESCALERA DE REATA",
-          guidance_text: "Revisar que las costuras estén íntegras y bien cosidas sin hilos sueltos",
-          input_type: "radio",
-          allow_comment: true,
-        },
-        {
-          item_number: "2.5",
-          question_text:
-            "VERIFICAR DAÑO O DETERIORO DEL ACOLCHADO DE LOS FORROS EN LOS SITIOS MAS CRITICOS DE LA ATRACCION",
-          guidance_text: "Inspeccionar zonas de mayor impacto, verificar grosor y integridad del acolchado",
-          input_type: "radio",
-          allow_comment: true,
-        },
-        {
-          item_number: "2.6",
-          question_text: "VERIFIQUE ASEO Y ESTADO DE LA ESTRUCTURA Y TORNILLERIA DE LA CASA",
-          guidance_text: "Revisar que todos los tornillos estén apretados y la estructura sin fisuras",
-          input_type: "radio",
-          allow_comment: true,
-        },
-        {
-          item_number: "2.7",
-          question_text: "VERIFIQUE FIJACION GENERAL, COSTURAS Y ESTADO DE CADA BOXEADOR",
-          guidance_text: "Inspeccionar que cada boxeador esté bien fijado, costuras íntegras y sin desgaste",
-          input_type: "radio",
-          allow_comment: true,
-        },
-             {
-          item_number: "2.8",
-          question_text: " VERIFICAR EL DESGASTE DEL ACOPLE Y QUE SE ENCUENTRE BIEN CERRADO, HALANDO",
-          guidance_text: "Inspeccionar que el acople esté en buen estado y bien asegurado",
-          input_type: "radio",
-          allow_comment: true,
-        },
-             {
-          item_number: "2.9",
-          question_text: "VERIFICAR LA COSTURA DE LA REATA CON RESPECTO A LA LONA DE LOS BOXEADORES",
-          guidance_text: "Inspeccionar que la costura de la reata esté firme y sin hilos sueltos",
+          question_text: "VERIFICAR ASEO, SONIDO Y FUNCIONAMIENTO DEL PAJARO QQ (OPRIMIENDO EL BOTON)",
+          guidance_text: "Probar el botón del pájaro, verificar sonido claro y movimiento correcto",
           input_type: "radio",
           allow_comment: true,
         },
@@ -178,53 +120,25 @@ module.exports = {
     },
     {
       item_number: "3",
-      question_text: "CAMA ELASTICA",
-      input_type: "section",
-      children: [
-        {
-          item_number: "3.1",
-          question_text: "REVISAR ESTADO DE LOS RESORTES (ENTRE LA LONA Y LA ESTRUCTURA)",
-          guidance_text: "Verificar que todos los resortes estén en buen estado, sin oxidación ni deformaciones",
-          input_type: "radio",
-          allow_comment: true,
-        },
-        {
-          item_number: "3.2",
-          question_text: "REVISAR EL ESTADO DE LA LONA DEL SALTARÍN Y AJUSTARLA SI ES NECESARIO",
-          guidance_text: "Inspeccionar la lona por roturas, desgaste y verificar tensión adecuada",
-          input_type: "radio",
-          allow_comment: true,
-        },
-        {
-          item_number: "3.3",
-          question_text: "VERIFICAR EL PERFECTO ACOLCHADO ALREDEDOR DE LOS RESORTES",
-          guidance_text: "Asegurar que el acolchado cubra completamente los resortes para evitar lesiones",
-          input_type: "radio",
-          allow_comment: true,
-        },
-      ],
-    },
-    {
-      item_number: "4",
       question_text: "CARRUSEL DE PONYS",
       input_type: "section",
       children: [
         {
-          item_number: "4.1",
+          item_number: "3.1",
           question_text: "VERIFICAR EL ASEO Y ESTADO DE LOS PONY´S (Manilares, Ojos, Sillas y Ponis)",
           guidance_text: "Inspeccionar limpieza y estado de cada componente del pony, verificar fijación",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "4.2",
+          item_number: "3.2",
           question_text: "VERIFICAR EL ASEO Y ESTADO DEL PISO DEL CARRUSEL Y BOTON DE START",
           guidance_text: "Revisar superficie del piso limpia y botón de inicio funcionando correctamente",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "4.3",
+          item_number: "3.3",
           question_text: "VERIFICAR LA OPERACIÓN DEL CARRUSEL (Sonido, Luces y Movimiento)",
           guidance_text: "Probar funcionamiento completo: rotación suave, música clara y luces operativas",
           input_type: "radio",
@@ -233,26 +147,26 @@ module.exports = {
       ],
     },
     {
-      item_number: "5",
+      item_number: "4",
       question_text: "LEON Y ACCESORIOS",
       input_type: "section",
       children: [
         {
-          item_number: "5.1",
+          item_number: "4.1",
           question_text: "VERIFICAR EL ASEO Y ESTADO DEL ACOLCHADO Y PEGUES DEL DISPOSITIVO",
           guidance_text: "Inspeccionar limpieza del acolchado y que todos los pegues estén firmes",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "5.2",
+          item_number: "4.2",
           question_text: "VERIFICAR AJUSTE DE DIENTES, COLA, OREJAS, MELENA Y OJOS",
           guidance_text: "Revisar que todas las partes del león estén bien fijadas y sin desprendimientos",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "5.3",
+          item_number: "4.3",
           question_text: "VERIFICAR LIMPIEZA Y ESTADO DE LOS ACCESORIOS DEL LEON",
           guidance_text: "Inspeccionar todos los elementos adicionales del león por limpieza y daños",
           input_type: "radio",
@@ -261,12 +175,12 @@ module.exports = {
       ],
     },
     {
-      item_number: "6",
+      item_number: "5",
       question_text: "VOLCAN",
       input_type: "section",
       children: [
         {
-          item_number: "6.1",
+          item_number: "5.1",
           question_text: "VERIFICAR FUNCIONAMIENTO DEL BOTON Y BLOWER DEL VOLCAN",
           guidance_text: "Probar que el botón active el soplador y genere el efecto volcánico esperado",
           input_type: "radio",
@@ -275,14 +189,28 @@ module.exports = {
       ],
     },
     {
+      item_number: "6",
+      question_text: "ARBOL CON OJOS EN MOVIMIENTO",
+      input_type: "section",
+      children: [
+        {
+          item_number: "6.1",
+          question_text: "VERIFICAR ASEO, SONIDO Y FUNCIONAMIENTO DE LOS OJOS (OPRIMIENDO EL BOTON)",
+          guidance_text: "Probar botón de activación, verificar movimiento de ojos y sonidos asociados",
+          input_type: "radio",
+          allow_comment: true,
+        },
+      ],
+    },
+    {
       item_number: "7",
-      question_text: "JUEGO INTERACTIVO GUITARRA Y BANDA TRANSPORTADORA",
+      question_text: "JUEGO INTERACTIVO PARED MUSICAL Y BANDA TRANSPORTADORA",
       input_type: "section",
       children: [
         {
           item_number: "7.1",
           question_text: "VERIFIQUE EL ESTADO Y FUNCIONAMIENTO DE CADA UNO DE LOS ELEMENTOS DEL JUEGO",
-          guidance_text: "Probar todos los componentes interactivos del juego de guitarra",
+          guidance_text: "Probar todos los componentes interactivos del juego de la pared musical",
           input_type: "radio",
           allow_comment: true,
         },
@@ -318,13 +246,27 @@ module.exports = {
     },
     {
       item_number: "8",
-      question_text: "ARBOL PAJARO QQ",
+      question_text: "CAMA ELASTICA",
       input_type: "section",
       children: [
         {
           item_number: "8.1",
-          question_text: "VERIFICAR ASEO, SONIDO Y FUNCIONAMIENTO DEL PAJARO QQ (OPRIMIENDO EL BOTON)",
-          guidance_text: "Probar el botón del pájaro, verificar sonido claro y movimiento correcto",
+          question_text: "REVISAR ESTADO DE LOS RESORTES (ENTRE LA LONA Y LA ESTRUCTURA)",
+          guidance_text: "Verificar que todos los resortes estén en buen estado, sin oxidación ni deformaciones",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "8.2",
+          question_text: "REVISAR EL ESTADO DE LA LONA DEL SALTARÍN Y AJUSTARLA SI ES NECESARIO",
+          guidance_text: "Inspeccionar la lona por roturas, desgaste y verificar tensión adecuada",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "8.3",
+          question_text: "VERIFICAR EL PERFECTO ACOLCHADO ALREDEDOR DE LOS RESORTES",
+          guidance_text: "Asegurar que el acolchado cubra completamente los resortes para evitar lesiones",
           input_type: "radio",
           allow_comment: true,
         },
@@ -332,13 +274,71 @@ module.exports = {
     },
     {
       item_number: "9",
-      question_text: "ARBOL CON OJOS EN MOVIMIENTO",
+      question_text: "CASA INTERACTIVA",
       input_type: "section",
       children: [
         {
           item_number: "9.1",
-          question_text: "VERIFICAR ASEO, SONIDO Y FUNCIONAMIENTO DE LOS OJOS (OPRIMIENDO EL BOTON)",
-          guidance_text: "Probar botón de activación, verificar movimiento de ojos y sonidos asociados",
+          question_text: "INSPECCIONE EL ASEO Y ESTADO DE LOS ESCALONES (TAPIZADO Y ESTRUCTURA)",
+          guidance_text: "Revisar que el tapizado esté limpio, sin roturas y bien adherido a la estructura",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "9.2",
+          question_text: "REVISE ASEO Y ESTADO DE LA RAMPA DE DESCENSO Y SUS LATERALES",
+          guidance_text: "Verificar superficie lisa, limpia y que los laterales estén seguros",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "9.3",
+          question_text:
+            "VERIFIQUE EL ESTADO Y TENSION DE LA MALLA DEL CERRAMIENTO TENIENDO EN CUENTA LA SEPARACION CON RESPECTO AL TUBO",
+          guidance_text: "Inspeccionar malla perimetral, tensión adecuada y distancia de seguridad",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "9.4",
+          question_text: "VERIFIQUE ASEO Y ESTADO DE LAS COSTURAS DE LA ESCALERA DE REATA",
+          guidance_text: "Revisar que las costuras estén íntegras y bien cosidas sin hilos sueltos",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "9.5",
+          question_text:
+            "VERIFICAR DAÑO O DETERIORO DEL ACOLCHADO DE LOS FORROS EN LOS SITIOS MAS CRITICOS DE LA ATRACCION",
+          guidance_text: "Inspeccionar zonas de mayor impacto, verificar grosor y integridad del acolchado",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "9.6",
+          question_text: "VERIFIQUE ASEO Y ESTADO DE LA ESTRUCTURA Y TORNILLERIA DE LA CASA",
+          guidance_text: "Revisar que todos los tornillos estén apretados y la estructura sin fisuras",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "9.7",
+          question_text: "VERIFIQUE FIJACION GENERAL, COSTURAS Y ESTADO DE CADA BOXEADOR",
+          guidance_text: "Inspeccionar que cada boxeador esté bien fijado, costuras íntegras y sin desgaste",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "9.8",
+          question_text: " VERIFICAR EL DESGASTE DEL ACOPLE Y QUE SE ENCUENTRE BIEN CERRADO, HALANDO",
+          guidance_text: "Inspeccionar que el acople esté en buen estado y bien asegurado",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "9.9",
+          question_text: "VERIFICAR LA COSTURA DE LA REATA CON RESPECTO A LA LONA DE LOS BOXEADORES",
+          guidance_text: "Inspeccionar que la costura de la reata esté firme y sin hilos sueltos",
           input_type: "radio",
           allow_comment: true,
         },
@@ -346,39 +346,11 @@ module.exports = {
     },
     {
       item_number: "10",
-      question_text: "OSITO AVIADOR",
-      input_type: "section",
-      children: [
-        {
-          item_number: "10.1",
-          question_text: "VERIFIQUE FIJACION GENERAL Y ASEO DE LA ATRACCION",
-          guidance_text: "Revisar que el osito esté bien fijado y limpio en todas sus partes",
-          input_type: "radio",
-          allow_comment: true,
-        },
-        {
-          item_number: "10.2",
-          question_text: "VERIFICAR QUE SE ESTE REALIZANDO EL MOVIMIENTO GIRATORIO DE LA ATRACCION",
-          guidance_text: "Probar que el osito gire correctamente sin trabas ni ruidos anormales",
-          input_type: "radio",
-          allow_comment: true,
-        },
-                {
-          item_number: "10.3",
-          question_text: "VERIFICAR ESTADO DE PROTECTORES (COSTURAS Y DESGASTE)",
-          guidance_text: "Probar que todo este en perfecto estado",
-          input_type: "radio",
-          allow_comment: true,
-        },
-      ],
-    },
-    {
-      item_number: "11",
       question_text: "ARBOL DEL TUCCAN",
       input_type: "section",
       children: [
         {
-          item_number: "11.1",
+          item_number: "10.1",
           question_text: "VERIFICAR ASEO, SONIDO Y FUNCIONAMIENTO DEL TUCAN (OPRIMIENDO EL BOTON)",
           guidance_text: "Probar botón del tucán, verificar sonido claro y respuesta del mecanismo",
           input_type: "radio",
@@ -386,45 +358,72 @@ module.exports = {
         },
       ],
     },
-  
     {
-      item_number: "12",
+      item_number: "11",
       question_text: "ELEMENTOS INTERACTIVOS Y PUFF",
       input_type: "section",
       children: [
         {
-          item_number: "12.1",
+          item_number: "11.1",
           question_text: "VERIFICAR ESTADO DE PROTECTORES (COSTURAS Y DESGASTE)",
           guidance_text: "Revisar integridad de costuras y nivel de desgaste de los protectores",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "12.2",
+          item_number: "11.2",
           question_text:
             "VERIFICAR ESTADO, ASEO Y UBICACIÓN DE LOS PUFF (NO DEBE ESTAR CERCA A ELEMENTOS QUE PUEDAN GENERAR ACCIDENTE)",
           guidance_text: "Verificar posición segura de puffs, alejados de zonas de riesgo y en buen estado",
           input_type: "radio",
           allow_comment: true,
         },
-       {
-          item_number: "12.3",
+        {
+          item_number: "11.3",
           question_text: "VERIFICAR ASEO, SONIDO Y FUNCIONAMIENTO DE LAS TECLAS DEL PIANO DE PISO(OPRIMIENDOLAS)",
           guidance_text: "Probar cada tecla del piano verificando sonido y respuesta táctil",
           input_type: "radio",
           allow_comment: true,
         },
-         {
-          item_number: "12.4",
+        {
+          item_number: "11.4",
           question_text: "VERIFICAR EL ASEO Y ESTADO DE CADA FICHA DEL ARMATODO",
           guidance_text: "Revisar que las fichas estén limpias, sin roturas y en cantidad completa",
           input_type: "radio",
           allow_comment: true,
         },
         {
-          item_number: "12.5",
+          item_number: "11.5",
           question_text: "ORGANIZAR FICHAS EN EL LUGAR DESIGNADO",
           guidance_text: "Colocar todas las fichas en su contenedor o área específica de almacenamiento",
+          input_type: "radio",
+          allow_comment: true,
+        },
+      ],
+    },
+    {
+      item_number: "12",
+      question_text: "OSITO AVIADOR",
+      input_type: "section",
+      children: [
+        {
+          item_number: "12.1",
+          question_text: "VERIFIQUE FIJACION GENERAL Y ASEO DE LA ATRACCION",
+          guidance_text: "Revisar que el osito esté bien fijado y limpio en todas sus partes",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "12.2",
+          question_text: "VERIFICAR QUE SE ESTE REALIZANDO EL MOVIMIENTO GIRATORIO DE LA ATRACCION",
+          guidance_text: "Probar que el osito gire correctamente sin trabas ni ruidos anormales",
+          input_type: "radio",
+          allow_comment: true,
+        },
+        {
+          item_number: "12.3",
+          question_text: "VERIFICAR ESTADO DE PROTECTORES (COSTURAS Y DESGASTE)",
+          guidance_text: "Probar que todo este en perfecto estado",
           input_type: "radio",
           allow_comment: true,
         },
@@ -481,4 +480,4 @@ module.exports = {
       ],
     },
   ],
-}
+};

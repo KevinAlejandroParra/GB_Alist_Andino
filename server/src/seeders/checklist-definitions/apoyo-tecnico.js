@@ -15,11 +15,6 @@ const subItemTemplates = [
     item_number: '3', 
     question_text: "CICLO DE MÁQUINA", 
     guidance_text: "Comprobar que el ciclo de operación (tiempo, movimientos, sonidos) se complete según las especificaciones del fabricante.",
-  },
-  { 
-    item_number: '4', 
-    question_text: "CINTURON DE SEGURIDAD PLASTICO", 
-    guidance_text: "Inspeccionar el cinturón de seguridad en busca de fisuras, roturas o desgaste. Asegurarse de que el anclaje sea firme.",
   }
 ];
 
@@ -28,7 +23,7 @@ module.exports = {
   description: 'Check list para la familia Apoyo, diseñado para anfitriones que supervisan el estado y funcionamiento de los dispositivos asignados.',
   frequency: 'semanal',
   version_label: 'V1 Dynamic Families SEP 2025 BY: Alejandro Parra',
-  role_id: 7, // Corresponde a "Tecnico de mantenimiento"
+  role_id: 3, // Corresponde a "Técnico de mantenimiento"
   family_name: 'Apoyo',
   dynamic_items: 'device', 
   items: subItemTemplates, 

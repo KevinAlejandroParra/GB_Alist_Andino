@@ -239,6 +239,79 @@ export const useFailureRequisitionSystem = (user = null) => {
     }
   }, []);
 
+  /**
+   * Obtener requisiciones con filtros (por usuario, estado, paginación)
+   */
+  const getRequisitions = useCallback(async (filters = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
+
+      const query = new URLSearchParams(filters).toString();
+      const response = await axiosInstance.get(`${API_URL}/api/requisitions${query ? `?${query}` : ''}`);
+
+      return { success: true, data: response.data };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error?.message || 'Error al consultar requisiciones';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Crear requisición general (se usa para re-solicitar desde items existentes)
+   */
+  const createRequisition = useCallback(async (requisitionData) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
+      // Normalize field names: backend expects camelCase `imageUrl`
+      const payload = {
+        ...requisitionData,
+        imageUrl: requisitionData.imageUrl || requisitionData.image_url || null
+      };
+      // Remove any image_url to avoid confusion
+      delete payload.image_url;
+
+      const response = await axiosInstance.post(`${API_URL}/api/requisitions`, payload);
+
+      return { success: true, data: response.data };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error?.message || 'Error al crear requisición';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Eliminar requisición por ID
+   */
+  const deleteRequisition = useCallback(async (requisitionId) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
+
+      const response = await axiosInstance.delete(`${API_URL}/api/requisitions/${requisitionId}`);
+      return { success: true, data: response.data };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error?.message || 'Error al eliminar requisición';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // ✅ NUEVO: Función para agregar falla pendiente (sin crear inmediatamente)
   const addPendingFailure = useCallback((failureData) => {
     const pendingFailure = {
@@ -388,6 +461,9 @@ export const useFailureRequisitionSystem = (user = null) => {
     getPendingRequisitions,
     approveRequisitionAndAddToInventory,
     getRequisitionStatistics,
+    //  ✅ NUEVO: Consultas y creación de requisiciones
+    getRequisitions,
+    createRequisition,
 
     // ✅ NUEVO: Funciones para manejo de fallas pendientes
     addPendingFailure,
@@ -396,6 +472,8 @@ export const useFailureRequisitionSystem = (user = null) => {
 
     // ✅ NUEVO: Funciones para manejo de múltiples repuestos
     useMultipleParts,
+    // ✅ NUEVO: Borrar requisición
+    deleteRequisition,
 
     // Utilidades
     clearError: () => setError(null)

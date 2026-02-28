@@ -24,6 +24,12 @@ router.post('/', (req, res) => RequisitionController.createRequisition(req, res)
 router.get('/', (req, res) => RequisitionController.getRequisitions(req, res));
 
 /**
+ * GET /api/requisitions/pending
+ * El sistema obtiene una lista mejorada de requisiciones pendientes de aprobación
+ */
+router.get('/pending', (req, res) => RequisitionController.getPendingRequisitions(req, res));
+
+/**
  * GET /api/requisitions/:id
  * El sistema obtiene los detalles específicos de una requisición por su ID
  */
@@ -55,6 +61,12 @@ router.put('/:id/approve', (req, res) => RequisitionController.approveRequisitio
 router.post('/:id/approve-and-add-to-inventory', (req, res) => RequisitionController.approveAndAddToInventory(req, res));
 
 /**
+ * POST /api/requisitions/:id/receive-and-add
+ * El sistema marca la requisición como recibida y agrega automáticamente el repuesto al inventario
+ */
+router.post('/:id/receive-and-add', (req, res) => RequisitionController.receiveAndAddToInventory(req, res));
+
+/**
  * PUT /api/requisitions/:id/receive
  * El sistema marca la requisición como recibida y actualiza el inventario
  */
@@ -65,5 +77,11 @@ router.put('/:id/receive', (req, res) => RequisitionController.markAsReceived(re
  * El sistema cancela una requisición pendiente con una razón específica
  */
 router.put('/:id/cancel', (req, res) => RequisitionController.cancelRequisition(req, res));
+
+/**
+ * DELETE /api/requisitions/:id
+ * El sistema elimina una requisición (solo petición del solicitante o admin/soporte)
+ */
+router.delete('/:id', (req, res) => RequisitionController.deleteRequisition(req, res));
 
 module.exports = router;

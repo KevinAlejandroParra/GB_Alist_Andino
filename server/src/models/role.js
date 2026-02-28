@@ -18,7 +18,7 @@ module.exports = (sequelize, DataTypes) => {
 
             // Un rol puede tener muchas firmas de checklist
             Role.hasMany(models.ChecklistSignature, {
-                foreignKey: 'role_at_signature',
+                foreignKey: 'role_id',
                 as: 'signatures'
             });
         }

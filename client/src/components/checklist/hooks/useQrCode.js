@@ -5,18 +5,18 @@ import axiosInstance from '../../../utils/axiosConfig';
 import Swal from 'sweetalert2';
 
 export const useQrCode = (checklistId, checklistTypeId, user) => {
-    const [showQrModal, setShowQrModal] = useState(false);
-    const [isLoadingQr, setIsLoadingQr] = useState(false);
-    const [qrScans, setQrScans] = useState([]);
-    const [completedParentItems, setCompletedParentItems] = useState(0);
-    const [isQrRequired, setIsQrRequired] = useState(false);
-    const [qrValidationEnabled, setQrValidationEnabled] = useState(false);
-    const [totalQrPartitions, setTotalQrPartitions] = useState(1);
-    const [currentPartition, setCurrentPartition] = useState(1);
-    const [qrAuthorizationInfo, setQrAuthorizationInfo] = useState(null);
-    const hasRequiredQr = useRef(false);
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [isLoadingQr, setIsLoadingQr] = useState(false);
+  const [qrScans, setQrScans] = useState([]);
+  const [completedParentItems, setCompletedParentItems] = useState(0);
+  const [isQrRequired, setIsQrRequired] = useState(false);
+  const [qrValidationEnabled, setQrValidationEnabled] = useState(false);
+  const [totalQrPartitions, setTotalQrPartitions] = useState(1);
+  const [currentPartition, setCurrentPartition] = useState(1);
+  const [qrAuthorizationInfo, setQrAuthorizationInfo] = useState(null);
+  const hasRequiredQr = useRef(false);
 
-   // Cargar historial de escaneos QR para este checklist
+  // Cargar historial de escaneos QR para este checklist
   const loadQrScans = useCallback(async () => {
     if (!checklistId) return;
 
@@ -64,8 +64,8 @@ export const useQrCode = (checklistId, checklistTypeId, user) => {
 
           // Usar la nueva información del backend para determinar si realmente se requiere QR
           const actuallyRequiresQr = authInfo.checklist_completion_status?.requires_further_qr_scans ||
-                                    (authInfo.requires_qr && authInfo.next_qr_required && authInfo.next_qr_required.qr_code);
-          
+            (authInfo.requires_qr && authInfo.next_qr_required && authInfo.next_qr_required.qr_code);
+
           console.log('🔍 Debug Frontend - Backend info:', {
             requires_qr: authInfo.requires_qr,
             next_qr_required: authInfo.next_qr_required,
@@ -189,38 +189,47 @@ export const useQrCode = (checklistId, checklistTypeId, user) => {
 
     } catch (error) {
       console.error('Error procesando escaneo QR:', error);
-      
+
+      // Obtener el mensaje de error real del backend si existe
+      let errorMessage = error.message || 'Error procesando el código QR';
+      if (error.response && error.response.data && error.response.data.message) {
+        errorMessage = error.response.data.message;
+      }
+
       // Si es un error de validación de QR (QR incorrecto), recargar modal automáticamente
-      if (error.message && error.message.includes('QR incorrecto')) {
+      if (errorMessage.includes('QR incorrecto') || errorMessage.includes('inactivo') || errorMessage.includes('no encontrado')) {
         // Cerrar modal actual y reabrirlo inmediatamente para permitir nuevo intento
         setShowQrModal(false);
-        
+
         // Mostrar error por un momento
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         // Reabrir modal automáticamente
         setShowQrModal(true);
-        
+
         // Mostrar mensaje de error de forma no bloqueante
         Swal.fire({
           icon: 'error',
-          title: 'QR Incorrecto',
-          text: error.message,
-          timer: 3000,
+          title: 'QR Inválido',
+          text: errorMessage,
+          timer: 4000,
           showConfirmButton: false,
           toast: true,
-          position: 'top-end'
+          position: 'center',
+          background: '#fee2e2',
+          color: '#991b1b',
+          iconColor: '#ef4444'
         });
       } else {
         // Para otros tipos de errores, mostrar modal normal
         Swal.fire({
           icon: 'error',
           title: 'Error',
-          text: error.message || 'Error procesando el código QR',
+          text: errorMessage,
           confirmButtonText: 'Reintentar'
         });
       }
-      
+
       return false;
     } finally {
       setIsLoadingQr(false);
@@ -286,7 +295,7 @@ export const useQrCode = (checklistId, checklistTypeId, user) => {
 
     // La única fuente de verdad es la lista `unlocked_items` del backend.
     const numericItemId = typeof itemId === 'string' ? parseInt(itemId, 10) : itemId;
-    
+
     const isUnlocked = qrAuthorizationInfo.unlocked_items.some(
       (item) => item.checklist_item_id === numericItemId
     );
@@ -317,7 +326,7 @@ export const useQrCode = (checklistId, checklistTypeId, user) => {
         ...authInfo,
         // Mantener los items desbloqueados de particiones anteriores
         unlocked_items: [
-          ...(prevInfo?.unlocked_items || []).filter(item => 
+          ...(prevInfo?.unlocked_items || []).filter(item =>
             item.partition < (authInfo.last_validated_partition + 1)
           ),
           ...(authInfo.unlocked_items || [])
@@ -433,9 +442,9 @@ export const useQrCode = (checklistId, checklistTypeId, user) => {
       const hasUnlockedItems = qr.associated_items && qr.associated_items.some(item => {
         // Verificar si este item está desbloqueado en qrAuthorizationInfo.unlocked_items
         const isUnlocked = qrAuthorizationInfo.unlocked_items &&
-               qrAuthorizationInfo.unlocked_items.some(unlocked =>
-                 unlocked.checklist_item_id === item.item_id
-               );
+          qrAuthorizationInfo.unlocked_items.some(unlocked =>
+            unlocked.checklist_item_id === item.item_id
+          );
         console.log(`   📋 Item ${item.item_number}: ${isUnlocked ? '✅ Desbloqueado' : '🔒 Bloqueado'}`);
         return isUnlocked;
       });

@@ -11,7 +11,7 @@ module.exports = {
       },
       {
        premise_id: 2,
-        premise_name: 'Centro Comercial Andino Bogotá',
+        premise_name: 'Andino Bogotá',
         premise_address: 'recreatec',
         createdAt: new Date(),
         updatedAt: new Date()

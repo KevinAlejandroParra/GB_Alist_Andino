@@ -14,10 +14,15 @@ router.get('/', (req, res) => InventoryController.getInventory(req, res));
 router.get('/search', (req, res) => InventoryController.searchInventory(req, res));
 router.get('/part/:id', (req, res) => InventoryController.getPartById(req, res));
 router.get('/statistics', (req, res) => InventoryController.getStatistics(req, res));
+router.get('/low-stock-alerts', (req, res) => InventoryController.getLowStockAlerts(req, res));
 
 // Operaciones de inventario
 router.post('/use', (req, res) => InventoryController.usePart(req, res));
-router.post('/add', (req, res) => InventoryController.addPart(req, res));
+router.post('/add', (req, res) => InventoryController.addStock(req, res));
+router.post('/transfer', (req, res) => InventoryController.transferStock(req, res));
+
+// Actualizar metadata de un item
+router.put('/:id', (req, res) => InventoryController.updateInventory(req, res));
 
 // Rutas para gestión de repuestos en órdenes de trabajo
 router.put('/:id/decrement', (req, res) => InventoryController.decrementQuantity(req, res));
