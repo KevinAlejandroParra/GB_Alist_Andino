@@ -1,754 +1,817 @@
-const {
-  WorkOrder,
-  ChecklistResponse,
-  ChecklistItem,
-  Checklist,
-  Inspectable,
-  User,
-  Requisition,
-  connection
-} = require("../models");
-const { Sequelize } = require("../models");
-const Op = Sequelize.Op;
+'use strict';
 
-/**
- * Genera un ID único para la orden de trabajo
- * Formato: OT-YYYYMMDD-XXX
- */
-const generateWorkOrderId = () => {
-  const today = new Date();
-  const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
-  const randomNum = Math.floor(Math.random() * 999).toString().padStart(3, '0');
-  return `OT-${dateStr}-${randomNum}`;
-};
+const { WorkOrder, FailureOrder, User, Inventory, WorkOrderPart, Sequelize } = require('../models');
+const { Op } = Sequelize;
 
-/**
- * Busca si existe una orden de trabajo abierta para un ítem específico
- * @param {number} inspectableId - ID del inspectable
- * @param {number} checklistItemId - ID del ítem del checklist
- * @param {number} currentChecklistId - ID del checklist actual (para distinguir actualizaciones)
- * @param {transaction} transaction - Transacción de base de datos
- * @returns {Promise<object|null>} - WorkOrder existente o null
- */
-const findExistingWorkOrder = async (inspectableId, checklistItemId, currentChecklistId = null, transaction) => {
-  try {
-    let whereClause = {
-      inspectable_id: inspectableId,
-      checklist_item_id: checklistItemId,
-      status: { [Op.in]: ['PENDIENTE', 'EN_PROCESO'] }
-    };
+class WorkOrderService {
+  /**
+   * Crear WorkOrder manualmente para una FailureOrder
+   * @param {Object} data
+   * @param {number} data.failure_order_id - ID de la FailureOrder
+   * @param {string} data.description - Descripción del trabajo
+   * @param {string} data.priority_level - BAJA | NORMAL | ALTA | URGENTE
+   * @param {number} data.created_by_id - Usuario que crea la OT
+   * @returns {Promise<WorkOrder>}
+   */
+  async createWorkOrder(data) {
+    try {
+      const { failure_order_id, description, priority_level = 'NORMAL', created_by_id } = data;
 
-    let include = [
-      {
-        model: ChecklistResponse,
-        as: 'initialResponse',
-        required: true,
+      // Validaciones
+      if (!failure_order_id) throw new Error('failure_order_id es requerido');
+      if (!description) throw new Error('description es requerido');
+      if (!created_by_id) throw new Error('created_by_id es requerido');
+
+      // Validar que la FailureOrder existe
+      const failureOrder = await FailureOrder.findByPk(failure_order_id);
+      if (!failureOrder) {
+        throw new Error(`FailureOrder con ID ${failure_order_id} no encontrada`);
+      }
+
+      // Validar que NO existe ya una WorkOrder para esta FailureOrder (relación 1:1)
+      const existingWorkOrder = await WorkOrder.findOne({
+        where: { failure_order_id }
+      });
+      if (existingWorkOrder) {
+        throw new Error(`Ya existe una WorkOrder para la FailureOrder ${failure_order_id}`);
+      }
+
+      // Validar priority_level
+      const validPriorities = ['BAJA', 'NORMAL', 'ALTA', 'URGENTE'];
+      if (!validPriorities.includes(priority_level)) {
+        throw new Error('priority_level debe ser: BAJA, NORMAL, ALTA o URGENTE');
+      }
+
+      // Generar work_order_id único
+      const work_order_id = this.generateWorkOrderId();
+
+      // Crear WorkOrder
+      const workOrder = await WorkOrder.create({
+        work_order_id,
+        failure_order_id,
+        status: 'EN_PROCESO'
+      });
+
+      // Cargar con relaciones
+      const createdWorkOrder = await WorkOrder.findByPk(workOrder.id, {
         include: [
           {
-            model: Checklist,
-            as: 'checklist',
-            attributes: ['checklist_id', 'createdAt']
+            model: FailureOrder,
+            as: 'failureOrder',
+            include: [
+              { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] }
+            ]
           }
         ]
-      },
-      {
-        model: ChecklistItem,
-        as: 'checklistItem',
-        attributes: ['question_text', 'item_number']
-      },
-      {
-        model: User,
-        as: 'reporter',
-        attributes: ['user_name']
-      }
-    ];
-
-    // Si tenemos currentChecklistId, buscar primero OTs del mismo checklist (actualización)
-    if (currentChecklistId) {
-      const sameChecklistWorkOrder = await WorkOrder.findOne({
-        where: {
-          ...whereClause,
-          '$initialResponse.checklist.checklist_id$': currentChecklistId
-        },
-        include,
-        order: [['createdAt', 'DESC']],
-        transaction,
       });
 
-      if (sameChecklistWorkOrder) {
-        console.log('✅ DEBUG - OT del mismo checklist encontrada (actualización, NO incrementar recurrencia):', sameChecklistWorkOrder.id);
-        return {
-          workOrder: sameChecklistWorkOrder,
-          isSameChecklist: true,
-          shouldIncrementRecurrence: false
-        };
+      console.log(`✅ OT creada: ${work_order_id} - Para OF: ${failureOrder.failure_order_id}`);
+
+      return createdWorkOrder;
+    } catch (error) {
+      console.error('❌ Error creando WorkOrder:', error);
+      throw new Error(`Error al crear orden de trabajo: ${error.message}`);
+    }
+  }
+
+  /**
+   * Iniciar trabajo en WorkOrder
+   * @param {number} workOrderId - ID de la WorkOrder
+   * @param {number} startedBy - Usuario que inicia
+   * @returns {Promise<WorkOrder>}
+   */
+  async startWork(workOrderId, startedBy) {
+    try {
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
       }
-    }
 
-    // Si no encontramos OT del mismo checklist, buscar OTs de checklists anteriores
-    const previousWorkOrder = await WorkOrder.findOne({
-      where: whereClause,
-      include,
-      order: [['createdAt', 'DESC']],
-      transaction,
-    });
-
-    if (previousWorkOrder) {
-      console.log('✅ DEBUG - OT de checklist anterior encontrada (incrementar recurrencia):', previousWorkOrder.id);
-      return {
-        workOrder: previousWorkOrder,
-        isSameChecklist: false,
-        shouldIncrementRecurrence: true
-      };
-    }
-
-    console.log('❌ DEBUG - No se encontró OT existente');
-    return null;
-
-  } catch (error) {
-    console.error('Error buscando orden de trabajo existente:', error);
-    throw error;
-  }
-};
-
-/**
- * Crea una nueva orden de trabajo
- */
-const createWorkOrder = async ({
-  initialResponseId,
-  reportedById,
-  inspectableId,
-  checklistItemId,
-  description = null,
-  severity = 'leve',
-  responsibleArea = 'Técnico',
-  transaction: existingTransaction,
-}) => {
-  const transaction = existingTransaction || await connection.transaction();
-  
-  try {
-    // Generar ID único
-    let workOrderId;
-    let existingWO;
-    do {
-      workOrderId = generateWorkOrderId();
-      existingWO = await WorkOrder.findOne({
-        where: { work_order_id: workOrderId },
-        transaction
+      // Registrar start_time
+      await workOrder.update({
+        start_time: new Date()
       });
-    } while (existingWO);
 
-    // Crear la orden de trabajo con todos los campos
-    const workOrder = await WorkOrder.create({
-      work_order_id: workOrderId,
-      status: 'PENDIENTE',
-      description,
-      severity,
-      responsible_area: responsibleArea,
-      reported_by_id: reportedById,
-      inspectable_id: inspectableId,
-      checklist_item_id: checklistItemId,
-      initial_response_id: initialResponseId,
-      recurrence_count: 1,
-      first_reported_date: new Date(),
-      reported_at: new Date(),
-      last_updated_date: new Date()
-    }, { transaction });
+      console.log(`✅ OT ${workOrder.work_order_id} iniciada`);
 
-    if (!existingTransaction) {
-      await transaction.commit();
+      return await this.getWorkOrderById(workOrderId);
+    } catch (error) {
+      console.error('❌ Error iniciando trabajo:', error);
+      throw new Error(`Error al iniciar trabajo: ${error.message}`);
     }
-    return workOrder;
-  } catch (error) {
-    if (!existingTransaction) await transaction.rollback();
-    console.error('Error creando orden de trabajo:', error);
-    throw error;
   }
-};
 
-/**
- * Actualiza el contador de recurrencia de una orden de trabajo
- * @param {number} workOrderId - ID de la orden de trabajo
- * @param {number} currentChecklistId - ID del checklist actual (para evitar duplicados)
- * @param {transaction} transaction - Transacción de base de datos
- * @returns {Promise<object>} - WorkOrder actualizada
- * @throws {Error} - Si la falla ya fue mantenida para este checklist
- */
-const updateRecurrence = async (workOrderId, currentChecklistId = null, transaction) => {
-  const t = transaction || await connection.transaction();
+  /**
+   * Finalizar trabajo en WorkOrder
+   * @param {number} workOrderId - ID de la WorkOrder
+   * @param {string} activityPerformed - Descripción del trabajo realizado
+   * @param {string} evidenceUrl - URL de evidencia (fotos/documentos)
+   * @returns {Promise<WorkOrder>}
+   */
+  async finishWork(workOrderId, activityPerformed, evidenceUrl) {
+    try {
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
+      }
 
-  try {
-    const workOrder = await WorkOrder.findByPk(workOrderId, {
-      include: [
-        {
-          model: ChecklistResponse,
-          as: 'initialResponse',
-          include: [
-            {
-              model: Checklist,
-              as: 'checklist',
-              attributes: ['checklist_id']
-            }
-          ]
+      // Validar que esté EN_PROCESO
+      if (workOrder.status !== 'EN_PROCESO') {
+        throw new Error(`Solo se puede finalizar una WorkOrder EN_PROCESO. Estado actual: ${workOrder.status}`);
+      }
+
+      // Validar campos requeridos
+      if (!activityPerformed) {
+        throw new Error('activity_performed es requerido para finalizar el trabajo');
+      }
+
+      // Registrar end_time y actividad
+      await workOrder.update({
+        end_time: new Date(),
+        activity_performed: activityPerformed,
+        evidence_url: evidenceUrl
+      });
+
+      console.log(`✅ OT ${workOrder.work_order_id} finalizada`);
+
+      return await this.getWorkOrderById(workOrderId);
+    } catch (error) {
+      console.error('❌ Error finalizando trabajo:', error);
+      throw new Error(`Error al finalizar trabajo: ${error.message}`);
+    }
+  }
+
+  /**
+   * Registrar resultados de pruebas
+   * @param {number} workOrderId - ID de la WorkOrder
+   * @param {string} testResults - Resultados de pruebas (JSON o texto)
+   * @returns {Promise<WorkOrder>}
+   */
+  async performTests(workOrderId, testResults) {
+    try {
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
+      }
+
+      // Validar que el trabajo ya fue finalizado
+      if (!workOrder.end_time) {
+        throw new Error('Debe finalizar el trabajo antes de registrar pruebas');
+      }
+
+      // Registrar pruebas
+      await workOrder.update({
+        test_results: testResults
+      });
+
+      console.log(`✅ Pruebas registradas para OT ${workOrder.work_order_id}`);
+
+      return await this.getWorkOrderById(workOrderId);
+    } catch (error) {
+      console.error('❌ Error registrando pruebas:', error);
+      throw new Error(`Error al registrar pruebas: ${error.message}`);
+    }
+  }
+
+  /**
+   * Resolver WorkOrder (cierre final)
+   * @param {number} workOrderId - ID de la WorkOrder
+   * @param {number} resolvedBy - Usuario que resuelve
+   * @returns {Promise<WorkOrder>}
+   */
+  async resolveWorkOrder(workOrderId, resolvedBy) {
+    try {
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
+      }
+
+      // Validar que esté EN_PROCESO
+      if (workOrder.status !== 'EN_PROCESO') {
+        throw new Error(`Solo se puede resolver una WorkOrder EN_PROCESO. Estado actual: ${workOrder.status}`);
+      }
+
+      // Validaciones obligatorias antes de resolver:
+      const validationErrors = [];
+
+      // 1. Validar que tiene solución/documentación del trabajo
+      if (!workOrder.activity_performed || workOrder.activity_performed.trim() === '') {
+        validationErrors.push('La evidencia de la solución (actividad realizada) es obligatoria');
+      }
+
+      // 2. Validar que tiene evidencia visual/documental
+      if (!workOrder.evidence_url || workOrder.evidence_url.trim() === '') {
+        validationErrors.push('La evidencia de la solución es obligatoria');
+      }
+
+      // 3. Validar que tiene firma digital
+      if (!workOrder.closure_signature || workOrder.closure_signature.trim() === '') {
+        validationErrors.push('La firma digital es obligatoria');
+      }
+
+      // 4. Validar que tiene hora de inicio
+      if (!workOrder.start_time) {
+        validationErrors.push('La hora de inicio es obligatoria');
+      }
+
+      // 5. Validar que tiene hora de fin
+      if (!workOrder.end_time) {
+        validationErrors.push('La hora de finalización es obligatoria');
+      }
+
+      // Si hay errores de validación, devolver todos los mensajes
+      if (validationErrors.length > 0) {
+        throw new Error(`Campos obligatorios faltantes: ${validationErrors.join(', ')}`);
+      }
+
+      // Resolver WorkOrder
+      await workOrder.update({
+        status: 'RESUELTA',
+        resolved_by_id: resolvedBy
+      });
+
+      console.log(`✅ OT ${workOrder.work_order_id} resuelta y completada`);
+
+      return await this.getWorkOrderById(workOrderId);
+    } catch (error) {
+      console.error('❌ Error resolviendo WorkOrder:', error);
+      throw new Error(`Error al resolver orden de trabajo: ${error.message}`);
+    }
+  }
+
+  /**
+   * Cancelar WorkOrder
+   * @param {number} workOrderId - ID de la WorkOrder
+   * @param {string} reason - Razón de cancelación
+   * @returns {Promise<WorkOrder>}
+   */
+  async cancelWorkOrder(workOrderId, reason) {
+    try {
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
+      }
+
+      // No se puede cancelar si ya está COMPLETADO
+      if (workOrder.status === 'COMPLETADO') {
+        throw new Error('No se puede cancelar una WorkOrder ya COMPLETADA');
+      }
+
+      // Cancelar
+      await workOrder.update({
+        status: 'CANCELADO',
+        cancellation_reason: reason
+      });
+
+      console.log(`✅ OT ${workOrder.work_order_id} cancelada`);
+
+      return await this.getWorkOrderById(workOrderId);
+    } catch (error) {
+      console.error('❌ Error cancelando WorkOrder:', error);
+      throw new Error(`Error al cancelar orden de trabajo: ${error.message}`);
+    }
+  }
+
+  /**
+   * Obtener WorkOrder por ID
+   * @param {number} workOrderId - ID de la WorkOrder
+   * @returns {Promise<WorkOrder>}
+   */
+  async getWorkOrderById(workOrderId) {
+    try {
+      const workOrder = await WorkOrder.findByPk(workOrderId, {
+        include: [
+          {
+            model: FailureOrder,
+            as: 'failureOrder',
+            include: [
+              { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] },
+              { model: require('../models').Inspectable, as: 'affectedInspectable' }
+            ]
+          },
+          {
+            model: User,
+            as: 'resolver',
+            attributes: ['user_id', 'user_name']
+          },
+          {
+            model: WorkOrderPart,
+            as: 'parts',
+            include: [
+              { model: Inventory, as: 'inventory' }
+            ]
+          }
+        ]
+      });
+
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
+      }
+
+      return workOrder;
+    } catch (error) {
+      console.error('❌ Error obteniendo WorkOrder:', error);
+      throw new Error(`Error al obtener orden de trabajo: ${error.message}`);
+    }
+  }
+
+  /**
+   * Listar WorkOrders con filtros
+   * @param {Object} filters - Filtros
+   * @returns {Promise<Array>}
+   */
+  async getWorkOrders(filters = {}) {
+    try {
+      const whereClause = {};
+
+      // Filtros
+      if (filters.status) whereClause.status = filters.status;
+      if (filters.priority_level) whereClause.priority_level = filters.priority_level;
+      if (filters.failure_order_id) whereClause.failure_order_id = filters.failure_order_id;
+
+      // Filtro por rango de fechas
+      if (filters.dateFrom || filters.dateTo) {
+        whereClause.createdAt = {};
+        if (filters.dateFrom) whereClause.createdAt[Op.gte] = new Date(filters.dateFrom);
+        if (filters.dateTo) whereClause.createdAt[Op.lte] = new Date(filters.dateTo);
+      }
+
+      const workOrders = await WorkOrder.findAll({
+        where: whereClause,
+        include: [
+          {
+            model: FailureOrder,
+            as: 'failureOrder',
+            include: [
+              { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] }
+            ]
+          },
+          {
+            model: User,
+            as: 'resolver',
+            attributes: ['user_id', 'user_name']
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      return workOrders;
+    } catch (error) {
+      console.error('❌ Error listando WorkOrders:', error);
+      throw new Error(`Error al listar órdenes de trabajo: ${error.message}`);
+    }
+  }
+
+  /**
+   * Obtener WorkOrders por área asignada
+   * @param {string} area - TECNICA o OPERATIVA
+   * @returns {Promise<Array>}
+   */
+  async getByArea(area) {
+    try {
+      // Validar área
+      if (!['TECNICA', 'OPERATIVA'].includes(area)) {
+        throw new Error('area debe ser TECNICA u OPERATIVA');
+      }
+
+      const workOrders = await WorkOrder.findAll({
+        include: [
+          {
+            model: FailureOrder,
+            as: 'failureOrder',
+            where: { assigned_to: area },
+            include: [
+              { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] }
+            ]
+          },
+          {
+            model: User,
+            as: 'resolver',
+            attributes: ['user_id', 'user_name']
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      return workOrders;
+    } catch (error) {
+      console.error('❌ Error obteniendo WorkOrders por área:', error);
+      throw new Error(`Error al obtener órdenes por área: ${error.message}`);
+    }
+  }
+
+  /**
+   * Actualizar WorkOrder
+   * @param {number} workOrderId - ID de la WorkOrder
+   * @param {Object} updateData - Datos a actualizar
+   * @returns {Promise<WorkOrder>}
+   */
+  async updateWorkOrder(workOrderId, updateData) {
+    try {
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
+      }
+
+      // Campos permitidos para actualizar
+      const allowedFields = ['description', 'priority_level'];
+
+      const filteredData = {};
+      allowedFields.forEach(field => {
+        if (updateData[field] !== undefined) {
+          filteredData[field] = updateData[field];
         }
-      ],
-      transaction: t
-    });
-    
-    if (!workOrder) {
-      throw new Error(`Orden de trabajo ${workOrderId} no encontrada`);
-    }
-
-    // ✅ VERIFICACIÓN ANTI-DUPLICADO: Si ya se mantuvo para este checklist
-    if (currentChecklistId && workOrder.initialResponse?.checklist?.checklist_id === currentChecklistId) {
-      throw new Error(`Esta falla ya fue mantenida para el checklist actual (recurrencia: ${workOrder.recurrence_count})`);
-    }
-
-    const newRecurrenceCount = workOrder.recurrence_count + 1;
-    
-    await workOrder.update({
-      recurrence_count: newRecurrenceCount,
-      status: 'EN_PROCESO',
-      last_updated_date: new Date()
-    }, { transaction: t });
-
-    console.log(`✅ DEBUG - Recurrencia actualizada: ${workOrder.recurrence_count} → ${newRecurrenceCount}`);
-
-    if (!transaction) {
-      await t.commit();
-    }
-    return workOrder;
-  } catch (error) {
-    if (!transaction) {
-      await t.rollback();
-    }
-    console.error('Error actualizando recurrencia:', error);
-    throw error;
-  }
-};
-
-/**
- * Cierra una orden de trabajo con detalles de resolución
- */
-const closeWorkOrder = async ({
-  workOrderId,
-  closingResponseId,
-  solutionText,
-  resolutionDetails,
-  closedById,
-  evidenceSolutionUrl = null,
-  responsibleArea = null,
-  transaction: existingTransaction
-}) => {
-  const transaction = existingTransaction || await connection.transaction();
-  
-  try {
-    const workOrder = await WorkOrder.findByPk(workOrderId, { transaction });
-    if (!workOrder) {
-      throw new Error(`Orden de trabajo ${workOrderId} no encontrada`);
-    }
-
-    await workOrder.update({
-      status: 'RESUELTO',
-      solution_text: solutionText,
-      resolution_details: resolutionDetails,
-      evidence_solution_url: evidenceSolutionUrl,
-      responsible_area: responsibleArea || workOrder.responsible_area,
-      resolved_at: new Date(),
-      closed_at: new Date(),
-      closing_response_id: closingResponseId,
-      closed_by: closedById,
-      last_updated_date: new Date()
-    }, { transaction });
-
-    if (!existingTransaction) {
-      await transaction.commit();
-    }
-    return workOrder;
-  } catch (error) {
-    if (!existingTransaction) {
-      await transaction.rollback();
-    }
-    console.error('Error cerrando orden de trabajo:', error);
-    throw error;
-  }
-};
-
-/**
- * Obtiene órdenes de trabajo pendientes por usuario o todas
- */
-const getPendingWorkOrders = async (userId = null, filters = {}) => {
-  try {
-    const whereClause = {
-      status: { [Op.in]: ['PENDIENTE', 'EN_PROCESO'] }
-    };
-
-    if (userId) {
-      whereClause.reported_by_id = userId;
-    }
-
-    // Construir include base
-    const baseInclude = [
-      {
-        model: User,
-        as: 'reporter',
-        attributes: ['user_id', 'user_name']
-      },
-      {
-        model: User,
-        as: 'closer',
-        attributes: ['user_id', 'user_name']
-      },
-      {
-        model: Inspectable,
-        as: 'inspectable',
-        attributes: ['ins_id', 'name']
-      },
-      {
-        model: ChecklistResponse,
-        as: 'initialResponse',
-        required: true
-      },
-      {
-        model: ChecklistResponse,
-        as: 'closingResponse',
-        required: false
-      },
-      {
-        model: ChecklistItem,
-        as: 'checklistItem',
-        attributes: ['question_text', 'item_number']
-      }
-    ];
-
-    let include = [...baseInclude];
-
-    // Agregar filtro por checklist_type_id si está presente
-    if (filters.checklistTypeId) {
-      const checklistResponseIndex = include.findIndex(inc => inc.as === 'initialResponse');
-      if (checklistResponseIndex !== -1) {
-        include[checklistResponseIndex] = {
-          ...include[checklistResponseIndex],
-          include: [
-            {
-              model: Checklist,
-              as: 'checklist',
-              attributes: ['checklist_type_id'],
-              required: true,
-              where: { checklist_type_id: filters.checklistTypeId }
-            }
-          ]
-        };
-      }
-    }
-
-    // Agregar filtro por checklist_id si está presente
-    if (filters.checklistId) {
-      const checklistResponseIndex = include.findIndex(inc => inc.as === 'initialResponse');
-      if (checklistResponseIndex !== -1) {
-        include[checklistResponseIndex].where = {
-          checklist_id: filters.checklistId
-        };
-      }
-    }
-
-    const workOrders = await WorkOrder.findAll({
-      where: whereClause,
-      include,
-      order: [['createdAt', 'DESC']]
-    });
-
-    return workOrders;
-  } catch (error) {
-    console.error('Error obteniendo órdenes de trabajo pendientes:', error);
-    throw error;
-  }
-};
-
-/**
- * Obtiene órdenes de trabajo resueltas con detalles completos
- */
-const getResolvedWorkOrders = async (filters = {}) => {
-  try {
-    const whereClause = {
-      status: { [Op.in]: ['RESUELTO', 'CERRADO'] }
-    };
-
-    // Construir include con todas las relaciones necesarias
-    const baseInclude = [
-      {
-        model: User,
-        as: 'reporter',
-        attributes: ['user_id', 'user_name']
-      },
-      {
-        model: User,
-        as: 'closer',
-        attributes: ['user_id', 'user_name']
-      },
-      {
-        model: Inspectable,
-        as: 'inspectable',
-        attributes: ['ins_id', 'name']
-      },
-      {
-        model: ChecklistResponse,
-        as: 'initialResponse',
-        required: true,
-        include: [
-          {
-            model: Checklist,
-            as: 'checklist',
-            attributes: ['checklist_type_id'],
-            required: true
-          }
-        ]
-      },
-      {
-        model: ChecklistResponse,
-        as: 'closingResponse',
-        required: false
-      },
-      {
-        model: ChecklistItem,
-        as: 'checklistItem',
-        attributes: ['question_text', 'item_number']
-      }
-    ];
-
-    let include = [...baseInclude];
-
-    // Agregar filtro por checklist_type_id si está presente
-    if (filters.checklistTypeId) {
-      const checklistResponseIndex = include.findIndex(inc => inc.as === 'initialResponse');
-      if (checklistResponseIndex !== -1) {
-        include[checklistResponseIndex] = {
-          ...include[checklistResponseIndex],
-          include: [
-            {
-              model: Checklist,
-              as: 'checklist',
-              attributes: ['checklist_type_id'],
-              required: true,
-              where: { checklist_type_id: filters.checklistTypeId }
-            }
-          ]
-        };
-      }
-    }
-
-    // ✅ AGREGAR FILTRO POR CHECKLIST_ID SI ESTÁ PRESENTE
-    if (filters.checklistId) {
-      const checklistResponseIndex = include.findIndex(inc => inc.as === 'initialResponse');
-      if (checklistResponseIndex !== -1) {
-        include[checklistResponseIndex].where = {
-          checklist_id: filters.checklistId
-        };
-      }
-    }
-
-    const workOrders = await WorkOrder.findAll({
-      where: whereClause,
-      include,
-      order: [['resolved_at', 'DESC']] // Ordenar por fecha de resolución más reciente
-    });
-
-    return workOrders;
-  } catch (error) {
-    console.error('Error obteniendo órdenes de trabajo resueltas:', error);
-    throw error;
-  }
-};
-
-/**
- * Maneja la lógica de creación o actualización de OT basado en una respuesta de checklist
- */
-const handleWorkOrderForResponse = async (responseData, transaction) => {
-  try {
-    const {
-      checklist_id,
-      checklist_item_id,
-      inspectable_id,
-      responded_by,
-      response_compliance,
-      comment,
-      responsibleArea = 'Técnico'
-    } = responseData;
-
-    console.log('🔍 DEBUG - handleWorkOrderForResponse recibir datos:', {
-      checklist_id,
-      checklist_item_id,
-      inspectable_id,
-      response_compliance,
-      comment,
-      responsibleArea
-    });
-
-    // Solo crear/actualizar OT si es una falla
-    if (response_compliance !== 'no cumple' && response_compliance !== 'observación') {
-      console.log('🚨 DEBUG - No es una falla, no se crea OT');
-      return null;
-    }
-
-    // ✅ ASIGNACIÓN AUTOMÁTICA DE SEVERITY BASADO EN TIPO DE RESPUESTA
-    let autoSeverity;
-    if (response_compliance === 'observación') {
-      autoSeverity = 'leve';  // Observación = leve
-    } else if (response_compliance === 'no cumple') {
-      autoSeverity = 'crítica';  // No cumple = crítica
-    } else {
-      autoSeverity = 'leve';  // Default fallback
-    }
-
-    console.log('🔍 DEBUG - Severity asignado automáticamente:', {
-      response_compliance,
-      autoSeverity
-    });
-
-    // ✅ NUEVA LÓGICA: Buscar OT existente diferenciando entre actualización y nueva recurrencia
-    console.log('🔍 DEBUG - Buscando OT existente:', { inspectable_id, checklist_item_id, currentChecklistId: checklist_id });
-    const existingWorkOrderInfo = await findExistingWorkOrder(inspectable_id, checklist_item_id, checklist_id, transaction);
-
-    if (existingWorkOrderInfo) {
-      const { workOrder: existingWorkOrder, isSameChecklist, shouldIncrementRecurrence } = existingWorkOrderInfo;
-      
-      console.log('✅ DEBUG - OT existente encontrada:', {
-        id: existingWorkOrder.id,
-        checklist_item_id: existingWorkOrder.checklist_item_id,
-        status: existingWorkOrder.status,
-        isSameChecklist,
-        shouldIncrementRecurrence
       });
-      
-      // ✅ LÓGICA CORREGIDA: Solo incrementar recurrencia si es de checklist diferente
-      if (shouldIncrementRecurrence) {
-        console.log('🔄 DEBUG - Incrementando recurrencia (checklist diferente)');
-        await updateRecurrence(existingWorkOrder.id, checklist_id, transaction);
+
+      await workOrder.update(filteredData);
+
+      return await this.getWorkOrderById(workOrderId);
+    } catch (error) {
+      console.error('❌ Error actualizando WorkOrder:', error);
+      throw new Error(`Error al actualizar orden de trabajo: ${error.message}`);
+    }
+  }
+
+  /**
+   * Agregar repuesto utilizado
+   * @param {number} workOrderId - ID de la WorkOrder
+   * @param {Object} partData - {inventory_id, quantity_used}
+   * @returns {Promise<WorkOrderPart>}
+   */
+  async addUsedPart(workOrderId, partData) {
+    try {
+      const { inventory_id, quantity_used = 1 } = partData;
+
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
+      }
+
+      // Solo se pueden agregar repuestos si está EN_PROCESO
+      if (workOrder.status !== 'EN_PROCESO') {
+        throw new Error('Solo se pueden agregar repuestos a WorkOrders EN_PROCESO');
+      }
+
+      // Verificar que el inventory item existe
+      const inventoryItem = await Inventory.findByPk(inventory_id);
+      if (!inventoryItem) {
+        throw new Error(`Inventory item con ID ${inventory_id} no encontrado`);
+      }
+
+      // Verificar si ya existe un registro con este repuesto
+      const existingPart = await WorkOrderPart.findOne({
+        where: {
+          work_order_id: workOrder.id,
+          inventory_id
+        }
+      });
+
+      if (existingPart) {
+        // Si ya existe, actualizar la cantidad sumándola a la existente
+        const newQuantity = existingPart.quantity_used + quantity_used;
+
+        // Verificar disponibilidad total
+        if (inventoryItem.quantity < newQuantity) {
+          throw new Error(`Stock insuficiente. Disponible: ${inventoryItem.quantity}, Total solicitado: ${newQuantity}`);
+        }
+
+        // Actualizar cantidad existente
+        existingPart.quantity_used = newQuantity;
+        await existingPart.save();
+
+        // Actualizar stock (restar solo la cantidad adicional)
+        await inventoryItem.update({
+          quantity: inventoryItem.quantity - quantity_used
+        });
+
+        console.log(`✅ Cantidad actualizada para repuesto en OT ${workOrder.work_order_id}`);
+        return existingPart;
       } else {
-        console.log('📝 DEBUG - Actualizando respuesta del mismo checklist (NO incrementar recurrencia)');
-        // Opcional: actualizar description si el comentario cambió
-        if (comment && comment !== existingWorkOrder.description) {
-          await existingWorkOrder.update({
-            description: comment,
-            last_updated_date: new Date()
-          }, { transaction });
+        // Si no existe, crear nuevo registro
+        // Verificar disponibilidad
+        if (inventoryItem.quantity < quantity_used) {
+          throw new Error(`Stock insuficiente. Disponible: ${inventoryItem.quantity}, Solicitado: ${quantity_used}`);
+        }
+
+        // Crear registro en work_order_parts
+        const workOrderPart = await WorkOrderPart.create({
+          work_order_id: workOrder.id,
+          inventory_id,
+          quantity_used
+        });
+
+        // Actualizar stock
+        await inventoryItem.update({
+          quantity: inventoryItem.quantity - quantity_used
+        });
+
+        console.log(`✅ Repuesto agregado a OT ${workOrder.work_order_id}`);
+        return workOrderPart;
+      }
+    } catch (error) {
+      console.error('❌ Error agregando repuesto:', error);
+
+      // Manejar específicamente el error de constraint único
+      if (error.name === 'SequelizeUniqueConstraintError') {
+        throw new Error('Este repuesto ya existe en la orden de trabajo');
+      }
+
+      throw new Error(`Error al agregar repuesto: ${error.message}`);
+    }
+  }
+
+  /**
+   * Remover repuesto utilizado
+   * @param {number} workOrderId - ID de la WorkOrder
+   * @param {number} inventoryId - ID del inventory
+   * @returns {Promise<void>}
+   */
+  async removeUsedPart(workOrderId, inventoryId) {
+    try {
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
+      }
+
+      const workOrderPart = await WorkOrderPart.findOne({
+        where: {
+          work_order_id: workOrder.id,
+          inventory_id: inventoryId
+        }
+      });
+
+      if (!workOrderPart) {
+        throw new Error('Repuesto no encontrado en esta WorkOrder');
+      }
+
+      // Devolver al stock
+      const inventoryItem = await Inventory.findByPk(inventoryId);
+      if (inventoryItem) {
+        await inventoryItem.update({
+          quantity: inventoryItem.quantity + workOrderPart.quantity_used
+        });
+      }
+
+      // Eliminar registro
+      await workOrderPart.destroy();
+
+      console.log(`✅ Repuesto removido de OT ${workOrder.work_order_id}`);
+    } catch (error) {
+      console.error('❌ Error removiendo repuesto:', error);
+      throw new Error(`Error al remover repuesto: ${error.message}`);
+    }
+  }
+
+  /**
+   * Actualizar cantidad de repuesto utilizado
+   * @param {number} workOrderId - ID de la WorkOrder
+   * @param {number} inventoryId - ID del inventory
+   * @param {number} newQuantity - Nueva cantidad
+   * @returns {Promise<WorkOrderPart>}
+   */
+  async updateUsedPartQuantity(workOrderId, inventoryId, newQuantity) {
+    try {
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
+      }
+
+      const workOrderPart = await WorkOrderPart.findOne({
+        where: {
+          work_order_id: workOrder.id,
+          inventory_id: inventoryId
+        }
+      });
+
+      if (!workOrderPart) {
+        throw new Error('Repuesto no encontrado en esta WorkOrder');
+      }
+
+      const oldQuantity = workOrderPart.quantity_used;
+      const difference = newQuantity - oldQuantity;
+
+      // Actualizar stock
+      const inventoryItem = await Inventory.findByPk(inventoryId);
+      if (inventoryItem) {
+        const newStock = inventoryItem.quantity - difference;
+        if (newStock < 0) {
+          throw new Error('Stock insuficiente para esta actualización');
+        }
+        await inventoryItem.update({ quantity: newStock });
+      }
+
+      // Actualizar cantidad
+      await workOrderPart.update({ quantity_used: newQuantity });
+
+      console.log(`✅ Cantidad actualizada en OT ${workOrder.work_order_id}`);
+
+      return workOrderPart;
+    } catch (error) {
+      console.error('❌ Error actualizando cantidad:', error);
+      throw new Error(`Error al actualizar cantidad: ${error.message}`);
+    }
+  }
+
+  /**
+   * Usar múltiples repuestos
+   * @param {number} workOrderId - ID de la WorkOrder
+   * @param {Array} parts - Array de {inventoryId, quantity}
+   * @returns {Promise<Object>}
+   */
+  async useMultipleParts(workOrderId, parts) {
+    try {
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
+      }
+
+      if (workOrder.status !== 'EN_PROCESO') {
+        throw new Error('Solo se pueden agregar repuestos a WorkOrders EN_PROCESO');
+      }
+
+      const results = [];
+
+      for (const partData of parts) {
+        const { inventoryId, quantity = 1 } = partData;
+
+        try {
+          await this.addUsedPart(workOrderId, {
+            inventory_id: inventoryId,
+            quantity_used: quantity
+          });
+
+          results.push({
+            inventoryId,
+            success: true,
+            quantity,
+            message: 'Repuesto agregado exitosamente'
+          });
+        } catch (error) {
+          results.push({
+            inventoryId,
+            success: false,
+            error: error.message
+          });
         }
       }
-      
-      return existingWorkOrder;
-    } else {
-      console.log('❌ DEBUG - No se encontró OT existente, creando nueva...');
-      
-      // Crear nueva OT
-      const checklistResponse = await ChecklistResponse.findOne({
-        where: {
-          checklist_id,
-          checklist_item_id,
-          inspectable_id,
-          responded_by
-        },
-        order: [['createdAt', 'DESC']],
-        transaction
-      });
 
-      if (!checklistResponse) {
-        throw new Error('No se pudo encontrar la respuesta del checklist recién creada');
+      return {
+        workOrderId,
+        results,
+        successCount: results.filter(r => r.success).length,
+        errorCount: results.filter(r => !r.success).length
+      };
+    } catch (error) {
+      console.error('❌ Error usando múltiples repuestos:', error);
+      throw new Error(`Error al usar múltiples repuestos: ${error.message}`);
+    }
+  }
+
+  /**
+   * Obtener estadísticas de WorkOrders
+   * @param {Object} dateRange - {from, to}
+   * @returns {Promise<Object>}
+   */
+  async getStatistics(dateRange = {}) {
+    try {
+      const whereClause = {};
+
+      if (dateRange.from || dateRange.to) {
+        whereClause.createdAt = {};
+        if (dateRange.from) whereClause.createdAt[Op.gte] = new Date(dateRange.from);
+        if (dateRange.to) whereClause.createdAt[Op.lte] = new Date(dateRange.to);
       }
 
-      const newWorkOrder = await createWorkOrder({
-        initialResponseId: checklistResponse.response_id,
-        reportedById: responded_by,
-        inspectableId: inspectable_id,
-        checklistItemId: checklist_item_id,
-        description: comment,
-        severity: autoSeverity,  // ✅ Usar severity automático
-        responsibleArea,
-        transaction: transaction
-      });
+      const total = await WorkOrder.count({ where: whereClause });
+      const pending = await WorkOrder.count({ where: { ...whereClause, status: 'PENDIENTE' } });
+      const inProgress = await WorkOrder.count({ where: { ...whereClause, status: 'EN_PROCESO' } });
+      const completed = await WorkOrder.count({ where: { ...whereClause, status: 'RESUELTA' } });
+      const cancelled = await WorkOrder.count({ where: { ...whereClause, status: 'CANCELADO' } });
 
-      return newWorkOrder;
+      return {
+        total,
+        pending,
+        inProgress,
+        completed,
+        cancelled,
+        completionRate: total > 0 ? ((completed / total) * 100).toFixed(2) : 0
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo estadísticas:', error);
+      throw new Error(`Error al obtener estadísticas: ${error.message}`);
     }
-  } catch (error) {
-    console.error('Error manejando orden de trabajo para respuesta:', error);
-    throw error;
   }
-};
 
-/**
- * Maneja falla recurrente - Opción 1: Mantener falla existente
- * @param {number} workOrderId - ID de la orden de trabajo
- * @param {number} currentChecklistId - ID del checklist actual
- * @param {transaction} transaction - Transacción de base de datos
- * @returns {Promise<object>} - WorkOrder actualizada
- * @throws {Error} - Si la falla ya fue mantenida para este checklist
- */
-const maintainRecurringFailure = async (workOrderId, currentChecklistId = null, transaction) => {
-  console.log('🔄 DEBUG - Mantener falla recurrente:', { workOrderId, currentChecklistId });
-  return await updateRecurrence(workOrderId, currentChecklistId, transaction);
-};
-
-/**
- * Maneja falla recurrente - Opción 2: Crear nueva OT
- */
-const createNewFailureForSameItem = async (responseData, transaction) => {
-  // Esta función crea una nueva OT para el mismo ítem
-  // Se usa cuando el problema es diferente pero en el mismo ítem
-  console.log('🔍 DEBUG - createNewFailureForSameItem recibiendo:', responseData);
-  
-  try {
-    // 1. Obtener el checklist_id desde la WorkOrder existente o hacer consulta
-    let checklistId = responseData.checklist_id;
-    
-    if (!checklistId) {
-      // Si no viene en los datos, consultar usando el checklist_item_id
-      const checklistItem = await ChecklistItem.findByPk(responseData.checklist_item_id, {
-        attributes: ['checklist_id'],
-        transaction
+  /**
+   * Obtener última WorkOrder creada por usuario
+   * @param {number} userId - ID del usuario
+   * @returns {Promise<WorkOrder>}
+   */
+  async getLatestWorkOrderByUser(userId) {
+    try {
+      const latestFailureOrder = await FailureOrder.findOne({
+        where: { reported_by_id: userId },
+        order: [['createdAt', 'DESC']]
       });
-      
-      if (!checklistItem) {
-        throw new Error(`ChecklistItem con ID ${responseData.checklist_item_id} no encontrado`);
+
+      if (!latestFailureOrder) {
+        throw new Error('No se encontró ninguna falla reportada por este usuario');
       }
-      
-      checklistId = checklistItem.checklist_id;
-      console.log('🔍 DEBUG - Checklist ID obtenido desde ChecklistItem:', checklistId);
+
+      const latestWorkOrder = await WorkOrder.findOne({
+        where: { failure_order_id: latestFailureOrder.id },
+        include: [
+          {
+            model: FailureOrder,
+            as: 'failureOrder',
+            include: [
+              { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] }
+            ]
+          },
+          {
+            model: WorkOrderPart,
+            as: 'parts',
+            include: [
+              { model: Inventory, as: 'inventory' }
+            ]
+          }
+        ]
+      });
+
+      if (!latestWorkOrder) {
+        throw new Error('No se encontró orden de trabajo asociada');
+      }
+
+      return latestWorkOrder;
+    } catch (error) {
+      console.error('❌ Error obteniendo última WorkOrder:', error);
+      throw new Error(`Error al obtener última orden de trabajo: ${error.message}`);
     }
-    
-    // 2. Crear una nueva ChecklistResponse para el nuevo reporte
-    const newChecklistResponse = await ChecklistResponse.create({
-      checklist_id: checklistId,
-      checklist_item_id: responseData.checklist_item_id,
-      inspectable_id: responseData.inspectable_id,
-      responded_by: responseData.reported_by_id,
-      response_compliance: 'no cumple',
-      comment: responseData.description,
-      evidence_url: responseData.evidence_url || null
-    }, { transaction });
-    
-    console.log('🔍 DEBUG - Nueva ChecklistResponse creada:', newChecklistResponse.response_id);
-    
-    // 3. Crear la nueva WorkOrder usando la nueva ChecklistResponse
-    const newWorkOrder = await createWorkOrder({
-      initialResponseId: newChecklistResponse.response_id,
-      reportedById: responseData.reported_by_id,
-      inspectableId: responseData.inspectable_id,
-      checklistItemId: responseData.checklist_item_id,
-      description: responseData.description,
-      severity: responseData.severity || 'leve',
-      responsibleArea: responseData.responsibleArea || 'Técnico',
-      transaction
-    });
-    
-    console.log('✅ DEBUG - Nueva WorkOrder creada para falla recurrente:', newWorkOrder.id);
-    
-    return newWorkOrder;
-  } catch (error) {
-    console.error('Error en createNewFailureForSameItem:', error);
-    throw error;
   }
-};
 
-/**
- * Maneja falla recurrente - Opción 3: Resolver OT existente
- */
-const resolveRecurringFailure = async ({
-  workOrderId,
-  solutionText,
-  resolutionDetails,
-  evidenceSolutionUrl,
-  responsibleArea,
-  closedById,
-  closingResponseId,
-  transaction
-}) => {
-  return await closeWorkOrder({
-    workOrderId,
-    solutionText,
-    resolutionDetails,
-    evidenceSolutionUrl,
-    responsibleArea,
-    closedById,
-    closingResponseId,
-    transaction
-  });
-};
+  /**
+   * Generar ID único para WorkOrder
+   * @returns {string}
+   */
+  async updateWorkOrderFields(workOrderId, updateData) {
+    try {
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
+      }
 
-/**
- * Actualiza una orden de trabajo específica
- */
-const updateWorkOrder = async (updateData) => {
-  try {
-    const { work_order_id, ...fields } = updateData;
-    
-    if (!work_order_id) {
-      throw new Error('Se requiere work_order_id para actualizar');
+
+      // ✅ VALIDACIÓN: Si se intenta cambiar a RESUELTA, validar campos obligatorios
+      if (updateData.status === 'RESUELTA') {
+        const validationErrors = [];
+
+        // 1. Validar que tiene actividad realizada (descripción de la solución)
+        if (!workOrder.activity_performed || workOrder.activity_performed.trim() === '') {
+          validationErrors.push('La descripción de la actividad realizada es obligatoria');
+        }
+
+        // 2. Validar que tiene evidencia visual/documental
+        if (!workOrder.evidence_url || workOrder.evidence_url.trim() === '') {
+          validationErrors.push('La evidencia de la solución (imagen/foto) es obligatoria');
+        }
+
+        // 3. Validar que tiene firma digital
+        if (!workOrder.closure_signature || workOrder.closure_signature.trim() === '') {
+          validationErrors.push('La firma digital es obligatoria');
+        }
+
+        // 4. Validar que tiene hora de inicio
+        if (!workOrder.start_time) {
+          validationErrors.push('La hora de inicio es obligatoria');
+        }
+
+        // 5. Validar que tiene hora de fin
+        if (!workOrder.end_time) {
+          validationErrors.push('La hora de finalización es obligatoria');
+        }
+
+        // Si hay errores de validación, lanzar error con todos los mensajes
+        if (validationErrors.length > 0) {
+          throw new Error(`Campos obligatorios faltantes: ${validationErrors.join(', ')}`);
+        }
+
+        console.log(`✅ Validaciones pasadas para cambiar OT ${workOrder.work_order_id} a RESUELTA`);
+      }
+
+      await workOrder.update(updateData);
+
+      return await this.getWorkOrderById(workOrderId);
+    } catch (error) {
+      console.error('❌ Error actualizando campos WorkOrder:', error);
+      throw new Error(`Error al actualizar campos: ${error.message}`);
     }
-
-    const workOrder = await WorkOrder.findByPk(work_order_id);
-    if (!workOrder) {
-      throw new Error(`Orden de trabajo con ID ${work_order_id} no encontrada`);
-    }
-
-    await workOrder.update({
-      ...fields,
-      last_updated_date: new Date()
-    });
-
-    return workOrder;
-  } catch (error) {
-    console.error('Error actualizando orden de trabajo:', error);
-    throw error;
   }
-};
 
-/**
- * Obtiene estadísticas de órdenes de trabajo
- */
-const getWorkOrderStats = async () => {
-  try {
-    const stats = await WorkOrder.findAll({
-      attributes: [
-        'status',
-        [Sequelize.fn('COUNT', Sequelize.col('id')), 'count'],
-        [Sequelize.fn('AVG', Sequelize.col('recurrence_count')), 'avg_recurrence'],
-        [Sequelize.fn('MAX', Sequelize.col('recurrence_count')), 'max_recurrence']
-      ],
-      group: ['status']
-    });
-
-    const totalWorkOrders = await WorkOrder.count();
-    const pendingCount = await WorkOrder.count({ where: { status: 'PENDIENTE' } });
-    const inProgressCount = await WorkOrder.count({ where: { status: 'EN_PROCESO' } });
-    const resolvedCount = await WorkOrder.count({ where: { status: 'RESUELTO' } });
-
-    return {
-      total: totalWorkOrders,
-      by_status: {
-        pendiente: pendingCount,
-        en_proceso: inProgressCount,
-        resuelto: resolvedCount,
-        cerrado: await WorkOrder.count({ where: { status: 'CERRADO' } })
-      },
-      stats: stats
-    };
-  } catch (error) {
-    console.error('Error obteniendo estadísticas de OT:', error);
-    throw error;
+  generateWorkOrderId() {
+    const year = new Date().getFullYear();
+    const timestamp = Date.now().toString().slice(-6);
+    return `OT-${year}-${timestamp}`;
   }
-};
+}
 
-module.exports = {
-  createWorkOrder,
-  findExistingWorkOrder,
-  updateRecurrence,
-  closeWorkOrder,
-  updateWorkOrder,
-  getPendingWorkOrders,
-  getResolvedWorkOrders,
-  handleWorkOrderForResponse,
-  getWorkOrderStats,
-  generateWorkOrderId,
-  maintainRecurringFailure,
-  createNewFailureForSameItem,
-  resolveRecurringFailure,
-};
+module.exports = new WorkOrderService();

@@ -1,22 +1,19 @@
-'use strict';
-
-const { ChecklistSignature } = require('../models');
+const { FailureOrder } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 
 class FailureSignatureService {
   /**
-   * Crear una firma para una falla
+   * Crear una firma para reportar una orden de falla
    * @param {Object} data - Datos de la firma
-   * @returns {Promise<Object>} - Firma creada
+   * @returns {Promise<Object>} - Resultado de la operación
    */
-  async createSignature(data) {
+  async createReportSignature(data) {
     try {
       const {
         failureOrderId,
         userId,
         userName,
         roleName,
-        signatureType,
         signatureData
       } = data;
 
@@ -30,218 +27,297 @@ class FailureSignatureService {
       if (!userName) {
         throw new Error('userName es requerido');
       }
-      if (!roleName) {
-        throw new Error('roleName es requerido');
-      }
-      if (!signatureType) {
-        throw new Error('signatureType es requerido');
-      }
       if (!signatureData) {
         throw new Error('signatureData es requerido');
       }
 
-      // Validar tipo de firma
-      if (!['REPORT', 'RESOLUTION', 'CLOSE'].includes(signatureType)) {
-        throw new Error('signatureType debe ser REPORT, RESOLUTION o CLOSE');
+      // Verificar si la orden de falla existe
+      const failureOrder = await FailureOrder.findByPk(failureOrderId);
+      if (!failureOrder) {
+        throw new Error('Orden de falla no encontrada');
       }
 
-      // Verificar si ya existe una firma del mismo tipo para esta falla
-      const existingSignature = await this.getSignatureByType(failureOrderId, signatureType);
-      if (existingSignature) {
-        throw new Error(`Ya existe una firma de tipo ${signatureType} para esta falla`);
+      // Verificar si ya tiene firma de reporte
+      if (failureOrder.report_signature) {
+        throw new Error('Esta orden de falla ya tiene una firma de reporte');
       }
 
-      // Crear la firma
-      const signature = await ChecklistSignature.create({
-        failure_order_id: failureOrderId,
-        user_id: userId,
-        signed_by_name: userName,
-        role_at_signature: roleName,
-        signature_type: signatureType,
-        digital_token: signatureData,
-        signed_at: new Date()
+      // Crear la firma en el campo report_signature
+      await failureOrder.update({
+        report_signature: signatureData
       });
 
-      console.log(`✅ Firma ${signatureType} creada para falla ${failureOrderId} por ${userName}`);
+      console.log(`✅ Firma de reporte creada para falla ${failureOrderId} por ${userName}`);
 
       return {
         success: true,
-        data: signature,
-        message: `Firma ${signatureType} creada exitosamente`
+        data: {
+          failureOrderId,
+          userId,
+          userName,
+          roleName,
+          signatureData,
+          createdAt: new Date()
+        },
+        message: 'Firma de reporte creada exitosamente'
       };
 
     } catch (error) {
-      console.error('❌ Error creando firma:', error);
-      throw new Error(`Error al crear firma: ${error.message}`);
+      console.error('❌ Error creando firma de reporte:', error);
+      throw new Error(`Error al crear firma de reporte: ${error.message}`);
     }
   }
 
   /**
-   * Obtener firma por tipo para una falla específica
-   * @param {number} failureOrderId - ID de la falla
-   * @param {string} signatureType - Tipo de firma
-   * @returns {Promise<Object>} - Firma encontrada
+   * Crear una firma de administrador para orden de falla
+   * @param {Object} data - Datos de la firma
+   * @returns {Promise<Object>} - Resultado de la operación
    */
-  async getSignatureByType(failureOrderId, signatureType) {
+  async createAdminSignature(data) {
     try {
-      const signature = await ChecklistSignature.findOne({
-        where: {
-          failure_order_id: failureOrderId,
-          signature_type: signatureType
+      const {
+        failureOrderId,
+        adminId,
+        signatureData
+      } = data;
+
+      // Validaciones
+      if (!failureOrderId) throw new Error('failureOrderId es requerido');
+      if (!adminId) throw new Error('adminId es requerido');
+      if (!signatureData) throw new Error('signatureData es requerido');
+
+      // Verificar si la orden de falla existe
+      const failureOrder = await FailureOrder.findByPk(failureOrderId);
+      if (!failureOrder) {
+        throw new Error('Orden de falla no encontrada');
+      }
+
+      // Verificar si ya tiene firma de admin
+      if (failureOrder.admin_signature) {
+        throw new Error('Esta orden de falla ya tiene una firma de administrador');
+      }
+
+      // Crear la firma en los campos de admin
+      await failureOrder.update({
+        admin_signature: signatureData,
+        admin_signature_by_id: adminId,
+        admin_signature_at: new Date()
+      });
+
+      console.log(`✅ Firma de administrador creada para falla ${failureOrderId} por admin ${adminId}`);
+
+      return {
+        success: true,
+        data: {
+          failureOrderId,
+          adminId,
+          signatureData,
+          signedAt: new Date()
         },
+        message: 'Firma de administrador guardada exitosamente'
+      };
+
+    } catch (error) {
+      console.error('❌ Error creando firma de administrador:', error);
+      throw new Error(`Error al crear firma de administrador: ${error.message}`);
+    }
+  }
+
+  /**
+   * Obtener firma de reporte de una orden de falla
+   * @param {number} failureOrderId - ID de la orden de falla
+   * @returns {Promise<Object>} - Datos de la firma
+   */
+  async getReportSignature(failureOrderId) {
+    try {
+      const failureOrder = await FailureOrder.findByPk(failureOrderId, {
+        attributes: ['id', 'failure_order_id', 'report_signature', 'reported_by_id'],
         include: [
-          { model: require('../models').User, as: 'user', attributes: ['user_id', 'user_name'] }
+          {
+            model: require('../models').User,
+            as: 'reporter',
+            attributes: ['user_id', 'user_name', 'role_id']
+          }
         ]
       });
 
-      return signature;
+      if (!failureOrder) {
+        throw new Error('Orden de falla no encontrada');
+      }
+
+      // Obtener el rol directamente por separado
+      let roleName = 'Rol no especificado';
+      if (failureOrder.reporter && failureOrder.reporter.role_id) {
+        const { Role } = require('../models');
+        const role = await Role.findByPk(failureOrder.reporter.role_id, {
+          attributes: ['role_name']
+        });
+        if (role) {
+          roleName = role.role_name;
+        }
+      }
+
+      // Combinar la información del usuario con el rol
+      const reportedByWithRole = {
+        ...failureOrder.reporter,
+        role_name: roleName
+      };
+
+      return {
+        success: true,
+        data: {
+          hasReportSignature: !!failureOrder.report_signature,
+          reportSignature: failureOrder.report_signature,
+          reportedBy: reportedByWithRole,
+          failureOrderId: failureOrder.id
+        }
+      };
 
     } catch (error) {
-      console.error('❌ Error obteniendo firma por tipo:', error);
+      console.error('❌ Error obteniendo firma de reporte:', error);
       throw new Error(`Error al obtener firma: ${error.message}`);
     }
   }
 
   /**
-   * Obtener todas las firmas de una falla
-   * @param {number} failureOrderId - ID de la falla
-   * @returns {Promise<Array>} - Lista de firmas
+   * Obtener firma de administrador de una orden de falla
+   * @param {number} failureOrderId - ID de la orden de falla
+   * @returns {Promise<Object>} - Datos de la firma
    */
-  async getFailureSignatures(failureOrderId) {
+  async getAdminSignature(failureOrderId) {
     try {
-      const signatures = await ChecklistSignature.findAll({
-        where: {
-          failure_order_id: failureOrderId
-        },
-        order: [['signed_at', 'ASC']],
+      const failureOrder = await FailureOrder.findByPk(failureOrderId, {
+        attributes: ['id', 'failure_order_id', 'admin_signature', 'admin_signature_by_id', 'admin_signature_at'],
         include: [
-          { model: require('../models').User, as: 'user', attributes: ['user_id', 'user_name'] }
+          {
+            model: require('../models').User,
+            as: 'adminSigner',
+            attributes: ['user_id', 'user_name']
+          }
         ]
       });
 
-      return {
-        success: true,
-        data: signatures
-      };
-
-    } catch (error) {
-      console.error('❌ Error obteniendo firmas de falla:', error);
-      throw new Error(`Error al obtener firmas: ${error.message}`);
-    }
-  }
-
-  /**
-   * Verificar si se puede avanzar al siguiente estado
-   * @param {string} currentStatus - Estado actual
-   * @param {number} failureOrderId - ID de la falla
-   * @returns {Promise<Object>} - Resultado de validación
-   */
-  async canAdvanceStatus(currentStatus, failureOrderId) {
-    try {
-      const requiredSignatures = {
-        'REPORTADO': ['REPORT'],
-        'RESUELTO': ['REPORT', 'RESOLUTION'],
-        'CERRADO': ['REPORT', 'RESOLUTION', 'CLOSE']
-      };
-
-      const neededSignatures = requiredSignatures[currentStatus] || [];
-      const missingSignatures = [];
-
-      // Verificar cada firma requerida
-      for (const signatureType of neededSignatures) {
-        const signature = await this.getSignatureByType(failureOrderId, signatureType);
-        if (!signature) {
-          missingSignatures.push(signatureType);
-        }
+      if (!failureOrder) {
+        throw new Error('Orden de falla no encontrada');
       }
 
-      const canAdvance = missingSignatures.length === 0;
-
       return {
         success: true,
-        canAdvance,
-        missingSignatures,
-        message: canAdvance 
-          ? 'Se puede avanzar al siguiente estado'
-          : `Faltan firmas: ${missingSignatures.join(', ')}`
+        data: {
+          hasAdminSignature: !!failureOrder.admin_signature,
+          adminSignature: failureOrder.admin_signature,
+          signedBy: failureOrder.adminSigner,
+          signedAt: failureOrder.admin_signature_at,
+          failureOrderId: failureOrder.id
+        }
       };
 
     } catch (error) {
-      console.error('❌ Error verificando avance de estado:', error);
-      throw new Error(`Error al verificar avance: ${error.message}`);
+      console.error('❌ Error obteniendo firma de administrador:', error);
+      throw new Error(`Error al obtener firma de administrador: ${error.message}`);
     }
   }
 
   /**
-   * Obtener resumen de firmas para una falla
-   * @param {number} failureOrderId - ID de la falla
-   * @returns {Promise<Object>} - Resumen de firmas
+   * Verificar si una orden de falla tiene firma de reporte
+   * @param {number} failureOrderId - ID de la orden de falla
+   * @returns {Promise<Object>} - Resultado de la verificación
    */
-  async getSignatureSummary(failureOrderId) {
+  async hasReportSignature(failureOrderId) {
     try {
-      const signatures = await this.getFailureSignatures(failureOrderId);
-      
-      const summary = {
-        hasReport: false,
-        hasResolution: false,
-        hasClose: false,
-        reportSignature: null,
-        resolutionSignature: null,
-        closeSignature: null
-      };
-
-      signatures.data.forEach(sig => {
-        switch (sig.signature_type) {
-          case 'REPORT':
-            summary.hasReport = true;
-            summary.reportSignature = sig;
-            break;
-          case 'RESOLUTION':
-            summary.hasResolution = true;
-            summary.resolutionSignature = sig;
-            break;
-          case 'CLOSE':
-            summary.hasClose = true;
-            summary.closeSignature = sig;
-            break;
-        }
+      const failureOrder = await FailureOrder.findByPk(failureOrderId, {
+        attributes: ['report_signature']
       });
+
+      if (!failureOrder) {
+        throw new Error('Orden de falla no encontrada');
+      }
+
+      const hasSignature = !!failureOrder.report_signature;
 
       return {
         success: true,
-        data: summary
+        data: {
+          hasReportSignature: hasSignature,
+          failureOrderId
+        },
+        message: hasSignature
+          ? 'La orden de falla tiene firma de reporte'
+          : 'La orden de falla no tiene firma de reporte'
       };
 
     } catch (error) {
-      console.error('❌ Error obteniendo resumen de firmas:', error);
-      throw new Error(`Error al obtener resumen: ${error.message}`);
+      console.error('❌ Error verificando firma de reporte:', error);
+      throw new Error(`Error al verificar firma: ${error.message}`);
+    }
+  }
+
+  /**
+   * Verificar si una orden de falla tiene firma de administrador
+   * @param {number} failureOrderId - ID de la orden de falla
+   * @returns {Promise<Object>} - Resultado de la verificación
+   */
+  async hasAdminSignature(failureOrderId) {
+    try {
+      const failureOrder = await FailureOrder.findByPk(failureOrderId, {
+        attributes: ['admin_signature']
+      });
+
+      if (!failureOrder) {
+        throw new Error('Orden de falla no encontrada');
+      }
+
+      const hasSignature = !!failureOrder.admin_signature;
+
+      return {
+        success: true,
+        data: {
+          hasAdminSignature: hasSignature,
+          failureOrderId
+        },
+        message: hasSignature
+          ? 'La orden de falla tiene firma de administrador'
+          : 'La orden de falla no tiene firma de administrador'
+      };
+
+    } catch (error) {
+      console.error('❌ Error verificando firma de administrador:', error);
+      throw new Error(`Error al verificar firma de administrador: ${error.message}`);
     }
   }
 
   /**
    * Validar si el usuario puede firmar según su rol
    * @param {string} userRole - Rol del usuario
-   * @param {string} signatureType - Tipo de firma
+   * @param {string} signatureType - Tipo de firma (solo REPORT para fallas)
    * @returns {Promise<Object>} - Resultado de validación
    */
   async canUserSign(userRole, signatureType) {
     try {
-      const rolePermissions = {
-        'REPORT': ['ADMIN', 'TECNICO', 'OPERADOR'],
-        'RESOLUTION': ['ADMIN', 'TECNICO', 'OPERADOR'],
-        'CLOSE': ['ADMIN']
-      };
+      // Para órdenes de falla, solo se permite firma de tipo REPORT y ADMIN
+      if (signatureType !== 'REPORT' && signatureType !== 'ADMIN') {
+        return {
+          success: false,
+          canSign: false,
+          message: 'Tipo de firma no válido para órdenes de falla'
+        };
+      }
 
-      const allowedRoles = rolePermissions[signatureType] || [];
-      const canSign = allowedRoles.includes(userRole);
+      if (signatureType === 'ADMIN') {
+        // Validación básica, aunque el controlador debe verificar role_id === 1
+        return {
+          success: true,
+          canSign: true,
+          message: 'Firma de administrador permitida'
+        };
+      }
 
+      // ✅ CAMBIO: Todos los usuarios autenticados pueden firmar órdenes de falla
+      // No hay restricción de roles para firmas de OF y OT
       return {
         success: true,
-        canSign,
-        allowedRoles,
-        message: canSign 
-          ? 'El usuario puede firmar'
-          : `Solo los roles ${allowedRoles.join(', ')} pueden firmar`
+        canSign: true,
+        message: 'El usuario puede firmar órdenes de falla'
       };
 
     } catch (error) {

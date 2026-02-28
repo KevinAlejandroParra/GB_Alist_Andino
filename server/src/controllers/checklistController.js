@@ -5,7 +5,7 @@ const puppeteer = require("puppeteer")
 const ensureChecklistInstance = async (req, res) => {
   try {
     const { inspectableId } = req.params
-    const { premise_id, checklist_type_id } = req.body 
+    const { premise_id, checklist_type_id } = req.body
     const user_id = req.user.user_id
     const role_id = req.user.role_id
 
@@ -28,7 +28,7 @@ const ensureChecklistInstance = async (req, res) => {
 const getLatestChecklist = async (req, res) => {
   try {
     const { inspectableId } = req.params
-    const { checklist_type_id } = req.query 
+    const { checklist_type_id } = req.query
     const checklist = await checklistService.getLatestChecklist({
       inspectableId: Number.parseInt(inspectableId),
       checklist_type_id: Number.parseInt(checklist_type_id), // Pasar checklist_type_id al servicio
@@ -110,7 +110,7 @@ const createChecklist = async (req, res) => {
 const getChecklistById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Buscar el checklist con sus relaciones
     const checklist = await Checklist.findOne({
       where: { checklist_id: id },
@@ -162,7 +162,7 @@ const submitResponses = async (req, res) => {
     const { responses } = req.body
     const user_id = req.user.user_id
     const role_id = req.user.role_id
-    
+
     await checklistService.submitResponses({
       checklist_id: Number.parseInt(checklist_id),
       responses,
@@ -200,10 +200,10 @@ const submitResponses = async (req, res) => {
     res.status(200).json({ message: "Respuestas registradas exitosamente" })
   } catch (error) {
     console.error('Error en submitResponses:', error.message);
-    
+
     // Manejar errores de validación específicos
     if (error.message.includes('requiere un comentario') ||
-        error.message.includes('requiere evidencia')) {
+      error.message.includes('requiere evidencia')) {
       res.status(400).json({
         error: error.message,
         type: 'validation_error',
@@ -261,7 +261,7 @@ const updateWorkOrder = async (req, res) => {
       responded_by,
       closed_by,
     } = req.body
-   
+
 
     const updateData = {
       work_order_id: Number.parseInt(work_order_id),
@@ -331,10 +331,10 @@ const signChecklist = async (req, res) => {
     if (checklist) {
       // Verificar si tiene ambas firmas requeridas
       const hasTechnicalSignature = checklist.signatures.some(
-        sig => sig.role_id === 7 || sig.role_at_signature === '7' || sig.role?.role_name === 'Tecnico de mantenimiento'
+        sig => sig.role_id === 7 || sig.role?.role_name === 'Tecnico de mantenimiento'
       );
       const hasOperationsSignature = checklist.signatures.some(
-        sig => sig.role_id === 4 || sig.role_at_signature === '4' || sig.role?.role_name === 'Jefe de Operaciones'
+        sig => sig.role_id === 4 || sig.role?.role_name === 'Jefe de Operaciones'
       );
 
       // Si tiene ambas firmas, resetear is_unlocked a false para todos los items asociados
@@ -403,10 +403,17 @@ const downloadChecklistPDF = async (req, res) => {
     const htmlContent = generateChecklistHTML(checklistData)
 
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--disable-gpu"
+      ],
+      headless: 'new'
     })
     const page = await browser.newPage()
-    await page.setContent(htmlContent, { waitUntil: "networkidle0" })
+    await page.setContent(htmlContent, { waitUntil: "networkidle2" })
 
     // Inject a style tag to handle page breaks
     await page.addStyleTag({
@@ -477,23 +484,23 @@ const generateChecklistHTML = (data) => {
     return items.sort((a, b) => {
       const itemA = a.item_number || '';
       const itemB = b.item_number || '';
-      
+
       // Dividir por puntos y convertir cada parte a número para comparación
       const partsA = itemA.split('.').map(part => parseInt(part, 10) || 0);
       const partsB = itemB.split('.').map(part => parseInt(part, 10) || 0);
-      
+
       // Comparar parte por parte
       const maxLength = Math.max(partsA.length, partsB.length);
-      
+
       for (let i = 0; i < maxLength; i++) {
         const partA = partsA[i] || 0;
         const partB = partsB[i] || 0;
-        
+
         if (partA !== partB) {
           return partA - partB;
         }
       }
-      
+
       // Si todas las partes son iguales, comparar como string como fallback
       return itemA.localeCompare(itemB);
     });
@@ -506,7 +513,7 @@ const generateChecklistHTML = (data) => {
     sortedItems.forEach((item) => {
       // Verificar si es un ítem padre (parent_item_id es null)
       const isParentItem = !item.parent_item_id;
-      
+
       if (isParentItem) {
         // Renderizar el ítem padre en negrilla
         html += `
@@ -516,7 +523,7 @@ const generateChecklistHTML = (data) => {
                         </td>
                     </tr>
                  `
-          } else {
+      } else {
         // Es un ítem hijo, renderizar sin negrilla en el texto
         const response = item.responses && item.responses[0] ? item.responses[0] : {}
 
@@ -532,9 +539,47 @@ const generateChecklistHTML = (data) => {
           displayValue = response.value || ""
         }
 
-        const comment = response.comment || ""
-        const evidence = response.evidence_url ?
-        `<a href="http://localhost:5000${response.evidence_url}" target="_blank"><img src="http://localhost:5000${response.evidence_url}" class="evidence-image"/></a>` : ""
+        // Obtener las fallas asociadas a este item
+        const itemFailures = data.failures?.failures_by_item?.[item.checklist_item_id] || [];
+
+        let failuresHtml = '';
+        if (itemFailures.length > 0) {
+          failuresHtml = `
+            <div style="margin-top: 6px; padding: 6px; background: #fefbeb; border-radius: 4px;">
+              <strong style="font-size: 9px; color: #92400e;">📋 Órdenes de Falla (${itemFailures.length})</strong>
+              ${itemFailures.map((failure, idx) => `
+                <div style="background: #fff; margin-top: 6px; padding: 6px; border-radius: 3px; border-left: 3px solid ${failure.severity === 'CRITICA' ? '#dc2626' : failure.severity === 'MODERADA' ? '#f59e0b' : '#10b981'};">
+                  <div style="font-size: 8px; margin-bottom: 4px;">
+                    <strong style="color: #1f2937;">${idx + 1}. ${failure.severity || 'N/A'}</strong> - ${failure.description}
+                  </div>
+                  <div style="font-size: 7px; color: #6b7280; margin-bottom: 4px;">
+                    <strong>Asignado:</strong> ${failure.assigned_to_name} | 
+                    <strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez/veces` : 'Primera vez'}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        // Construir contenido de observaciones (comentario + descripciones de fallas)
+        let comment = response.comment || "";
+        if (itemFailures.length > 0) {
+          const failureDescriptions = itemFailures.map(f => `[Falla: ${f.description}]`).join(' ');
+          comment = comment ? `${comment} <br/> ${failureDescriptions}` : failureDescriptions;
+        }
+
+        // Construir contenido de evidencia (evidencia respuesta + evidencia fallas)
+        let evidence = response.evidence_url ?
+          `<a href="http://localhost:5000${response.evidence_url}" target="_blank"><img src="http://localhost:5000${response.evidence_url}" class="evidence-image"/></a>` : "";
+
+        if (itemFailures.length > 0) {
+          const failureImages = itemFailures
+            .filter(f => f.evidence_url)
+            .map(f => `<a href="http://localhost:5000${f.evidence_url}" target="_blank"><img src="http://localhost:5000${f.evidence_url}" class="evidence-image" style="margin-top: 4px; border-color: #ef4444;"/></a>`)
+            .join('');
+          evidence = evidence + failureImages;
+        }
 
         html += `
                     <tr class="sub-item-row">
@@ -550,6 +595,13 @@ const generateChecklistHTML = (data) => {
                         </td>
                         <td style="text-align: center; padding: 2px;">${evidence}</td>
                     </tr>
+                    ${failuresHtml ? `
+                    <tr class="failures-row" style="background-color: #fefbeb;">
+                        <td colspan="5" style="padding: 4px 8px; border-top: 1px solid #e5e7eb;">
+                            ${failuresHtml}
+                        </td>
+                    </tr>
+                    ` : ''}
                  `
       }
     })
@@ -563,10 +615,10 @@ const generateChecklistHTML = (data) => {
     sortedItems.forEach((deviceSection) => {
       // Verificar si es un ítem padre (parent_item_id es null)
       const isParentItem = !deviceSection.parent_item_id;
-      
+
       if (isParentItem) {
-      // Renderizar el header de la sección de dispositivo en negrilla
-      html += `
+        // Renderizar el header de la sección de dispositivo en negrilla
+        html += `
                 <tr class="device-section-row" style="background-color: #7c3aed; color: white;">
                     <td colspan="5" style="font-size: 10px; font-weight: bold; padding: 6px; color: white;">
                         <strong>${deviceSection.question_text}</strong>
@@ -589,9 +641,47 @@ const generateChecklistHTML = (data) => {
           displayValue = response.value || ""
         }
 
-        const comment = response.comment || ""
-        const evidence = response.evidence_url ?
-        `<a href="http://localhost:5000${response.evidence_url}" target="_blank"><img src="http://localhost:5000${response.evidence_url}" class="evidence-image"/></a>` : ""
+        // Obtener las fallas asociadas a este item
+        const itemFailures = data.failures?.failures_by_item?.[deviceSection.checklist_item_id] || [];
+
+        let failuresHtml = '';
+        if (itemFailures.length > 0) {
+          failuresHtml = `
+            <div style="margin-top: 6px; padding: 6px; background: #fefbeb; border-radius: 4px;">
+              <strong style="font-size: 9px; color: #92400e;">📋 Órdenes de Falla (${itemFailures.length})</strong>
+              ${itemFailures.map((failure, idx) => `
+                <div style="background: #fff; margin-top: 6px; padding: 6px; border-radius: 3px; border-left: 3px solid ${failure.severity === 'CRITICA' ? '#dc2626' : failure.severity === 'MODERADA' ? '#f59e0b' : '#10b981'};">
+                  <div style="font-size: 8px; margin-bottom: 4px;">
+                    <strong style="color: #1f2937;">${idx + 1}. ${failure.severity || 'N/A'}</strong> - ${failure.description}
+                  </div>
+                  <div style="font-size: 7px; color: #6b7280; margin-bottom: 4px;">
+                    <strong>Asignado:</strong> ${failure.assigned_to_name} | 
+                    <strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez/veces` : 'Primera vez'}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        // Construir contenido de observaciones (comentario + descripciones de fallas)
+        let comment = response.comment || "";
+        if (itemFailures.length > 0) {
+          const failureDescriptions = itemFailures.map(f => `[Falla: ${f.description}]`).join(' ');
+          comment = comment ? `${comment} <br/> ${failureDescriptions}` : failureDescriptions;
+        }
+
+        // Construir contenido de evidencia (evidencia respuesta + evidencia fallas)
+        let evidence = response.evidence_url ?
+          `<a href="http://localhost:5000${response.evidence_url}" target="_blank"><img src="http://localhost:5000${response.evidence_url}" class="evidence-image"/></a>` : "";
+
+        if (itemFailures.length > 0) {
+          const failureImages = itemFailures
+            .filter(f => f.evidence_url)
+            .map(f => `<a href="http://localhost:5000${f.evidence_url}" target="_blank"><img src="http://localhost:5000${f.evidence_url}" class="evidence-image" style="margin-top: 4px; border-color: #ef4444;"/></a>`)
+            .join('');
+          evidence = evidence + failureImages;
+        }
 
         html += `
                     <tr class="sub-item-row">
@@ -607,6 +697,13 @@ const generateChecklistHTML = (data) => {
                         </td>
                         <td style="text-align: center; padding: 2px;">${evidence}</td>
                     </tr>
+                    ${failuresHtml ? `
+                    <tr class="failures-row" style="background-color: #fefbeb;">
+                        <td colspan="5" style="padding: 4px 8px; border-top: 1px solid #e5e7eb;">
+                            ${failuresHtml}
+                        </td>
+                    </tr>
+                    ` : ''}
                 `
       }
     })
@@ -1160,8 +1257,8 @@ const getChecklistByTypeHelper = async (checklistTypeId, checklistInstanceData) 
   });
 
   return {
-     ...checklistInstanceData, // Contains checklist_id, type, signatures, pending_work_orders
-     type: checklistTypeTemplate.toJSON(), // Ensure the type data is from the template
+    ...checklistInstanceData, // Contains checklist_id, type, signatures, pending_work_orders
+    type: checklistTypeTemplate.toJSON(), // Ensure the type data is from the template
     items: combinedItems,
   };
 };
@@ -1215,6 +1312,25 @@ const getChecklistHistoryByType = async (req, res) => {
 }
 
 const { getChecklistDataForPDF } = require('../services/checklistService')
+
+const getResolvedFailuresByChecklistType = async (req, res) => {
+  try {
+    const { checklist_type_id } = req.params;
+    const workOrders = await checklistService.getWorkOrdersByChecklistType({
+      checklist_type_id: Number.parseInt(checklist_type_id),
+    });
+
+    // Filter for resolved/closed work orders
+    const resolvedWorkOrders = workOrders.filter(wo => wo.status === 'RESUELTA' || wo.status === 'CERRADA');
+
+    res.status(200).json(resolvedWorkOrders);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
 
 const getWorkOrdersByChecklistType = async (req, res) => {
   try {
@@ -1320,6 +1436,8 @@ const getParentItemsByChecklistType = async (req, res) => {
   }
 };
 
+
+
 const getChecklistTypeDetails = async (req, res) => {
   try {
     const { checklistTypeId } = req.params;
@@ -1354,6 +1472,7 @@ module.exports = {
   getPendingFailures,
   getClosedFailures,
   getWorkOrdersByChecklistType,
+  getResolvedFailuresByChecklistType,
   getChecklistTypeDetails,
   getParentItemsByChecklistType
 }

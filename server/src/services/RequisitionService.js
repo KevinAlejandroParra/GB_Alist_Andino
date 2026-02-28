@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { InventoryService } = require('./InventoryService');
+const InventoryService = require('./InventoryService');
 
 // Configuración de multer para subida de imágenes
 const storage = multer.diskStorage({
@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB máximo
@@ -163,7 +163,7 @@ class RequisitionService {
       }
 
       // Verificar estado actual
-      if (requisition.status !== 'SOLICITADO') {
+      if (!['SOLICITADO', 'PENDIENTE'].includes(requisition.status)) {
         throw new Error(`No se puede aprobar requisición en estado ${requisition.status}`);
       }
 
@@ -269,13 +269,13 @@ class RequisitionService {
         dateTo,
         page = 1,
         limit = 20,
-        sortBy = 'requested_at',
+        sortBy = 'createdAt',
         sortOrder = 'DESC'
       } = filters;
 
       // Construir condiciones WHERE
       const whereConditions = {};
-      
+
       if (status && status !== 'all') {
         whereConditions.status = status;
       }
@@ -285,12 +285,12 @@ class RequisitionService {
       }
 
       if (dateFrom || dateTo) {
-        whereConditions.requested_at = {};
+        whereConditions.createdAt = {};
         if (dateFrom) {
-          whereConditions.requested_at[require('sequelize').Op.gte] = new Date(dateFrom);
+          whereConditions.createdAt[require('sequelize').Op.gte] = new Date(dateFrom);
         }
         if (dateTo) {
-          whereConditions.requested_at[require('sequelize').Op.lte] = new Date(dateTo);
+          whereConditions.createdAt[require('sequelize').Op.lte] = new Date(dateTo);
         }
       }
 
@@ -302,8 +302,8 @@ class RequisitionService {
             model: WorkOrder,
             as: 'workOrder',
             include: [
-              { 
-                model: FailureOrder, 
+              {
+                model: FailureOrder,
                 as: 'failureOrder',
                 attributes: ['id', 'failure_order_id', 'description']
               }
@@ -377,7 +377,7 @@ class RequisitionService {
       }
 
       // Verificar estado actual
-      if (requisition.status !== 'SOLICITADO') {
+      if (!['SOLICITADO', 'PENDIENTE'].includes(requisition.status)) {
         throw new Error(`No se puede aprobar requisición en estado ${requisition.status}`);
       }
 
@@ -446,6 +446,108 @@ class RequisitionService {
     } catch (error) {
       console.error('❌ Error aprobando y agregando al inventario:', error);
       throw new Error(`Error al procesar requisición: ${error.message}`);
+    }
+  }
+
+  /**
+   * Recibir requisición y agregar al inventario
+   * @param {number} requisitionId - ID de la requisición
+   * @param {number} receivedBy - ID del usuario que recibe
+   * @param {Object} inventoryData - Datos del inventario
+   * @returns {Promise<Object>} - Requisición procesada
+   */
+  async receiveAndAddToInventory(requisitionId, receivedBy, inventoryData = {}) {
+    try {
+      const requisition = await Requisition.findByPk(requisitionId, {
+        include: [
+          {
+            model: WorkOrder,
+            as: 'workOrder',
+            include: [
+              {
+                model: FailureOrder,
+                as: 'failureOrder',
+                attributes: ['id', 'failure_order_id', 'description']
+              }
+            ]
+          },
+          { model: User, as: 'requester', attributes: ['user_id', 'user_name'] }
+        ]
+      });
+
+      if (!requisition) {
+        throw new Error(`Requisición ${requisitionId} no encontrada`);
+      }
+
+      // Verificar estado actual
+      if (!['SOLICITADO', 'PENDIENTE'].includes(requisition.status)) {
+        throw new Error(`No se puede recibir requisición en estado ${requisition.status}`);
+      }
+
+      // Verificar que el receptor existe
+      const receiver = await User.findByPk(receivedBy);
+      if (!receiver) {
+        throw new Error(`Usuario receptor ${receivedBy} no encontrado`);
+      }
+
+      // Datos por defecto para el inventario
+      const {
+        location = 'Almacén Central',
+        category = 'Repuesto',
+        status = 'Disponible',
+        notes = 'Recibido desde requisición',
+        image_url = null
+      } = inventoryData;
+
+      // Crear o actualizar el item en el inventario
+      const inventoryItem = await InventoryService.createOrUpdateInventoryItem({
+        part_name: requisition.part_reference,
+        quantity: requisition.quantity_requested, // Asumimos que se recibe todo lo solicitado
+        details: `Repuesto para OT: ${requisition.workOrder.work_order_id} - ${requisition.workOrder.failureOrder?.description || 'Sin descripción'}`,
+        location,
+        category,
+        status,
+        image_url
+      });
+
+      // Actualizar la requisición
+      await requisition.update({
+        status: 'RECIBIDO',
+        received_at: new Date(),
+        // received_by_id: receivedBy, // Si existiera este campo
+        notes: notes ? `${requisition.notes} [RECIBIDO: Agregado al inventario]` : requisition.notes
+      });
+
+      console.log(`✅ Requisición recibida e inventario actualizado: ${requisition.id}`);
+
+      return {
+        success: true,
+        data: {
+          requisition: await Requisition.findByPk(requisitionId, {
+            include: [
+              {
+                model: WorkOrder,
+                as: 'workOrder',
+                include: [
+                  {
+                    model: FailureOrder,
+                    as: 'failureOrder',
+                    attributes: ['id', 'failure_order_id', 'description']
+                  }
+                ]
+              },
+              { model: User, as: 'requester', attributes: ['user_id', 'user_name'] },
+              { model: User, as: 'approver', attributes: ['user_id', 'user_name'] }
+            ]
+          }),
+          inventory: inventoryItem
+        },
+        message: 'Requisición recibida y repuesto agregado al inventario exitosamente'
+      };
+
+    } catch (error) {
+      console.error('❌ Error recibiendo y agregando al inventario:', error);
+      throw new Error(`Error al procesar recepción: ${error.message}`);
     }
   }
 
@@ -586,6 +688,36 @@ class RequisitionService {
   }
 
   /**
+   * Eliminar requisición
+   * Solo el solicitante (requested_by_id) o un admin/soporte puede eliminar la requisición
+   */
+  async deleteRequisition(requisitionId, requesterUserId, userRoleId) {
+    try {
+      const requisition = await Requisition.findByPk(requisitionId);
+      if (!requisition) {
+        throw new Error(`Requisición ${requisitionId} no encontrada`);
+      }
+
+      // Permitir borrado si el usuario es quien solicitó o si tiene rol admin/soporte (1 o 2)
+      if (Number(requisition.requested_by_id) !== Number(requesterUserId) && ![1, 2].includes(Number(userRoleId))) {
+        throw new Error('No autorizado para eliminar esta requisición');
+      }
+
+      // Evitar eliminar requisiciones que ya fueron recibidas o aprobadas
+      if (['PENDIENTE', 'RECIBIDO'].includes(requisition.status)) {
+        throw new Error(`No se puede eliminar una requisición en estado ${requisition.status}`);
+      }
+
+      await requisition.destroy();
+
+      return { success: true, message: 'Requisición eliminada exitosamente' };
+    } catch (error) {
+      console.error('❌ Error eliminando requisición:', error);
+      throw new Error(error.message || 'Error al eliminar requisición');
+    }
+  }
+
+  /**
    * Obtener historial de requisiciones para una orden de trabajo
    * @param {number} workOrderId - ID de la orden de trabajo
    * @returns {Promise<Object>} - Historial de requisiciones
@@ -621,7 +753,7 @@ class RequisitionService {
   async getStatistics(dateFrom, dateTo) {
     try {
       const whereConditions = {};
-      
+
       if (dateFrom || dateTo) {
         whereConditions.createdAt = {};
         if (dateFrom) {

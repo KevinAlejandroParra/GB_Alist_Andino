@@ -46,7 +46,14 @@ class FailureOrderService {
       // ✅ NUEVO: Manejar recurrencia
       const isRecurring = data.isRecurring || false;
       const recurrenceCount = 1; // Primera ocurrencia por defecto
-      const closureSignature = null; // No tiene firma de cierre inicialmente
+      const reportSignature = null; // No tiene firma de reporte inicialmente
+
+      // 🔍 DEBUG: Verificar que inspectableId está llegando
+      console.log('🔍 ========== DEBUG: CREATE FROM CHECKLIST ==========');
+      console.log('📋 inspectableId recibido:', inspectableId);
+      console.log('🔢 checklistItemId recibido:', checklistItemId);
+      console.log('📝 description:', description);
+      console.log('🔍 ==================================================');
 
       // Generar ID único
       const failureOrderId = this.generateFailureOrderId();
@@ -65,8 +72,10 @@ class FailureOrderService {
         // ✅ NUEVO: Campos de recurrencia
         is_recurring: isRecurring,
         recurrence_count: recurrenceCount,
-        closure_signature: closureSignature
+        report_signature: reportSignature
       });
+
+      console.log(`✅ OF creada con affected_id: ${inspectableId} - ID: ${failureOrderId}`);
 
       // Cargar con relaciones
       const createdFailureOrder = await FailureOrder.findByPk(failureOrder.id, {
@@ -123,7 +132,7 @@ class FailureOrderService {
       // ✅ NUEVO: Manejar recurrencia para fallas independientes
       const isRecurring = data.isRecurring || false;
       const recurrenceCount = 1;
-      const closureSignature = null;
+      const reportSignature = null;
 
       // Generar ID único
       const failureOrderId = this.generateFailureOrderId();
@@ -142,7 +151,7 @@ class FailureOrderService {
         // ✅ NUEVO: Campos de recurrencia
         is_recurring: isRecurring,
         recurrence_count: recurrenceCount,
-        closure_signature: closureSignature
+        report_signature: reportSignature
       });
 
       // Cargar con relaciones
@@ -206,7 +215,7 @@ class FailureOrderService {
       // ✅ NUEVO: Manejar recurrencia para fallas con repuesto
       const isRecurring = data.isRecurring || false;
       const recurrenceCount = 1;
-      const closureSignature = null;
+      const reportSignature = null;
 
       // Generar ID único
       const failureOrderId = this.generateFailureOrderId();
@@ -226,7 +235,7 @@ class FailureOrderService {
         // ✅ NUEVO: Campos de recurrencia
         is_recurring: isRecurring,
         recurrence_count: recurrenceCount,
-        closure_signature: closureSignature
+        report_signature: reportSignature
       });
 
       // Cargar con relaciones
@@ -280,7 +289,7 @@ class FailureOrderService {
         // ✅ NUEVO: Campos de recurrencia
         'is_recurring',
         'recurrence_count',
-        'closure_signature'
+        'report_signature'
       ];
 
       const filteredData = {};

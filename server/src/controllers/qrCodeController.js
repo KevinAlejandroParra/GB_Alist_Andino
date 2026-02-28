@@ -153,7 +153,7 @@ class QrCodeController {
         return res.status(404).json({ success: false, message: 'Código QR no encontrado' });
       }
 
-      const checklist = await Checklist.findByPk(checklist_id, { include: [ { model: ChecklistType, as: 'type'} ]});
+      const checklist = await Checklist.findByPk(checklist_id, { include: [{ model: ChecklistType, as: 'type' }] });
       if (!checklist) {
         return res.status(404).json({ success: false, message: 'Checklist no encontrado' });
       }
@@ -281,23 +281,23 @@ class QrCodeController {
   // Obtener un único código QR por su ID
   getQrCodeById = async (req, res) => {
     try {
-        const { qr_id } = req.params;
-        const qrCode = await ChecklistQrCode.findByPk(qr_id);
+      const { qr_id } = req.params;
+      const qrCode = await ChecklistQrCode.findByPk(qr_id);
 
-        if (!qrCode) {
-            return res.status(404).json({ success: false, message: 'Código QR no encontrado' });
-        }
+      if (!qrCode) {
+        return res.status(404).json({ success: false, message: 'Código QR no encontrado' });
+      }
 
-        const qrImageBase64 = await this._generateQrImage(qrCode.qr_code);
+      const qrImageBase64 = await this._generateQrImage(qrCode.qr_code);
 
-        res.json({
-            success: true,
-            data: { ...qrCode.toJSON(), qr_image_base64: qrImageBase64 }
-        });
+      res.json({
+        success: true,
+        data: { ...qrCode.toJSON(), qr_image_base64: qrImageBase64 }
+      });
 
     } catch (error) {
-        console.error('Error obteniendo código QR por ID:', error);
-        res.status(500).json({ success: false, message: 'Error interno del servidor' });
+      console.error('Error obteniendo código QR por ID:', error);
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 
@@ -376,7 +376,7 @@ class QrCodeController {
 
       // SOLUCIÓN: Mapear IDs para mantener el orden original de selección del usuario
       console.log('🔍 DEBUG - IDs recibidos del frontend:', parent_item_ids);
-      
+
       // Obtener todos los items y crear un mapa para acceso rápido
       const allItems = await ChecklistItem.findAll({
         where: { checklist_item_id: parent_item_ids, checklist_type_id, parent_item_id: null },
@@ -407,7 +407,7 @@ class QrCodeController {
       for (let i = 0; i < parentItemsInOriginalOrder.length; i += partitionSize) {
         const groupItems = parentItemsInOriginalOrder.slice(i, i + partitionSize);
         const groupNumber = Math.floor(i / partitionSize) + 1;
-        
+
         console.log(`🔍 DEBUG - Grupo ${groupNumber}: items`, groupItems.map(item => `${item.item_number}:${item.checklist_item_id}`));
 
         const qrName = `QR-Grupo-${groupNumber}`;
@@ -451,9 +451,9 @@ class QrCodeController {
   generatePrintPdf = async (req, res) => {
     try {
       if (!this._ensureAdmin(res, req.user)) return;
-      
+
       const { qr_codes, options = {} } = req.body;
-      
+
       if (!qr_codes || !Array.isArray(qr_codes) || qr_codes.length === 0) {
         return res.status(400).json({ success: false, message: 'Se requiere un array de códigos QR' });
       }
@@ -478,12 +478,12 @@ class QrCodeController {
       for (const [typeName, typeCodes] of Object.entries(groupedQRCodes)) {
         pdfText += `═ TIPO: ${typeName.toUpperCase()} ═\n`;
         pdfText += `Cantidad: ${typeCodes.length} códigos\n\n`;
-        
+
         typeCodes.forEach((qr) => {
           pdfText += `${index}. ${qr.attraction_name}\n\n`;
           index++;
         });
-        
+
         pdfText += '\n';
       }
 
@@ -552,7 +552,7 @@ class QrCodeController {
       const totalQrCodes = qrCodes.length;
       const totalScans = qrScans.length;
       const allQrCompleted = totalScans >= totalQrCodes;
-      
+
       // Determinar si realmente se requiere QR (solo si hay un siguiente QR disponible)
       const actuallyRequiresQr = nextQrRequired && nextQrRequired.qr_code;
 
@@ -639,9 +639,10 @@ class QrCodeController {
         });
       }
 
-      // Obtener QR codes disponibles para este tipo de checklist
+      // Obtener QR codes disponibles para este tipo de checklist (tengan o no is_active: true)
+      // MODIFICADO: Traemos todos para poder dar mensajes de error más específicos
       const qrCodes = await ChecklistQrCode.findAll({
-        where: { checklist_type_id: checklist.type.checklist_type_id, is_active: true },
+        where: { checklist_type_id: checklist.type.checklist_type_id },
         include: [{ model: ChecklistQrItemAssociation, as: 'itemAssociations', include: [{ model: ChecklistItem, as: 'checklistItem' }] }],
         order: [['group_number', 'ASC']]
       });
@@ -654,16 +655,40 @@ class QrCodeController {
         });
       }
 
-      // Buscar el QR específico
+      // Filtrar solo los activos para la lógica de validación subsiguiente
+      const activeQrCodes = qrCodes.filter(qr => qr.is_active);
+
+      if (activeQrCodes.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Los códigos QR para este checklist están inactivos, contacte al administrador',
+          data: { is_valid: false }
+        });
+      }
+
+      // Buscar el QR específico (en la lista completa para saber si existe pero está inactivo)
       const qrCode = qrCodes.find(qr => qr.qr_code === qr_code);
 
       if (!qrCode) {
         return res.status(404).json({
           success: false,
-          message: 'Código QR no encontrado o inactivo',
+          message: 'Código QR no encontrado',
           data: { is_valid: false }
         });
       }
+
+      if (!qrCode.is_active) {
+        return res.status(400).json({
+          success: false,
+          message: 'El código QR escaneado está inactivo',
+          data: { is_valid: false }
+        });
+      }
+
+      // Para el resto del flujo usamos solo los activos
+      // Nota: Si el QR escaneado es válido (activo), ya está en activeQrCodes, 
+      // pero para cálculos de "siguiente requerido" etc, deberíamos usar activeQrCodes
+      // para no pedir un QR que está inactivo.
 
       // Obtener escaneos previos y items desbloqueados
       const qrScans = await ChecklistQrScan.findAll({
@@ -674,13 +699,12 @@ class QrCodeController {
         where: { is_unlocked: true },
         include: ['checklistItem']
       });
-
       // Calcular progreso actual
       const lastScan = qrScans.length > 0 ? qrScans[qrScans.length - 1] : null;
       const lastValidatedPartition = lastScan ? (await lastScan.getQrCode()).group_number : 0;
 
-      // Calcular siguiente QR requerido
-      const nextQrRequired = QrCodeController.calculateNextRequiredQr(qrCodes, unlockedItems.length, lastValidatedPartition);
+      // Calcular siguiente QR requerido (usando solo ACTIVOS)
+      const nextQrRequired = QrCodeController.calculateNextRequiredQr(activeQrCodes, unlockedItems.length, lastValidatedPartition);
 
       // Determinar si este QR es válido para la partición actual
       // IMPORTANTE: Lógica corregida para permitir completar secciones ya desbloqueadas
@@ -688,7 +712,7 @@ class QrCodeController {
 
       // VERIFICAR si el QR ya fue escaneado para este checklist específico
       const wasAlreadyScanned = qrScans.some(scan => scan.qr_id === qrCode.qr_id);
-      
+
       console.log(`🔍 DEBUG - QR ${qr_code} ya escaneado:`, wasAlreadyScanned);
       console.log(`🔍 DEBUG - Escaneos previos:`, qrScans.map(s => `QR:${s.qr_id}`));
 
@@ -700,7 +724,7 @@ class QrCodeController {
       // Solo permitir el QR si:
       // 1. Es el siguiente requerido según la lógica de particiones, Y no ha sido escaneado antes
       const isValidForCurrentProgress = !wasAlreadyScanned &&
-                                       (nextQrRequired && nextQrRequired.qr_id === qrCode.qr_id);
+        (nextQrRequired && nextQrRequired.qr_id === qrCode.qr_id);
 
       // Si el QR ya fue escaneado, es definitivamente inválido
       if (wasAlreadyScanned) {
@@ -712,11 +736,11 @@ class QrCodeController {
         { qr_code: nextQrRequired.qr_code, group_number: nextQrRequired.group_number } :
         (!isValidForCurrentProgress && wasAlreadyScanned ? null : null);
 
-      // Calcular progreso actual
+      // Calcular progreso actual (basado en ACTIVOS)
       const currentProgress = {
-        next_partition: nextQrRequired ? nextQrRequired.group_number : qrCodes.length + 1,
+        next_partition: nextQrRequired ? nextQrRequired.group_number : activeQrCodes.length + 1,
         unlocked_items_count: unlockedItems.length,
-        total_items: qrCodes.reduce((total, qr) => total + (qr.itemAssociations ? qr.itemAssociations.length : 0), 0)
+        total_items: activeQrCodes.reduce((total, qr) => total + (qr.itemAssociations ? qr.itemAssociations.length : 0), 0)
       };
 
       res.json({
@@ -733,7 +757,7 @@ class QrCodeController {
           current_progress: currentProgress,
           correct_qr: correctQrInfo,
           next_qr_required: nextQrRequired,
-          available_qr_codes: qrCodes.map(qr => ({
+          available_qr_codes: activeQrCodes.map(qr => ({
             qr_id: qr.qr_id,
             qr_code: qr.qr_code,
             group_number: qr.group_number,
@@ -744,14 +768,14 @@ class QrCodeController {
           })),
           // Información adicional para el frontend (calculada localmente)
           qr_progress_summary: {
-            total_qr_codes: qrCodes.length,
+            total_qr_codes: activeQrCodes.length,
             total_scans_completed: qrScans.length,
-            all_qr_completed: qrScans.length >= qrCodes.length,
+            all_qr_completed: qrScans.length >= activeQrCodes.length,
             last_validated_partition: lastValidatedPartition,
             next_partition_required: nextQrRequired ? nextQrRequired.group_number : null
           },
           checklist_completion_status: {
-            qr_authorization_complete: qrScans.length >= qrCodes.length,
+            qr_authorization_complete: qrScans.length >= activeQrCodes.length,
             requires_further_qr_scans: !!(nextQrRequired && nextQrRequired.qr_code),
             unlocked_items_count: unlockedItems.length,
             can_proceed_without_qr: !(nextQrRequired && nextQrRequired.qr_code)

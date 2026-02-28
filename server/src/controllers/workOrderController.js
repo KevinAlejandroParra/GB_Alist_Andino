@@ -1,430 +1,838 @@
-const workOrderService = require("../services/workOrderService");
-const checklistService = require("../services/checklistService");
-const { Sequelize } = require("../models");
-const Op = Sequelize.Op;
+'use strict';
 
-/**
- * Obtener órdenes de trabajo pendientes
- */
-const getPendingWorkOrders = async (req, res) => {
-  try {
-    const userId = req.query.user_id ? Number.parseInt(req.query.user_id) : null;
-    const checklistTypeId = req.query.checklist_type_id ? Number.parseInt(req.query.checklist_type_id) : null;
-    const checklistId = req.query.checklist_id ? Number.parseInt(req.query.checklist_id) : null;
-    
-    console.log('🔍 Debug: getPendingWorkOrders recibe:', { userId, checklistTypeId, checklistId, query: req.query });
+const WorkOrderService = require('../services/workOrderService');
+const { WorkOrder, WorkOrderPart, Inventory } = require('../models');
 
-    const filters = { checklistTypeId, checklistId };
-    const workOrders = await workOrderService.getPendingWorkOrders(userId, filters);
+class WorkOrderController {
+  /**
+   * Crear orden de trabajo desde OF
+   * POST /api/work-orders
+   */
+  async createWorkOrder(req, res) {
+    try {
+      const {
+        failure_order_id,
+        description,
+        priority_level = 'NORMAL',
+        created_by_id
+      } = req.body;
 
-    res.status(200).json(workOrders);
-  } catch (error) {
-    console.error('Error obteniendo órdenes de trabajo pendientes:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
+      // Validaciones básicas
+      if (!failure_order_id || !description) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'MISSING_REQUIRED_FIELDS',
+            message: 'failure_order_id y description son requeridos'
+          }
+        });
+      }
 
-/**
- * Obtener una orden de trabajo específica por ID
- */
-const getWorkOrderById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const workOrders = await workOrderService.getPendingWorkOrders();
-    const workOrder = workOrders.find(wo => wo.id === Number.parseInt(id));
+      const userId = created_by_id || req.user?.user_id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Usuario no autenticado'
+          }
+        });
+      }
 
-    if (!workOrder) {
-      return res.status(404).json({
-        success: false,
-        error: 'Orden de trabajo no encontrada'
+      // Llamar al servicio refactorizado
+      const result = await WorkOrderService.createWorkOrder({
+        failure_order_id: parseInt(failure_order_id),
+        description: description.trim(),
+        priority_level,
+        created_by_id: userId
       });
-    }
 
-    res.status(200).json({
-      success: true,
-      data: workOrder
-    });
-  } catch (error) {
-    console.error('Error obteniendo orden de trabajo:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
-
-/**
- * Cerrar una orden de trabajo (actualizado para nuevos campos)
- */
-const closeWorkOrder = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      closing_response_id,
-      solution_text,
-      resolution_details,
-      evidence_solution_url,
-      responsible_area
-    } = req.body;
-    const closedById = req.user.user_id;
-
-    if (!closing_response_id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Se requiere el ID de la respuesta de cierre'
+      res.status(201).json({
+        success: true,
+        data: result
       });
-    }
 
-    const workOrder = await workOrderService.closeWorkOrder({
-      workOrderId: id,
-      closingResponseId: closing_response_id,
-      solutionText: solution_text,
-      resolutionDetails: resolution_details,
-      evidenceSolutionUrl: evidence_solution_url,
-      responsibleArea: responsible_area,
-      closedById
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Orden de trabajo cerrada exitosamente',
-      data: workOrder
-    });
-  } catch (error) {
-    console.error('Error cerrando orden de trabajo:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
-
-/**
- * Opción 1: Mantener falla recurrente (incrementar contador)
- */
-const maintainRecurringFailure = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { checklist_id } = req.body; // ✅ Recibir currentChecklistId del frontend
-    
-    console.log('🔍 DEBUG - maintainRecurringFailure recibe:', { workOrderId: id, checklist_id });
-    
-    const workOrder = await workOrderService.maintainRecurringFailure(id, checklist_id);
-
-    res.status(200).json({
-      success: true,
-      message: 'Contador de recurrencia actualizado',
-      data: workOrder
-    });
-  } catch (error) {
-    console.error('Error manteniendo falla recurrente:', error);
-    
-    // ✅ MANEJAR ERROR ESPECÍFICO DE DUPLICADO
-    if (error.message.includes('ya fue mantenida para el checklist actual')) {
+    } catch (error) {
+      console.error('❌ Error en createWorkOrder:', error);
       res.status(400).json({
         success: false,
-        error: error.message,
-        code: 'ALREADY_MAINTAINED'
+        error: {
+          code: 'CREATE_WORK_ORDER_ERROR',
+          message: error.message
+        }
       });
-    } else {
+    }
+  }
+
+  /**
+   * Iniciar trabajo en OT
+   * PUT /api/work-orders/:id/start
+   */
+  async startWork(req, res) {
+    try {
+      const { id } = req.params;
+      const workOrderId = parseInt(id);
+      const { started_by } = req.body;
+
+      if (isNaN(workOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_ID',
+            message: 'ID de orden de trabajo inválido'
+          }
+        });
+      }
+
+      const userId = started_by || req.user?.user_id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Usuario no autenticado'
+          }
+        });
+      }
+
+      const result = await WorkOrderService.startWork(workOrderId, userId);
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en startWork:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'START_WORK_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Finalizar trabajo en OT
+   * PUT /api/work-orders/:id/finish
+   */
+  async finishWork(req, res) {
+    try {
+      const { id } = req.params;
+      const workOrderId = parseInt(id);
+      const { activity_performed, evidence_url } = req.body;
+
+      if (isNaN(workOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_ID',
+            message: 'ID de orden de trabajo inválido'
+          }
+        });
+      }
+
+      if (!activity_performed || activity_performed.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'ACTIVITY_REQUIRED',
+            message: 'activity_performed es requerido'
+          }
+        });
+      }
+
+      const result = await WorkOrderService.finishWork(
+        workOrderId,
+        activity_performed.trim(),
+        evidence_url
+      );
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en finishWork:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'FINISH_WORK_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Registrar resultados de pruebas
+   * PUT /api/work-orders/:id/tests
+   */
+  async performTests(req, res) {
+    try {
+      const { id } = req.params;
+      const workOrderId = parseInt(id);
+      const { test_results } = req.body;
+
+      if (isNaN(workOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_ID',
+            message: 'ID de orden de trabajo inválido'
+          }
+        });
+      }
+
+      if (!test_results || test_results.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'TEST_RESULTS_REQUIRED',
+            message: 'test_results es requerido'
+          }
+        });
+      }
+
+      const result = await WorkOrderService.performTests(
+        workOrderId,
+        test_results.trim()
+      );
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en performTests:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'PERFORM_TESTS_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Resolver WorkOrder (cierre final)
+   * PUT /api/work-orders/:id/resolve
+   */
+  async resolveWorkOrder(req, res) {
+    try {
+      const { id } = req.params;
+      const workOrderId = parseInt(id);
+      const { resolved_by } = req.body;
+
+      if (isNaN(workOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_ID',
+            message: 'ID de orden de trabajo inválido'
+          }
+        });
+      }
+
+      const userId = resolved_by || req.user?.user_id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Usuario no autenticado'
+          }
+        });
+      }
+
+      const result = await WorkOrderService.resolveWorkOrder(workOrderId, userId);
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en resolveWorkOrder:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'RESOLVE_WORK_ORDER_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Obtener OTs por área
+   * GET /api/work-orders/area/:area
+   */
+  async getByArea(req, res) {
+    try {
+      const { area } = req.params;
+
+      if (!['TECNICA', 'OPERATIVA'].includes(area)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_AREA',
+            message: 'Área debe ser TECNICA u OPERATIVA'
+          }
+        });
+      }
+
+      const result = await WorkOrderService.getByArea(area);
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en getByArea:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'GET_BY_AREA_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Cancelar orden de trabajo
+   * PUT /api/work-orders/:id/cancel
+   */
+  async cancelWorkOrder(req, res) {
+    try {
+      const { id } = req.params;
+      const workOrderId = parseInt(id);
+      const { reason } = req.body;
+
+      if (isNaN(workOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_ID',
+            message: 'ID de orden de trabajo inválido'
+          }
+        });
+      }
+
+      if (!reason || reason.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'REASON_REQUIRED',
+            message: 'Razón de cancelación es requerida'
+          }
+        });
+      }
+
+      const result = await WorkOrderService.cancelWorkOrder(
+        workOrderId,
+        reason.trim()
+      );
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en cancelWorkOrder:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'CANCEL_WORK_ORDER_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Obtener lista de órdenes de trabajo con filtros
+   * GET /api/work-orders
+   */
+  async getWorkOrders(req, res) {
+    try {
+      const { status, priority_level, dateFrom, dateTo } = req.query;
+
+      const filters = { status, priority_level, dateFrom, dateTo };
+      const result = await WorkOrderService.getWorkOrders(filters);
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en getWorkOrders:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'GET_WORK_ORDERS_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Obtener detalles de una OT específica
+   * GET /api/work-orders/:id
+   */
+  async getWorkOrderById(req, res) {
+    try {
+      const { id } = req.params;
+      const workOrderId = parseInt(id);
+
+      if (isNaN(workOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_ID',
+            message: 'ID de orden de trabajo inválido'
+          }
+        });
+      }
+
+      const result = await WorkOrderService.getWorkOrderById(workOrderId);
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en getWorkOrderById:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'GET_WORK_ORDER_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Agregar múltiples repuestos a una orden de trabajo
+   * POST /api/work-orders/:id/parts/multiple
+   */
+  async addMultipleParts(req, res) {
+    try {
+      const { id } = req.params;
+      const workOrderId = parseInt(id);
+      const { parts = [] } = req.body;
+
+      if (isNaN(workOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_WORK_ORDER_ID',
+            message: 'workOrderId debe ser un número válido'
+          }
+        });
+      }
+
+      if (!Array.isArray(parts) || parts.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_PARTS_ARRAY',
+            message: 'parts debe ser un array con al menos un repuesto'
+          }
+        });
+      }
+
+      const cleanedParts = parts.map((part, index) => {
+        const inventoryId = parseInt(part.inventoryId || part.partId);
+        const quantity = parseInt(part.quantity || part.quantityUsed || 1);
+        
+        if (isNaN(inventoryId)) {
+          throw new Error(`ID inválido para repuesto ${index + 1}`);
+        }
+        
+        return { inventoryId, quantity };
+      });
+      
+      const result = await WorkOrderService.useMultipleParts(workOrderId, cleanedParts);
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en addMultipleParts:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'ADD_MULTIPLE_PARTS_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Obtener estadísticas de OT
+   * GET /api/work-orders/statistics
+   */
+  async getStatistics(req, res) {
+    try {
+      const { dateFrom, dateTo } = req.query;
+      const dateRange = { from: dateFrom, to: dateTo };
+
+      const result = await WorkOrderService.getStatistics(dateRange);
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en getStatistics:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'GET_STATISTICS_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Obtener la última orden de trabajo creada por el usuario actual
+   * GET /api/work-orders/latest
+   */
+  async getLatestWorkOrderByUser(req, res) {
+    try {
+      const userId = req.user?.user_id;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Usuario no autenticado'
+          }
+        });
+      }
+
+      const result = await WorkOrderService.getLatestWorkOrderByUser(userId);
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en getLatestWorkOrderByUser:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'GET_LATEST_WORK_ORDER_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Actualizar campos específicos de una orden de trabajo
+   * PUT /api/work-orders/:id/update
+   */
+  async updateWorkOrderFields(req, res) {
+    try {
+      const { id } = req.params;
+      const workOrderId = parseInt(id);
+      
+      if (isNaN(workOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_ID',
+            message: 'ID de orden de trabajo inválido'
+          }
+        });
+      }
+
+      const updateData = {};
+      const allowedFields = [
+        'start_time',
+        'end_time',
+        'activity_performed',
+        'evidence_url',
+        'closure_signature',
+        'requiere_replacement',
+        'resolved_by_id',
+        'status'
+      ];
+
+      // Filtrar solo campos permitidos
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field];
+        }
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'NO_FIELDS_TO_UPDATE',
+            message: 'No se proporcionaron campos válidos para actualizar'
+          }
+        });
+      }
+
+      const result = await WorkOrderService.updateWorkOrderFields(workOrderId, updateData);
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Error en updateWorkOrderFields:', error);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'UPDATE_WORK_ORDER_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Obtener repuestos de una orden de trabajo
+   * GET /api/work-orders/:id/parts
+   */
+  async getWorkOrderParts(req, res) {
+    try {
+      const { id } = req.params;
+      const workOrderId = parseInt(id);
+
+      if (isNaN(workOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_ID',
+            message: 'ID de orden de trabajo inválido'
+          }
+        });
+      }
+
+      const parts = await WorkOrderPart.findAll({
+        where: { work_order_id: workOrderId },
+        include: [{
+          model: Inventory,
+          as: 'inventory',
+          attributes: ['id', 'part_name', 'details', 'category', 'location', 'quantity', 'status']
+        }]
+      });
+
+      res.status(200).json({
+        success: true,
+        data: parts
+      });
+
+    } catch (error) {
+      console.error('❌ Error en getWorkOrderParts:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: {
+          code: 'GET_WORK_ORDER_PARTS_ERROR',
+          message: error.message
+        }
       });
     }
   }
-};
 
-/**
- * Opción 2: Crear nueva falla para el mismo ítem
- */
-const createNewFailureForSameItem = async (req, res) => {
-  try {
-    const responseData = req.body;
-    const transaction = await require("../models").connection.transaction();
-    
-    const newWorkOrder = await workOrderService.createNewFailureForSameItem(
-      responseData,
-      transaction
-    );
+  /**
+   * Eliminar un repuesto de una orden de trabajo
+   * DELETE /api/work-orders/:id/parts/:partId
+   */
+  async removeWorkOrderPart(req, res) {
+    try {
+      const { id, partId } = req.params;
+      const workOrderId = parseInt(id);
+      const workOrderPartId = parseInt(partId);
 
-    await transaction.commit();
+      if (isNaN(workOrderId) || isNaN(workOrderPartId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_ID',
+            message: 'IDs inválidos'
+          }
+        });
+      }
 
-    res.status(201).json({
-      success: true,
-      message: 'Nueva orden de trabajo creada para el mismo ítem',
-      data: newWorkOrder
-    });
-  } catch (error) {
-    console.error('Error creando nueva falla:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
+      const part = await WorkOrderPart.findOne({
+        where: { id: workOrderPartId, work_order_id: workOrderId }
+      });
 
-/**
- * Opción 3: Resolver falla recurrente
- */
-const resolveRecurringFailure = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      solution_text,
-      resolution_details,
-      evidence_solution_url,
-      responsible_area,
-      closing_response_id
-    } = req.body;
-    const closedById = req.user.user_id;
+      if (!part) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'PART_NOT_FOUND',
+            message: 'Repuesto no encontrado en esta orden de trabajo'
+          }
+        });
+      }
 
-    if (!closing_response_id) {
-      return res.status(400).json({
+      await part.destroy();
+
+      res.status(200).json({
+        success: true,
+        message: 'Repuesto eliminado exitosamente'
+      });
+
+    } catch (error) {
+      console.error('❌ Error en removeWorkOrderPart:', error);
+      res.status(500).json({
         success: false,
-        error: 'Se requiere el ID de la respuesta de cierre'
+        error: {
+          code: 'REMOVE_WORK_ORDER_PART_ERROR',
+          message: error.message
+        }
       });
     }
-
-    const workOrder = await workOrderService.resolveRecurringFailure({
-      workOrderId: id,
-      solutionText: solution_text,
-      resolutionDetails: resolution_details,
-      evidenceSolutionUrl: evidence_solution_url,
-      responsibleArea: responsible_area,
-      closedById,
-      closingResponseId: closing_response_id
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Falla recurrente resuelta exitosamente',
-      data: workOrder
-    });
-  } catch (error) {
-    console.error('Error resolviendo falla recurrente:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
   }
-};
 
-/**
- * Obtener estadísticas de órdenes de trabajo
- */
-const getWorkOrderStats = async (req, res) => {
-  try {
-    const stats = await workOrderService.getWorkOrderStats();
+  /**
+   * Agregar un repuesto a una orden de trabajo
+   * POST /api/work-orders/:id/parts
+   */
+  async addWorkOrderPart(req, res) {
+    try {
+      const { id } = req.params;
+      const workOrderId = parseInt(id);
+      const { inventory_id, quantity_used, quantity_requested } = req.body;
 
-    res.status(200).json({
-      success: true,
-      data: stats
-    });
-  } catch (error) {
-    console.error('Error obteniendo estadísticas:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
+      if (isNaN(workOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_ID',
+            message: 'ID de orden de trabajo inválido'
+          }
+        });
+      }
 
-/**
- * Crear una orden de trabajo manualmente (actualizado)
- */
-const createWorkOrder = async (req, res) => {
-  try {
-    const {
-      initial_response_id,
-      inspectable_id,
-      checklist_item_id,
-      description,
-      severity = 'leve',
-      responsible_area = 'Técnico'
-    } = req.body;
-    const reportedById = req.user.user_id;
+      if (!inventory_id) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVENTORY_ID_REQUIRED',
+            message: 'inventory_id es requerido'
+          }
+        });
+      }
 
-    if (!initial_response_id || !inspectable_id || !checklist_item_id) {
-      return res.status(400).json({
+      // Verificar que la orden de trabajo existe
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'WORK_ORDER_NOT_FOUND',
+            message: 'Orden de trabajo no encontrada'
+          }
+        });
+      }
+
+      const newQuantity = quantity_used || quantity_requested || 1;
+      const inventoryId = parseInt(inventory_id);
+
+      // Verificar si ya existe un repuesto con el mismo inventory_id para esta orden de trabajo
+      const existingPart = await WorkOrderPart.findOne({
+        where: {
+          work_order_id: workOrderId,
+          inventory_id: inventoryId
+        }
+      });
+
+      let partWithInventory;
+
+      if (existingPart) {
+        // Si ya existe, actualizar la cantidad sumándola a la existente
+        existingPart.quantity_used += newQuantity;
+        await existingPart.save();
+
+        // Obtener el repuesto actualizado con información del inventario
+        partWithInventory = await WorkOrderPart.findByPk(existingPart.id, {
+          include: [{
+            model: Inventory,
+            as: 'inventory',
+            attributes: ['id', 'part_name', 'details', 'category', 'location', 'quantity', 'status']
+          }]
+        });
+      } else {
+        // Si no existe, crear un nuevo registro
+        const newPart = await WorkOrderPart.create({
+          work_order_id: workOrderId,
+          inventory_id: inventoryId,
+          quantity_used: newQuantity
+        });
+
+        // Obtener el repuesto con información del inventario
+        partWithInventory = await WorkOrderPart.findByPk(newPart.id, {
+          include: [{
+            model: Inventory,
+            as: 'inventory',
+            attributes: ['id', 'part_name', 'details', 'category', 'location', 'quantity', 'status']
+          }]
+        });
+      }
+
+      const message = existingPart
+        ? 'Cantidad de repuesto actualizada exitosamente'
+        : 'Repuesto agregado exitosamente';
+
+      res.status(200).json({
+        success: true,
+        data: partWithInventory,
+        message: message
+      });
+
+    } catch (error) {
+      console.error('❌ Error en addWorkOrderPart:', error);
+      
+      // Manejar específicamente el error de constraint único
+      if (error.name === 'SequelizeUniqueConstraintError') {
+        return res.status(409).json({
+          success: false,
+          error: {
+            code: 'DUPLICATE_PART',
+            message: 'Este repuesto ya existe en la orden de trabajo'
+          }
+        });
+      }
+
+      res.status(500).json({
         success: false,
-        error: 'Se requieren initial_response_id, inspectable_id y checklist_item_id'
+        error: {
+          code: 'ADD_WORK_ORDER_PART_ERROR',
+          message: error.message
+        }
       });
     }
-
-    const workOrder = await workOrderService.createWorkOrder({
-      initialResponseId: initial_response_id,
-      reportedById,
-      inspectableId: inspectable_id,
-      checklistItemId: checklist_item_id,
-      description,
-      severity,
-      responsibleArea: responsible_area
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Orden de trabajo creada exitosamente',
-      data: workOrder
-    });
-  } catch (error) {
-    console.error('Error creando orden de trabajo:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
   }
-};
+}
 
-/**
- * NUEVAS FUNCIONES PARA REEMPLAZAR ENDPOINTS DUPLICADOS DE checklist.routes.js
- */
-
-/**
- * Obtener OT pendientes por checklist específico
- */
-const getPendingWorkOrdersByChecklist = async (req, res) => {
-  try {
-    const { checklist_id } = req.params;
-    const filters = { checklistId: Number.parseInt(checklist_id) };
-    const workOrders = await workOrderService.getPendingWorkOrders(null, filters);
-
-    res.status(200).json(workOrders);
-  } catch (error) {
-    console.error('Error obteniendo OT pendientes por checklist:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
-
-/**
- * Obtener OT cerradas por checklist específico
- */
-const getClosedWorkOrdersByChecklist = async (req, res) => {
-  try {
-    const { checklist_id } = req.params;
-    const filters = { checklistId: Number.parseInt(checklist_id) };
-    
-    // ✅ CORREGIDO: Usar getResolvedWorkOrders con filtros
-    const workOrders = await workOrderService.getResolvedWorkOrders(filters);
-
-    res.status(200).json(workOrders);
-  } catch (error) {
-    console.error('Error obteniendo OT cerradas por checklist:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
-
-/**
- * Actualizar OT específica
- */
-const updateWorkOrder = async (req, res) => {
-  try {
-    const { id: work_order_id } = req.params
-    const {
-      description,
-      solution_text,
-      responsible_area,
-      status,
-      severity,
-      reported_at,
-      closed_at,
-      responded_by,
-      closed_by,
-    } = req.body
-
-    const updateData = {
-      work_order_id: Number.parseInt(work_order_id),
-      description,
-      solution_text,
-      responsible_area,
-      status,
-      severity,
-      reported_at,
-      closed_at,
-      responded_by,
-      closed_by,
-    }
-
-    const updatedWorkOrder = await workOrderService.updateWorkOrder(updateData)
-    res.status(200).json({
-      success: true,
-      message: "Falla actualizada exitosamente",
-      workOrder: updatedWorkOrder,
-    })
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    })
-  }
-};
-
-/**
- * Obtener OT por checklist type
- */
-const getWorkOrdersByChecklistType = async (req, res) => {
-  try {
-    const { checklist_type_id } = req.params;
-    const filters = { checklistTypeId: Number.parseInt(checklist_type_id) };
-    const workOrders = await workOrderService.getPendingWorkOrders(null, filters);
-
-    res.status(200).json({
-      success: true,
-      data: workOrders
-    });
-  } catch (error) {
-    console.error('Error obteniendo OT por checklist type:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
-
-/**
- * Obtener órdenes de trabajo resueltas por checklist type
- */
-const getResolvedWorkOrdersByChecklistType = async (req, res) => {
-  try {
-    const { checklist_type_id } = req.params;
-    const filters = { checklistTypeId: Number.parseInt(checklist_type_id) };
-    const workOrders = await workOrderService.getResolvedWorkOrders(filters);
-
-    res.status(200).json({
-      success: true,
-      data: workOrders
-    });
-  } catch (error) {
-    console.error('Error obteniendo OT resueltas por checklist type:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
-
-module.exports = {
-  getPendingWorkOrders,
-  getWorkOrderById,
-  closeWorkOrder,
-  getWorkOrderStats,
-  createWorkOrder,
-  maintainRecurringFailure,
-  createNewFailureForSameItem,
-  resolveRecurringFailure,
-  // Nuevas funciones para reemplazar endpoints duplicados
-  getPendingWorkOrdersByChecklist,
-  getClosedWorkOrdersByChecklist,
-  updateWorkOrder,
-  getWorkOrdersByChecklistType,
-  getResolvedWorkOrdersByChecklistType
-};
+module.exports = new WorkOrderController();

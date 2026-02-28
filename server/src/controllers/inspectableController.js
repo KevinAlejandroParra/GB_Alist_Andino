@@ -1,5 +1,6 @@
 
 const { Premise, Inspectable, Device, Attraction, ChecklistType } = require("../models");
+const { Op } = require("sequelize");
 
 const inspectableController = {
     async getAllInspectables(req, res) {
@@ -59,30 +60,74 @@ const inspectableController = {
 
     getPremisesWithInspectables: async (req, res) => {
         try {
-            const premises = await Premise.findAll({
-                include: [
-                    {
-                        model: Inspectable,
-                        as: "inspectables",
-                        include: [
-                            {
-                                model: Device,
-                                as: "deviceData",
-                                required: false,
-                                where: { '$inspectables.type_code$': 'device' } 
-                            },
-                            {
-                                model: Attraction,
-                                as: "attractionData",
-                                required: false,
-                                where: { '$inspectables.type_code$': 'attraction' } 
-                            },
-                        ],
-                    },
-                ],
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 10;
+            const search = req.query.search || '';
+            const premiseId = req.query.premiseId;
+            
+            const offset = (page - 1) * limit;
+            
+            // Construir condiciones de búsqueda
+            const whereConditions = {};
+            const includeConditions = [
+                {
+                    model: Inspectable,
+                    as: "inspectables",
+                    required: true,
+                    limit: limit,
+                    offset: offset,
+                    include: [
+                        {
+                            model: Device,
+                            as: "deviceData",
+                            required: false,
+                            where: { '$inspectables.type_code$': 'device' }
+                        },
+                        {
+                            model: Attraction,
+                            as: "attractionData", 
+                            required: false,
+                            where: { '$inspectables.type_code$': 'attraction' }
+                        },
+                    ],
+                },
+            ];
+            
+            // Aplicar filtros
+            if (premiseId) {
+                whereConditions.premise_id = premiseId;
+            }
+            
+            if (search) {
+                includeConditions[0].where = {
+                    ...includeConditions[0].where,
+                    name: {
+                        [Op.iLike]: `%${search}%`
+                    }
+                };
+            }
+            
+            const premises = await Premise.findAndCountAll({
+                where: whereConditions,
+                include: includeConditions,
+                limit: limit,
+                offset: offset,
+                distinct: true
             });
-
-            res.status(200).json(premises);
+            
+            const totalPages = Math.ceil(premises.count / limit);
+            
+            res.status(200).json({
+                premises: premises.rows,
+                pagination: {
+                    currentPage: page,
+                    totalPages: totalPages,
+                    totalItems: premises.count,
+                    itemsPerPage: limit,
+                    hasNextPage: page < totalPages,
+                    hasPrevPage: page > 1
+                }
+            });
         } catch (error) {
             console.error("Error al obtener sedes con inspeccionables:", error);
             res.status(500).json({ message: "Error interno del servidor", error: error.message });

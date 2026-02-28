@@ -6,7 +6,7 @@ const attractionController = {
         try {
             const attractions = await Attraction.findAll({
                 include: [
-                    { model: Inspectable, as: "inspectable" },
+                    { model: Inspectable, as: "parentInspectable" },
                 ],
             });
             res.status(200).json(attractions);
@@ -21,7 +21,7 @@ const attractionController = {
         try {
             const attraction = await Attraction.findByPk(req.params.id, {
                 include: [
-                    { model: Inspectable, as: "inspectable" },
+                    { model: Inspectable, as: "parentInspectable" },
                 ],
             });
             if (!attraction) {
@@ -37,7 +37,7 @@ const attractionController = {
     // Crear una nueva atracción
     async createAttraction(req, res) {
         try {
-            const { name, description, premise_id, public_flag, capacity } = req.body; 
+            const { name, description, premise_id, public_flag, capacity } = req.body;
             const photo_url = req.file ? `/media/${req.file.filename}` : req.body.photo_url; // Obtener la URL de la foto
 
             // Crear primero el Inspectable
@@ -46,12 +46,12 @@ const attractionController = {
                 description,
                 type_code: 'attraction',
                 premise_id,
-                photo_url, 
+                photo_url,
             });
 
             // Crear la Attraction, vinculándola al Inspectable
             const newAttraction = await Attraction.create({
-                ins_id: inspectable.ins_id, 
+                ins_id: inspectable.ins_id,
                 public_flag,
                 capacity,
             });
@@ -80,7 +80,7 @@ const attractionController = {
 
             // Actualizar el Inspectable asociado
             await Inspectable.update(
-                { name, description, premise_id, type_code: 'attraction', photo_url }, 
+                { name, description, premise_id, type_code: 'attraction', photo_url },
                 { where: { ins_id: attraction.ins_id } }
             );
 
@@ -93,7 +93,7 @@ const attractionController = {
             if (updated) {
                 const updatedAttraction = await Attraction.findByPk(attractionId, {
                     include: [
-                        { model: Inspectable, as: "inspectable" },
+                        { model: Inspectable, as: "parentInspectable" },
                     ],
                 });
                 return res.status(200).json({ message: "Atracción actualizada correctamente.", attraction: updatedAttraction });

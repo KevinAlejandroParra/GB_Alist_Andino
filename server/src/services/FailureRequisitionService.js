@@ -77,11 +77,13 @@ class FailureRequisitionService {
 
       // 4. Si requiere repuesto, crear Requisition
       if (requires_replacement && part_info) {
+        // Permitir both camelCase `imageUrl` y snake_case `image_url`
+        const imageUrlValue = part_info.image_url || part_info.imageUrl || null;
         requisition = await Requisition.create({
           status: 'SOLICITADO',
           part_reference: part_info.name || 'Repuesto no especificado',
           quantity_requested: part_info.quantity || 1,
-          image_url: part_info.image_url || null,
+          image_url: imageUrlValue,
           work_order_id: workOrder.id,
           requested_by_id: reported_by_id
         }, { transaction });

@@ -72,7 +72,6 @@ class InventoryService {
             location: inv.location,
             status: inv.status,
             category: inv.category,
-            imageUrl: inv.image_url,
             lastUpdated: inv.updatedAt
           })),
           pagination: {
@@ -87,6 +86,56 @@ class InventoryService {
     } catch (error) {
       console.error('❌ Error buscando repuestos:', error);
       throw new Error(`Error al buscar repuestos: ${error.message}`);
+    }
+  }
+
+  /**
+   * Actualizar metadata de un item de inventario
+   * @param {number} id - ID del inventario
+   * @param {Object} data - Campos a actualizar (part_name, details, location, category, quantity)
+   */
+  async updateInventoryItem(id, data = {}) {
+    try {
+      if (!id || isNaN(parseInt(id))) {
+        throw new Error('ID de inventario inválido');
+      }
+
+      const inventory = await Inventory.findByPk(parseInt(id));
+      if (!inventory) {
+        throw new Error(`Repuesto con ID ${id} no encontrado`);
+      }
+
+      const updatable = {};
+      if (data.part_name !== undefined) updatable.part_name = data.part_name;
+      if (data.details !== undefined) updatable.details = data.details;
+      if (data.location !== undefined) updatable.location = data.location;
+      if (data.category !== undefined) updatable.category = data.category;
+      if (data.quantity !== undefined && !isNaN(parseInt(data.quantity))) updatable.quantity = parseInt(data.quantity);
+
+      // Ajustar status automáticamente según cantidad si se provee
+      if (updatable.quantity !== undefined) {
+        updatable.status = updatable.quantity === 0 ? 'agotado' : 'disponible';
+      }
+
+      await inventory.update(updatable);
+
+      return {
+        success: true,
+        data: {
+          inventoryId: inventory.id,
+          partName: inventory.part_name,
+          details: inventory.details,
+          quantity: inventory.quantity,
+          location: inventory.location,
+          category: inventory.category,
+          updatedAt: inventory.updatedAt
+        },
+        message: 'Item actualizado correctamente'
+      };
+
+    } catch (error) {
+      console.error('❌ Error actualizando item de inventario:', error);
+      throw new Error(`Error al actualizar item: ${error.message}`);
     }
   }
 
@@ -107,19 +156,18 @@ class InventoryService {
       const isAvailable = inventoryItem.quantity >= quantity && inventoryItem.status === 'disponible';
 
       return {
-      success: true,
-      data: {
-        inventoryId: inventoryItem.id,
-        partName: inventoryItem.part_name,
-        requestedQuantity: quantity,
-        availableQuantity: inventoryItem.quantity,
-        isAvailable: isAvailable,
-        location: inventoryItem.location,
-        status: inventoryItem.status,
-        imageUrl: inventoryItem.image_url,
-        recommendation: isAvailable ? 'AVAILABLE' : 'INSUFFICIENT_STOCK'
-      }
-    };
+        success: true,
+        data: {
+          inventoryId: inventoryItem.id,
+          partName: inventoryItem.part_name,
+          requestedQuantity: quantity,
+          availableQuantity: inventoryItem.quantity,
+          isAvailable: isAvailable,
+          location: inventoryItem.location,
+          status: inventoryItem.status,
+          recommendation: isAvailable ? 'AVAILABLE' : 'INSUFFICIENT_STOCK'
+        }
+      };
 
     } catch (error) {
       console.error('❌ Error consultando disponibilidad:', error);
@@ -137,7 +185,7 @@ class InventoryService {
     try {
       // Construir condiciones
       const whereConditions = { location: location };
-      
+
       if (lowStockOnly) {
         whereConditions.quantity = { [Op.lte]: 2 }; // Stock bajo definido como <= 2
       }
@@ -164,7 +212,6 @@ class InventoryService {
             quantity: inv.quantity,
             status: inv.status,
             category: inv.category,
-            imageUrl: inv.image_url,
             lastUpdated: inv.updatedAt,
             isLowStock: inv.quantity <= 2
           }))
@@ -273,7 +320,6 @@ class InventoryService {
       } else if (partName) {
         // Crear nuevo item
         isNewItem = true;
-        const imageUrl = metadata.imageUrl || null;
         inventory = await Inventory.create({
           part_name: partName,
           details: details || '',
@@ -281,7 +327,6 @@ class InventoryService {
           location: location,
           status: 'disponible',
           category: category || 'herramientas',
-          image_url: imageUrl
         });
       } else {
         throw new Error('Debe proporcionar id de item existente o partName para item nuevo');
@@ -439,7 +484,7 @@ class InventoryService {
     try {
       // Construir condiciones
       const whereConditions = {};
-      
+
       if (location) {
         whereConditions.location = location;
       }
@@ -487,7 +532,6 @@ class InventoryService {
           details: inventory.details,
           currentStock: currentStock,
           category: inventory.category,
-          imageUrl: inventory.image_url,
           severity: severityLevel,
           location: inventory.location,
           lastUpdated: inventory.updatedAt,
@@ -595,9 +639,9 @@ class InventoryService {
   async searchInventory(filters = {}) {
     try {
       const { partName, category, location } = filters;
-      
+
       const whereConditions = {};
-      
+
       // Búsqueda por nombre del repuesto
       if (partName && partName.trim()) {
         const searchTerm = `%${partName.trim()}%`;
@@ -606,26 +650,26 @@ class InventoryService {
           { details: { [Op.like]: searchTerm } }
         ];
       }
-      
+
       // Filtro por categoría
       if (category) {
         whereConditions.category = category;
       }
-      
+
       // Filtro por ubicación
       if (location) {
         whereConditions.location = location;
       }
-      
+
       // Solo items disponibles con stock
       whereConditions.status = 'disponible';
       whereConditions.quantity = { [Op.gt]: 0 };
-      
+
       const inventories = await Inventory.findAll({
         where: whereConditions,
         order: [['quantity', 'DESC'], ['part_name', 'ASC']]
       });
-      
+
       return inventories.map(inv => ({
         inventory_id: inv.id,
         item_name: inv.part_name,
@@ -634,7 +678,6 @@ class InventoryService {
         location: inv.location,
         category: inv.category,
         status: inv.status,
-        image_url: inv.image_url,
         created_at: inv.createdAt,
         updated_at: inv.updatedAt
       }));
@@ -652,28 +695,28 @@ class InventoryService {
   async checkAvailability(params = {}) {
     try {
       const { partName, category } = params;
-      
+
       const whereConditions = {
         status: 'disponible',
         quantity: { [Op.gt]: 0 }
       };
-      
+
       if (partName && partName.trim()) {
         const searchTerm = `%${partName.trim()}%`;
         whereConditions[Op.or] = [
           { part_name: { [Op.like]: searchTerm } }
         ];
       }
-      
+
       if (category) {
         whereConditions.category = category;
       }
-      
+
       const items = await Inventory.findAll({
         where: whereConditions,
         order: [['quantity', 'DESC'], ['part_name', 'ASC']]
       });
-      
+
       return items.map(item => ({
         inventory_id: item.id,
         item_name: item.part_name,
@@ -681,8 +724,7 @@ class InventoryService {
         quantity_available: item.quantity,
         location: item.location,
         category: item.category,
-        status: item.status,
-        image_url: item.image_url
+        status: item.status
       }));
     } catch (error) {
       console.error('Error verificando disponibilidad:', error);
@@ -698,27 +740,27 @@ class InventoryService {
   async usePartFromInventory(params = {}) {
     try {
       const { partId, quantity, userId, reason, partData } = params;
-      
+
       // Validar existencia del repuesto
       const inventory = await Inventory.findByPk(partId);
       if (!inventory) {
         throw new Error(`Repuesto con ID ${partId} no encontrado`);
       }
-      
+
       // Validar disponibilidad
       if (inventory.quantity < quantity) {
         throw new Error(`Cantidad insuficiente. Disponible: ${inventory.quantity}, Solicitado: ${quantity}`);
       }
-      
+
       // Realizar descuento
       const newQuantity = inventory.quantity - quantity;
       const newStatus = newQuantity === 0 ? 'agotado' : 'disponible';
-      
+
       await inventory.update({
         quantity: newQuantity,
         status: newStatus
       });
-      
+
       return {
         success: true,
         updatedInventory: {
@@ -743,7 +785,7 @@ class InventoryService {
   async createUsageRecord(params = {}) {
     try {
       const { inventoryId, userId, quantityUsed, reason, partData, usageType } = params;
-      
+
       // Si no existe el modelo InventoryUsage, crear registro en una tabla temporal
       // o registrar en logs para auditoría
       const usageRecord = {
@@ -757,10 +799,10 @@ class InventoryService {
         created_at: new Date(),
         updated_at: new Date()
       };
-      
+
       // Aquí deberías guardar en una tabla de uso de inventario si existe
       console.log('Registro de uso de repuesto:', usageRecord);
-      
+
       return usageRecord;
     } catch (error) {
       console.error('Error creando registro de uso:', error);
@@ -776,7 +818,7 @@ class InventoryService {
   async getUsageHistory(params = {}) {
     try {
       const { inventoryId, userId, limit = 50 } = params;
-      
+
       // Simulación de historial de uso (debería consultarse de una tabla real)
       const mockHistory = [
         {
@@ -790,7 +832,7 @@ class InventoryService {
           part_data: { name: 'Motor 12V', category: 'Motor' }
         }
       ];
-      
+
       return mockHistory.slice(0, limit);
     } catch (error) {
       console.error('Error obteniendo historial de uso:', error);
@@ -830,11 +872,58 @@ class InventoryService {
         usage_type: 'FALLA_CHECKLIST',
         created_at: new Date()
       };
-      
+
       return mockRecord;
     } catch (error) {
       console.error('Error obteniendo registro de uso:', error);
       throw error;
+    }
+  }
+  /**
+   * Crear o actualizar item de inventario (UPSERT por part_name)
+   * @param {Object} data - Datos del item
+   * @returns {Promise<Object>} - Item creado o actualizado
+   */
+  async createOrUpdateInventoryItem(data) {
+    try {
+      const { part_name, quantity, details, location, category, status, image_url } = data;
+
+      // Buscar si ya existe un item con el mismo nombre
+      const existingItem = await Inventory.findOne({
+        where: { part_name: part_name }
+      });
+
+      if (existingItem) {
+        // Actualizar cantidad y detalles
+        const newQuantity = existingItem.quantity + quantity;
+        await existingItem.update({
+          quantity: newQuantity,
+          details: details ? `${existingItem.details} | ${details}` : existingItem.details,
+          // Mantener ubicación y categoría originales salvo que se especifique lo contrario
+          location: location || existingItem.location,
+          category: category || existingItem.category,
+          status: newQuantity > 0 ? 'disponible' : 'agotado',
+          image_url: image_url || existingItem.image_url
+        });
+
+        return existingItem;
+      } else {
+        // Crear nuevo item
+        const newItem = await Inventory.create({
+          part_name,
+          quantity,
+          details,
+          location,
+          category,
+          status: status || 'disponible',
+          image_url
+        });
+
+        return newItem;
+      }
+    } catch (error) {
+      console.error('❌ Error createOrUpdateInventoryItem:', error);
+      throw new Error(`Error al crear/actualizar inventario: ${error.message}`);
     }
   }
 }
