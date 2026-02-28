@@ -19,8 +19,8 @@ export default function InspectablesList() {
         if (!token) {
           // Manejo específico para token de autenticación faltante
           Swal.fire({
-            title: 'Sesión caducada',
-            text: 'La sesión ha caducado, vuelve a iniciar sesión',
+            title: 'Autenticación requerida',
+            text: 'Por favor, inicia sesión para continuar',
             icon: 'warning',
             confirmButtonText: 'Ir a iniciar sesión',
             confirmButtonColor: '#3085d6',
@@ -37,9 +37,9 @@ export default function InspectablesList() {
           setLoading(false);
           return;
         }
-        
+
         const API_URL = process.env.NEXT_PUBLIC_API || 'http://localhost:5000';
-        
+
         // Si es Admin (rol 1) o Soporte (rol 2), obtener todos los checklist types
         const checklistTypesResponse = await axiosInstance.get(
           user?.role_id === 1 || user?.role_id === 2
@@ -80,25 +80,25 @@ export default function InspectablesList() {
     if (checklist.role_id === 3) {
       return 'tecnico'; // Técnico - Mantenimiento
     }
-    
+
     // Si no se puede clasificar
     if (user?.role_id === 1 || user?.role_id === 2) {
       return null; // Sin clasificar para admin/soporte
     }
-    
+
     return 'otros'; // Para usuarios normales
   };
 
   // Agrupar checklists por tipo
   const groupChecklistsByType = () => {
     const isAdmin = user?.role_id === 1 || user?.role_id === 2;
-    
+
     if (isAdmin) {
       // Para admin y soporte, mostrar por secciones
       const operacion = [];
       const tecnico = [];
       const otros = [];
-      
+
       checklistTypes.forEach(checklist => {
         const type = getChecklistType(checklist);
         if (type === 'operacion') {
@@ -109,7 +109,7 @@ export default function InspectablesList() {
           otros.push(checklist);
         }
       });
-      
+
       return { operacion, tecnico, otros };
     } else {
       // Para usuarios normales, mostrar en una sola sección
@@ -120,7 +120,7 @@ export default function InspectablesList() {
   // Componente para renderizar una sección de checklists
   const renderChecklistSection = (title, checklists, bgColor = 'bg-gray-50', icon = 'fas fa-list') => {
     if (checklists.length === 0) return null;
-    
+
     return (
       <div className={`${bgColor} rounded-lg p-6 mb-8`}>
         <div className="flex items-center mb-6">
@@ -130,7 +130,7 @@ export default function InspectablesList() {
             {checklists.length}
           </span>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {checklists.map((checklistType) => (
             <div
@@ -192,7 +192,7 @@ export default function InspectablesList() {
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-gray-800 mb-2">Gestión de Checklists</h2>
         <p className="text-gray-600">
-          {isAdmin 
+          {isAdmin
             ? 'Organizados por tipo de operación para mejor gestión administrativa'
             : 'Checklists disponibles para tu rol'
           }
@@ -204,30 +204,30 @@ export default function InspectablesList() {
           // Vista para Admin y Soporte - organizada por secciones
           <>
             {renderChecklistSection(
-              'Checklists de Operación', 
-              groupedChecklists.operacion, 
-              'bg-green-50', 
+              'Checklists de Operación',
+              groupedChecklists.operacion,
+              'bg-green-50',
               'fas fa-user-tie'
             )}
             {renderChecklistSection(
-              'Checklists Técnicos', 
-              groupedChecklists.tecnico, 
-              'bg-orange-50', 
+              'Checklists Técnicos',
+              groupedChecklists.tecnico,
+              'bg-orange-50',
               'fas fa-tools'
             )}
             {renderChecklistSection(
-              'Otros Checklists', 
-              groupedChecklists.otros, 
-              'bg-blue-50', 
+              'Otros Checklists',
+              groupedChecklists.otros,
+              'bg-blue-50',
               'fas fa-list'
             )}
           </>
         ) : (
           // Vista para usuarios normales
           renderChecklistSection(
-            'Checklists Disponibles', 
-            groupedChecklists.todos, 
-            'bg-gray-50', 
+            'Checklists Disponibles',
+            groupedChecklists.todos,
+            'bg-gray-50',
             'fas fa-list'
           )
         )

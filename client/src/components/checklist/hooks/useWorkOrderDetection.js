@@ -17,6 +17,12 @@ export function useWorkOrderDetection(checklist, items, user) {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
 
+      console.log('🔍 ========== DEBUG: LOAD WORK ORDERS ==========');
+      console.log('📋 Checklist completo:', checklist);
+      console.log('🏷️ Checklist.inspectable_id:', checklist?.inspectable_id);
+      console.log('📝 Items del checklist:', items);
+      console.log('🔍 ===============================================');
+
       // Extraer todos los checklist_item_ids de los items (incluyendo subitems)
       const getAllItemIds = (itemsArray) => {
         const ids = [];
@@ -39,11 +45,45 @@ export function useWorkOrderDetection(checklist, items, user) {
       }
 
       console.log(`🔍 Buscando fallas para ${allItemIds.length} items: [${allItemIds.join(', ')}]`);
+      console.log(`🔍 Inspectable ID del checklist: ${checklist.inspectable_id}`);
+
+      // ✅ NUEVO: Incluir inspectable_id en los parámetros para filtrar por dispositivo específico
+      // Esto evita que se muestren fallas de otros dispositivos de la misma familia
+      const params = {
+        item_ids: allItemIds.join(','),
+        status: 'active'
+      };
+
+      // ✅ NUEVO: Extraer inspectable_id del checklist o del primer item si tiene formato "device-X"
+      let inspectableId = checklist.inspectable_id;
+
+      // Si no está en checklist, intentar extraerlo del primer item con formato "device-X"
+      if (!inspectableId && allItemIds.length > 0) {
+        const firstItemId = String(allItemIds[0]);
+        if (firstItemId.startsWith('device-')) {
+          // Extraer el número después de "device-"
+          const deviceIdMatch = firstItemId.match(/^device-(\d+)$/);
+          if (deviceIdMatch) {
+            inspectableId = parseInt(deviceIdMatch[1]);
+            console.log(`🔍 Inspectable ID extraído del item "${firstItemId}": ${inspectableId}`);
+          }
+        }
+      }
+
+      // Solo agregar inspectable_id si existe
+      if (inspectableId) {
+        params.inspectable_id = inspectableId;
+        console.log(`✅ Usando inspectable_id: ${inspectableId}`);
+      } else {
+        console.warn('⚠️ No se pudo determinar el inspectable_id');
+      }
+
+      console.log('🔍 Parámetros de búsqueda:', params);
 
       // Buscar fallas activas (PENDIENTE, EN_REPARACION, ESPERANDO_REPUESTO) para estos checklist_item_ids
       const response = await axiosInstance.get(`${API_URL}/api/failures/by-items`, {
         headers: { Authorization: `Bearer ${user.token}` },
-        params: { item_ids: allItemIds.join(','), status: 'active' }
+        params
       });
 
       let failureOrders = Array.isArray(response.data) ? response.data : (response.data?.data && Array.isArray(response.data.data)) ? response.data.data : [];
@@ -51,7 +91,7 @@ export function useWorkOrderDetection(checklist, items, user) {
       console.log('--- ÓRDENES DE FALLA (OFs) ACTIVAS ---');
       console.log(`Total de fallas activas encontradas: ${failureOrders.length}`);
       failureOrders.forEach(fo => {
-        console.log(`OF ID: ${fo.id} (${fo.failure_order_id}) -> Item ID: ${fo.checklist_item_id} - Status: ${fo.status}`);
+        console.log(`OF ID: ${fo.id} (${fo.failure_order_id}) -> Item ID: ${fo.checklist_item_id} - affected_id: ${fo.affected_id} - Status: ${fo.status}`);
       });
 
       setWorkOrders(failureOrders);
@@ -67,11 +107,36 @@ export function useWorkOrderDetection(checklist, items, user) {
   const getWorkOrderForItem = useCallback((item) => {
     if (!item) return [];
 
+    // ✅ NUEVO: Obtener el inspectable_id del item para filtrar por affected_id
+    let itemInspectableId = null;
+
+    // Intentar obtener de inspectable_id_for_response
+    if (item.inspectable_id_for_response) {
+      itemInspectableId = item.inspectable_id_for_response;
+    }
+    // O extraer del checklist_item_id si tiene formato "device-X"
+    else if (item.checklist_item_id && String(item.checklist_item_id).startsWith('device-')) {
+      const match = String(item.checklist_item_id).match(/^device-(\d+)$/);
+      if (match) {
+        itemInspectableId = parseInt(match[1]);
+      }
+    }
+
     if (item.subItems && item.subItems.length > 0) {
       const workOrdersForChildren = item.subItems.flatMap(subItem => {
-        const foundWorkOrders = workOrders.filter(wo => wo.checklist_item_id === subItem.checklist_item_id);
+        // Obtener inspectable_id del subitem
+        let subItemInspectableId = subItem.inspectable_id_for_response || itemInspectableId;
+
+        const foundWorkOrders = workOrders.filter(wo => {
+          // Filtrar por checklist_item_id Y affected_id
+          const itemIdMatch = wo.checklist_item_id === subItem.checklist_item_id;
+          const affectedIdMatch = !subItemInspectableId || wo.affected_id === subItemInspectableId;
+
+          return itemIdMatch && affectedIdMatch;
+        });
+
         if (foundWorkOrders.length > 0) {
-          console.log(`✅ Fallas encontradas para ítem ${subItem.item_number} (ID: ${subItem.checklist_item_id}):`, foundWorkOrders.length);
+          console.log(`✅ Fallas encontradas para ítem ${subItem.item_number} (ID: ${subItem.checklist_item_id}, affected_id: ${subItemInspectableId}):`, foundWorkOrders.length);
         }
         return foundWorkOrders;
       });
@@ -79,9 +144,14 @@ export function useWorkOrderDetection(checklist, items, user) {
     }
 
     const itemWorkOrders = workOrders.filter(wo => {
-      const match = wo.checklist_item_id === item.checklist_item_id;
+      // Filtrar por checklist_item_id Y affected_id
+      const itemIdMatch = wo.checklist_item_id === item.checklist_item_id;
+      const affectedIdMatch = !itemInspectableId || wo.affected_id === itemInspectableId;
+
+      const match = itemIdMatch && affectedIdMatch;
+
       if (match) {
-        console.log(`✅ Falla encontrada para ítem ${item.item_number} (ID: ${item.checklist_item_id})`);
+        console.log(`✅ Falla encontrada para ítem ${item.item_number} (ID: ${item.checklist_item_id}, affected_id: ${itemInspectableId})`);
       }
       return match;
     });

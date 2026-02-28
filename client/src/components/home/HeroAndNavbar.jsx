@@ -20,8 +20,8 @@ const HeroandNavbar = () => {
 
       if (response.status === 401) {
         Swal.fire({
-          title: 'Sesión caducada',
-          text: 'La sesión ha caducado, vuelve a iniciar sesión',
+          title: 'Autenticación requerida',
+          text: 'Por favor, inicia sesión para continuar',
           icon: 'warning',
           confirmButtonText: 'Ir a iniciar sesión',
           confirmButtonColor: '#3085d6',
@@ -296,7 +296,7 @@ const HeroandNavbar = () => {
                                 {user?.user_email || user?.email || ''}
                               </p>
                             </div>
-                            
+
                             {/* Usar rol del token como fallback si no está en user */}
                             {(user?.role_id === 1 || getRoleFromToken() === 1) && (
                               <motion.button
@@ -308,7 +308,7 @@ const HeroandNavbar = () => {
                                 <span className="text-sm">Gestión de Checklists</span>
                               </motion.button>
                             )}
-                            
+
                             {(user?.role_id === 1 || user?.role_id === 2 || getRoleFromToken() === 1 || getRoleFromToken() === 2) && (
                               <motion.button
                                 whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
@@ -319,7 +319,7 @@ const HeroandNavbar = () => {
                                 <span className="text-sm">Gestión Administrativa</span>
                               </motion.button>
                             )}
-                            
+
                             <motion.button
                               whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
                               onClick={redirectToEdit}
@@ -328,7 +328,7 @@ const HeroandNavbar = () => {
                               <i className="fas fa-pen-alt text-green-500 w-4"></i>
                               <span className="text-sm">Editar Perfil</span>
                             </motion.button>
-                            
+
                             {/* Dashboard solo para usuarios no admin/soporte */}
                             {!isAdminOrSupport() && (
                               <motion.button
@@ -340,7 +340,7 @@ const HeroandNavbar = () => {
                                 <span className="text-sm">Dashboard</span>
                               </motion.button>
                             )}
-                            
+
                             <motion.button
                               whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
                               onClick={handleLogout}
