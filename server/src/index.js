@@ -28,14 +28,21 @@ const cors = require('cors');
 const multerConfig = require('./config/multerConfig');
 const upload = multerConfig; // Alias para compatibilidad
 
-// Configurar middleware en orden correcto
 app.use(cors({
-  origin: ["https://tfdbsvwq-3000.use2.devtunnels.ms"],
+  origin: [
+    "https://192.168.57.96",
+    "https://192.168.57.96:443",
+    "https://192.168.57.96:8443", 
+    "http://192.168.57.96",
+    "http://localhost:3000",
+    "https://localhost:3000"
+  ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 }));
 
+app.options('*', cors());
 // Configurar body parsing DESPUÉS de CORS
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -74,17 +81,30 @@ app.use("/api/checklists", familyChecklistRoutes);
 app.use("/api", checklistTypeRoutes);
 app.use("/api/work-orders", workOrderRoutes);
 app.use("/api/failures", failureRoutes);
-app.use("/api/checklists/failures", failureRoutes);
 app.use("/api", failureRequisitionRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/requisitions", requisitionRoutes);
 app.use("/api", qrCodeRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 
-module.exports = {
-    app,
-};
+
+
+app.use((err, req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ 
+      error: 'El archivo es demasiado grande. Máximo 10MB permitido.' 
+    });
+  }
+  next(err);
+});
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor escuchando en http://0.0.0.0:${port}`);
 });
+
+module.exports = {
+    app,
+};

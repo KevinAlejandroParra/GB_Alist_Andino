@@ -50,12 +50,8 @@ export function useFileUpload(user) {
       const formData = new FormData()
       formData.append("evidence", file)
 
-      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
-      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      })
+      const API_URL = process.env.NEXT_PUBLIC_API
+      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData)
 
       if (onSuccess) {
         onSuccess(itemId, response.data.filePath)

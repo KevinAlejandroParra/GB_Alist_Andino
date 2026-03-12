@@ -179,9 +179,8 @@ export default function WorkOrderProcessModal({
             const formDataUpload = new FormData()
             formDataUpload.append("evidence", formData.evidence)
 
-            const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formDataUpload, {
-                headers: { "Content-Type": "multipart/form-data" },
-            })
+            const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formDataUpload)
+  
 
             const newFilePath = response.data.filePath
             setUploadedEvidenceUrl(newFilePath)

@@ -84,11 +84,8 @@ const CreateFailureModal = ({
 
       console.log('📤 Subiendo imagen:', file.name, 'Tamaño:', file.size);
 
-      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData);
+
 
       const filePath = response.data?.filePath;
       if (!filePath) {

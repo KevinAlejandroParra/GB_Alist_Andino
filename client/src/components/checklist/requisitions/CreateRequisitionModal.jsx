@@ -139,18 +139,14 @@ const CreateRequisitionModal = ({
 
     setUploadingImage(true);
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
+      const API_URL = process.env.NEXT_PUBLIC_API;
       const formData = new FormData();
       formData.append("evidence", file);
 
       console.log('📤 Subiendo imagen:', file.name, 'Tamaño:', file.size);
 
-      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
+      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData);
+     
       console.log('📥 Respuesta de subida:', response.data);
 
       // Verificar si la respuesta contiene filePath
@@ -316,8 +312,7 @@ const CreateRequisitionModal = ({
               type="text"
               value={formData.partReference}
               onChange={(e) => handleInputChange('partReference', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.partReference ? 'border-red-500' : 'border-gray-300'
+             className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.partReference ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Ej: Motor de 12V, Sensor de proximidad..."
               required
@@ -337,8 +332,7 @@ const CreateRequisitionModal = ({
               min="1"
               value={formData.quantityRequested}
               onChange={(e) => handleInputChange('quantityRequested', parseInt(e.target.value) || 1)}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.quantityRequested ? 'border-red-500' : 'border-gray-300'
+             className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.quantityRequested ? 'border-red-500' : 'border-gray-300'
               }`}
               required
             />
@@ -374,8 +368,7 @@ const CreateRequisitionModal = ({
               type="file"
               accept="image/*"
               onChange={(e) => handleFileChange('image', e.target.files[0])}
-              className={`w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 ${
-                errors.image ? 'border-red-500' : ''
+             className={`w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 ${errors.image ? 'border-red-500' : ''
               }`}
               required
             />

@@ -394,7 +394,7 @@ const downloadChecklistPDF = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const checklistData = await getChecklistDataForPDF(id)
+    const checklistData = await checklistService.getChecklistDataForPDF(id)
 
     if (!checklistData) {
       return res.status(404).json({ error: "Checklist not found" })
@@ -459,7 +459,8 @@ const downloadChecklistPDF = async (req, res) => {
 
     res.send(pdfBuffer)
   } catch (error) {
-    res.status(500).json({ error: "Error al generar el PDF" })
+console.error("PDF Generate Error:", error);
+    res.status(500).json({ error: "Error al generar el PDF: " + error.message, stack: error.stack })
   }
 }
 
@@ -569,14 +570,16 @@ const generateChecklistHTML = (data) => {
           comment = comment ? `${comment} <br/> ${failureDescriptions}` : failureDescriptions;
         }
 
+      const API_URL = process.env.NEXT_PUBLIC_API
+
         // Construir contenido de evidencia (evidencia respuesta + evidencia fallas)
         let evidence = response.evidence_url ?
-          `<a href="http://localhost:5000${response.evidence_url}" target="_blank"><img src="http://localhost:5000${response.evidence_url}" class="evidence-image"/></a>` : "";
+          `<a href="${API_URL}${response.evidence_url}" target="_blank"><img src="${API_URL}${response.evidence_url}" class="evidence-image"/></a>` : "";
 
         if (itemFailures.length > 0) {
           const failureImages = itemFailures
             .filter(f => f.evidence_url)
-            .map(f => `<a href="http://localhost:5000${f.evidence_url}" target="_blank"><img src="http://localhost:5000${f.evidence_url}" class="evidence-image" style="margin-top: 4px; border-color: #ef4444;"/></a>`)
+            .map(f => `<a href=${API_URL}{f.evidence_url}" target="_blank"><img src="${API_URL}${f.evidence_url}" class="evidence-image" style="margin-top: 4px; border-color: #ef4444;"/></a>`)
             .join('');
           evidence = evidence + failureImages;
         }

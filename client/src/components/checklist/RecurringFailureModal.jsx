@@ -151,9 +151,7 @@ export default function RecurringFailureModal({
     try {
       const formData = new FormData()
       formData.append("evidence", file)
-      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
+      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData)
       return response.data.filePath
     } catch (error) {
       throw new Error(`Error al subir archivo: ${error.response?.data?.error || error.message}`)
