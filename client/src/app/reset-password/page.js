@@ -1,8 +1,8 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function ResetPassword() {
+function ResetPasswordContent() {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [message, setMessage] = useState('');
@@ -78,7 +78,7 @@ export default function ResetPassword() {
             if (response.ok) {
                 setMessage(data.message + ' Serás redirigido al login.');
                 setTimeout(() => {
-                    router.push('/login'); 
+                    router.push('/login');
                 }, 3000);
             } else {
                 setError(data.message || 'Error al restablecer la contraseña.');
@@ -149,5 +149,13 @@ export default function ResetPassword() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function ResetPassword() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+            <ResetPasswordContent />
+        </Suspense>
     );
 }

@@ -64,7 +64,6 @@ app.use("/api/checklists", familyChecklistRoutes);
 app.use("/api", checklistTypeRoutes);
 app.use("/api/work-orders", workOrderRoutes);
 app.use("/api/failures", failureRoutes);
-app.use("/api/checklists/failures", failureRoutes);
 app.use("/api", failureRequisitionRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/requisitions", requisitionRoutes);

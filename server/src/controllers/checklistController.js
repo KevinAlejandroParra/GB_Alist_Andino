@@ -397,7 +397,7 @@ const downloadChecklistPDF = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const checklistData = await getChecklistDataForPDF(id)
+    const checklistData = await checklistService.getChecklistDataForPDF(id)
 
     if (!checklistData) {
       return res.status(404).json({ error: "Checklist not found" })

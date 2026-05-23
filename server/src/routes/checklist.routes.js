@@ -3,11 +3,9 @@ const router = express.Router()
 const { verifyToken } = require("../middleware/authMiddleware")
 const upload = require("../config/multerConfig")
 
-// Importar rutas de checklist de familia
-const familyChecklistRoutes = require('./familyChecklist.routes')
+
 
 // Usar las rutas de checklist de familia
-router.use('/', familyChecklistRoutes)
 const {
   ensureChecklistInstance,
   getLatestChecklist,

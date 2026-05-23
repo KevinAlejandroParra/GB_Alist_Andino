@@ -1,3 +1,13 @@
 {
+<<<<<<< HEAD
+=======
+  "/AdminDashboard/page": "app/AdminDashboard/page.js",
+  "/Profile/page": "app/Profile/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/checklists/detail/[checklistTypeId]/page": "app/checklists/detail/[checklistTypeId]/page.js",
+  "/checklists/family/[checklistTypeId]/page": "app/checklists/family/[checklistTypeId]/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/login/page": "app/login/page.js",
+>>>>>>> 3f4176d2b664546523b8c293d0a921ecec0861ff
   "/page": "app/page.js"
 }
