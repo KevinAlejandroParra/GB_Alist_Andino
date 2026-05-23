@@ -6,6 +6,7 @@ import ProtectedRoute from '../../../components/ProtectedRoute';
 import useFailureRequisitionSystem from '../../../components/checklist/hooks/useFailureRequisitionSystem';
 import ApproveRequisitionModal from '../../../components/checklist/ApproveRequisitionModal';
 import Swal from 'sweetalert2';
+import { formatLocalDateTimeWithOptions } from '../../../utils/dateUtils';
 
 const JefeRequisitionsPage = () => {
   const { user } = useAuth();
@@ -98,14 +99,13 @@ const JefeRequisitionsPage = () => {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('es-ES', {
+    return formatLocalDateTimeWithOptions(dateString, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
-    });
+    }, 'es-ES');
   };
 
   const filteredRequisitions = requisitions.filter(req => {

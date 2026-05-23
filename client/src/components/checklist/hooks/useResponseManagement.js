@@ -337,6 +337,8 @@ export function useResponseManagement(checklist) {
       return newSet;
     });
   }, [checklist]);
+
+
   /**
    * Resetea las modificaciones
    */

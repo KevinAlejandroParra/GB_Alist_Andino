@@ -28,6 +28,12 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'creator'
             });
 
+            // Un checklist puede ser creado por un usuario de soporte
+            Checklist.belongsTo(models.User, {
+                foreignKey: 'support_user_id',
+                as: 'support_user'
+            });
+
 
             // Un checklist puede tener muchas respuestas
             Checklist.hasMany(models.ChecklistResponse, {
@@ -64,6 +70,31 @@ module.exports = (sequelize, DataTypes) => {
             version_label: {
                 type: DataTypes.STRING,
                 allowNull: true,
+            },
+            week_identifier: {
+                type: DataTypes.STRING(10),
+                allowNull: true,
+                comment: 'Identificador de semana en formato YYYY-Wxx (ej: 2026-W18) para checklists semanales'
+            },
+            created_by_support: {
+                type: DataTypes.BOOLEAN,
+                defaultValue: false,
+                allowNull: false,
+                comment: 'Indica si el checklist fue creado por personal de soporte'
+            },
+            support_user_id: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                references: {
+                    model: "users",
+                    key: "user_id",
+                },
+                comment: 'ID del usuario de soporte que creó el checklist'
+            },
+            support_notes: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+                comment: 'Notas del personal de soporte sobre la creación del checklist'
             },
             created_by: {
                 type: DataTypes.INTEGER,

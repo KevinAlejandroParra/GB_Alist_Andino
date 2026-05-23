@@ -47,45 +47,37 @@ export const useQrCode = (checklistId, checklistTypeId, user) => {
       if (response.data.success) {
         const authInfo = response.data.data;
 
-        // Verificar si la información ha cambiado para evitar actualizaciones innecesarias
-        const currentAuthInfo = qrAuthorizationInfo;
-        const hasChanged =
-          !currentAuthInfo ||
-          currentAuthInfo.requires_qr !== authInfo.requires_qr ||
-          currentAuthInfo.total_qr_codes !== authInfo.total_qr_codes ||
-          JSON.stringify(currentAuthInfo.next_qr_required) !== JSON.stringify(authInfo.next_qr_required) ||
-          JSON.stringify(currentAuthInfo.unlocked_items) !== JSON.stringify(authInfo.unlocked_items);
+        console.log('🔍 Cargando autorización QR:', authInfo);
+        console.log('🔓 Items desbloqueados:', authInfo.unlocked_items?.length || 0);
 
-        if (hasChanged) {
-          // Actualizar estado basado en la información de autorización
-          setQrValidationEnabled(authInfo.requires_qr);
-          setTotalQrPartitions(authInfo.total_qr_codes);
-          setQrAuthorizationInfo(authInfo);
+        // Actualizar estado basado en la información de autorización
+        setQrValidationEnabled(authInfo.requires_qr);
+        setTotalQrPartitions(authInfo.total_qr_codes);
+        setQrAuthorizationInfo(authInfo);
 
-          // Usar la nueva información del backend para determinar si realmente se requiere QR
-          const actuallyRequiresQr = authInfo.checklist_completion_status?.requires_further_qr_scans ||
-            (authInfo.requires_qr && authInfo.next_qr_required && authInfo.next_qr_required.qr_code);
+        // Usar la nueva información del backend para determinar si realmente se requiere QR
+        const actuallyRequiresQr = authInfo.checklist_completion_status?.requires_further_qr_scans ||
+          (authInfo.requires_qr && authInfo.next_qr_required && authInfo.next_qr_required.qr_code);
 
-          console.log('🔍 Debug Frontend - Backend info:', {
-            requires_qr: authInfo.requires_qr,
-            next_qr_required: authInfo.next_qr_required,
-            checklist_completion_status: authInfo.checklist_completion_status,
-            actuallyRequiresQr: actuallyRequiresQr
-          });
+        console.log('🔍 Debug Frontend - Backend info:', {
+          requires_qr: authInfo.requires_qr,
+          next_qr_required: authInfo.next_qr_required,
+          checklist_completion_status: authInfo.checklist_completion_status,
+          actuallyRequiresQr: actuallyRequiresQr,
+          unlocked_items_count: authInfo.unlocked_items?.length || 0
+        });
 
-          // Solo marcar como requerido si realmente hay un siguiente QR disponible
-          if (actuallyRequiresQr) {
-            setIsQrRequired(true);
-            console.log('🔒 Frontend: Requiriendo QR según backend');
-          } else {
-            // Si no se requiere QR o no hay siguiente QR requerido, habilitar botones
-            setIsQrRequired(false);
-            console.log('✅ Frontend: No se requiere QR, habilitando botones');
-          }
-
-          console.log('✅ Información de autorización QR cargada:', authInfo);
-          console.log('🔓 Items desbloqueados desde backend:', authInfo.unlocked_items?.length || 0);
+        // Solo marcar como requerido si realmente hay un siguiente QR disponible
+        if (actuallyRequiresQr) {
+          setIsQrRequired(true);
+          console.log('🔒 Frontend: Requiriendo QR según backend');
+        } else {
+          // Si no se requiere QR o no hay siguiente QR requerido, habilitar botones
+          setIsQrRequired(false);
+          console.log('✅ Frontend: No se requiere QR, habilitando botones');
         }
+
+        console.log('✅ Información de autorización QR cargada exitosamente');
         return authInfo;
       } else {
         console.warn('⚠️ Respuesta no exitosa al cargar autorización QR:', response.data);
@@ -95,7 +87,7 @@ export const useQrCode = (checklistId, checklistTypeId, user) => {
       // Inicializar con valores por defecto en caso de error
       setQrAuthorizationInfo(null);
     }
-  }, [checklistId, qrAuthorizationInfo]);
+  }, [checklistId]); // Solo depende de checklistId
 
   // Verificar configuración QR para el tipo de checklist
   const checkQrRequirement = useCallback(async () => {

@@ -68,6 +68,9 @@ router.get('/recent-failures', (req, res) => FailureController.getRecentFailures
 // GET /api/failures/statistics - Obtener estadísticas de OF
 router.get('/statistics', (req, res) => FailureController.getFailureOrderStatistics(req, res));
 
+// GET /api/failures/export/excel - Exportar fallas a Excel (gerencial)
+router.get('/export/excel', (req, res) => FailureController.exportFailuresToExcel(req, res));
+
 /**
  * RUTAS GENERALES
  */
@@ -79,6 +82,18 @@ router.get('/', (req, res) => FailureController.getFailureOrders(req, res));
  * RUTAS CON PARÁMETROS (DESPUÉS de las específicas)
  */
 
+// GET /api/failures/:id/complete - Obtener detalles completos de OF con todas las relaciones
+router.get('/:id/complete', (req, res) => FailureController.getFailureComplete(req, res));
+
+// GET /api/failures/:id/linked-failures - Obtener fallas enlazadas a una WorkOrder
+router.get('/:id/linked-failures', (req, res) => FailureController.getLinkedFailures(req, res));
+
+// POST /api/failures/:id/link-work-order - Enlazar falla a OT existente (resolver duplicados)
+router.post('/:id/link-work-order', (req, res) => FailureController.linkToWorkOrder(req, res));
+
+// DELETE /api/failures/:id/unlink-work-order - Desenlazar falla de OT enlazada
+router.delete('/:id/unlink-work-order', (req, res) => FailureController.unlinkFromWorkOrder(req, res));
+
 // GET /api/failures/:id - Obtener detalles de OF específica
 router.get('/:id', (req, res) => FailureController.getFailureOrderById(req, res));
 
@@ -88,8 +103,14 @@ router.get('/:id/signatures-check', (req, res) => FailureController.checkRequire
 // POST /api/failures/:id/sign-and-advance - Firmar y avanzar estado
 router.post('/:id/sign-and-advance', (req, res) => FailureController.signAndAdvanceFailure(req, res));
 
+// PUT /api/failures/:id/increment-recurrence - Incrementar contador de recurrencia
+router.put('/:id/increment-recurrence', (req, res) => FailureController.incrementRecurrence(req, res));
+
 // PUT /api/failures/:id - Actualizar OF
 router.put('/:id', (req, res) => FailureController.updateFailureOrder(req, res));
+
+// DELETE /api/failures/:id - Eliminar OF permanentemente (Solo Admin/Soporte)
+router.delete('/:id', (req, res) => FailureController.deleteFailureOrder(req, res));
 
 /**
  * RUTAS ESPECÍFICAS PARA CHECKLISTS

@@ -49,9 +49,71 @@ export default function ChecklistDetailPage() {
       
       if (historyResponse.data && historyResponse.data.length > 0) {
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        const todayChecklist = historyResponse.data.find(checklist =>
-          checklist.createdAt.split('T')[0] === today
-        );
+        
+        // Para checklists semanales, buscar por week_identifier
+        // Para checklists diarios, buscar por fecha de creación
+        const isWeeklyChecklist = typeResponse.data?.frequency?.toLowerCase() === 'semanal' || 
+                                   typeResponse.data?.frequency?.toLowerCase() === 'weekly';
+        
+        let todayChecklist;
+        
+        if (isWeeklyChecklist) {
+          // Para checklists semanales, calcular el identificador de la semana actual
+          const now = new Date();
+          const dayOfWeek = now.getUTCDay();
+          const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          const monday = new Date(now);
+          monday.setUTCDate(now.getUTCDate() + diff);
+          monday.setUTCHours(0, 0, 0, 0);
+          
+          const year = monday.getUTCFullYear();
+          const startOfYear = new Date(Date.UTC(year, 0, 1));
+          const firstMonday = new Date(startOfYear);
+          const firstMondayDay = firstMonday.getUTCDay();
+          const daysToMonday = firstMondayDay === 0 ? -6 : 1 - firstMondayDay;
+          firstMonday.setUTCDate(firstMonday.getUTCDate() + daysToMonday);
+          
+          if (firstMonday.getUTCFullYear() < year) {
+            firstMonday.setUTCDate(firstMonday.getUTCDate() + 7);
+          }
+          
+          const weekNumber = Math.floor((monday - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
+          const currentWeekIdentifier = `${year}-W${String(weekNumber).padStart(2, '0')}`;
+          
+          console.log('🔍 [ChecklistDetailPage] Buscando checklist semanal:', {
+            currentWeekIdentifier,
+            availableChecklists: historyResponse.data.map(c => ({
+              id: c.checklist_id,
+              weekId: c.week_identifier,
+              created: c.createdAt
+            }))
+          });
+          
+          // Buscar checklist con el week_identifier de la semana actual
+          todayChecklist = historyResponse.data.find(checklist =>
+            checklist.week_identifier === currentWeekIdentifier
+          );
+          
+          if (todayChecklist) {
+            console.log('✅ [ChecklistDetailPage] Checklist semanal encontrado:', {
+              id: todayChecklist.checklist_id,
+              weekId: todayChecklist.week_identifier
+            });
+          } else {
+            console.log('⚠️ [ChecklistDetailPage] No se encontró checklist para la semana actual');
+          }
+        } else {
+          // Para checklists diarios, buscar por fecha de creación
+          todayChecklist = historyResponse.data.find(checklist =>
+            checklist.createdAt.split('T')[0] === today
+          );
+          
+          console.log('🔍 [ChecklistDetailPage] Buscando checklist diario:', {
+            today,
+            found: !!todayChecklist
+          });
+        }
+        
         if (todayChecklist) {
           setTodayChecklist(todayChecklist);
         }
@@ -205,13 +267,24 @@ export default function ChecklistDetailPage() {
           
           {/* Instancia de hoy o botón para crear */}
           <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Checklist de Hoy</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              {checklistType?.frequency?.toLowerCase() === 'semanal' || checklistType?.frequency?.toLowerCase() === 'weekly' 
+                ? 'Checklist de Esta Semana' 
+                : 'Checklist de Hoy'}
+            </h2>
             {todayChecklist ? (
               <div className="border border-green-200 bg-green-50 rounded-lg p-4">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-green-700 font-medium">Ya existe un checklist para hoy</p>
+                    <p className="text-green-700 font-medium">
+                      {checklistType?.frequency?.toLowerCase() === 'semanal' || checklistType?.frequency?.toLowerCase() === 'weekly'
+                        ? 'Ya existe un checklist para esta semana'
+                        : 'Ya existe un checklist para hoy'}
+                    </p>
                     <p className="text-sm text-gray-600">Creado: {formatLocalDate(todayChecklist.createdAt)}</p>
+                    {todayChecklist.week_identifier && (
+                      <p className="text-sm text-gray-600">Semana: {todayChecklist.week_identifier}</p>
+                    )}
                     {todayChecklist.completed && <p className="text-sm text-green-600 font-medium mt-1">✓ Completado</p>}
                   </div>
                   <button onClick={handleCreateOrEditChecklist} className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
@@ -222,7 +295,11 @@ export default function ChecklistDetailPage() {
             ) : (
               <div className="border border-gray-200 bg-gray-50 rounded-lg p-4">
                 <div className="flex justify-between items-center">
-                  <p className="text-gray-700">Ingresar a diligenciar el checklist</p>
+                  <p className="text-gray-700">
+                    {checklistType?.frequency?.toLowerCase() === 'semanal' || checklistType?.frequency?.toLowerCase() === 'weekly'
+                      ? 'Ingresar a diligenciar el checklist semanal'
+                      : 'Ingresar a diligenciar el checklist'}
+                  </p>
                   <button onClick={handleCreateOrEditChecklist} className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
                     Crear Checklist
                   </button>

@@ -31,7 +31,7 @@ export function useSignature(user, checklist, onSuccess, hasExistingResponses = 
     if (!hasExistingResponses) {
       Swal.fire({
         title: "⚠️ Guardar Checklist Requerido",
-        text: "Debes guardar las respuestas del checklist antes de poder firmarlo. Si no se han enviado las firmas, no será posible guardar la firma.",
+        text: "Debes guardar las respuestas del checklist antes de poder firmarlo.",
         icon: "warning",
         confirmButtonColor: "#7c3aed",
         confirmButtonText: "Entendido",
@@ -39,6 +39,77 @@ export function useSignature(user, checklist, onSuccess, hasExistingResponses = 
           popup: "rounded-2xl shadow-2xl",
           title: "text-slate-800 font-bold",
           content: "text-slate-600",
+        },
+      })
+      return
+    }
+
+    // Verificar que todos los items estén respondidos
+    const incompleteItems = []
+    
+    const checkItems = (items) => {
+      if (!items) return
+      
+      items.forEach(item => {
+        // Solo validar items que no son secciones
+        if (item.input_type !== 'section') {
+          const hasResponse = item.responses && item.responses.length > 0
+          const response = item.responses?.[0]
+          
+          // Verificar que tenga respuesta Y que tenga un valor válido
+          const hasValidValue = response && (
+            response.response_compliance || 
+            response.response_numeric !== null && response.response_numeric !== undefined ||
+            response.response_text
+          )
+          
+          if (!hasResponse || !hasValidValue) {
+            incompleteItems.push({
+              item_number: item.item_number,
+              question_text: item.question_text
+            })
+          }
+        }
+        
+        // Revisar subitems recursivamente
+        if (item.subItems && item.subItems.length > 0) {
+          checkItems(item.subItems)
+        }
+      })
+    }
+    
+    if (checklist.items) {
+      checkItems(checklist.items)
+    }
+    
+    // Si hay items incompletos, mostrar alerta
+    if (incompleteItems.length > 0) {
+      Swal.fire({
+        title: "⚠️ Checklist Incompleto",
+        html: `
+          <div style="text-align: left; max-height: 400px; overflow-y: auto;">
+            <p style="margin-bottom: 15px; color: #475569;">Los siguientes <strong>${incompleteItems.length}</strong> ítems deben ser respondidos antes de firmar:</p>
+            <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #7c3aed;">
+              ${incompleteItems
+                .map(
+                  (item) => `
+                  <div style="margin-bottom: 12px; padding: 12px; background: white; border-radius: 8px; border: 2px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <strong style="color: #1e293b;">${item.item_number}.</strong> <span style="color: #475569;">${item.question_text}</span>
+                  </div>
+                `,
+                )
+                .join("")}
+            </div>
+          </div>
+        `,
+        icon: "warning",
+        confirmButtonText: "Entendido",
+        confirmButtonColor: "#7c3aed",
+        width: "700px",
+        customClass: {
+          popup: "rounded-2xl shadow-2xl",
+          title: "text-slate-800 font-bold",
+          confirmButton: "rounded-xl font-semibold px-6 py-3",
         },
       })
       return

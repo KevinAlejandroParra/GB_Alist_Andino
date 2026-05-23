@@ -3,8 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import SignaturePad from './SignaturePad';
+import ManageFailureModal from './ManageFailureModal';
+import DeleteFailureModal from './DeleteFailureModal';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../utils/axiosConfig';
+import LinkedFailuresSection from './LinkedFailuresSection';
 import {
   getFailureSignaturesInfo,
   createFailureReportSignature,
@@ -28,6 +31,8 @@ const FailureDetailModal = ({
   const [signatureType, setSignatureType] = useState(null); // 'REPORT' or 'ADMIN'
   const [signaturesInfo, setSignaturesInfo] = useState(null);
   const [loadingSignatures, setLoadingSignatures] = useState(false);
+  const [showManageModal, setShowManageModal] = useState(false); // Para RecurringFailureModal
+  const [showDeleteModal, setShowDeleteModal] = useState(false); // Para DeleteFailureModal
 
   useEffect(() => {
     if (show && failure) {
@@ -271,12 +276,43 @@ const FailureDetailModal = ({
                 )}
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              ✕
-            </button>
+            
+            <div className="flex items-center gap-2">
+              {/* Botón de Gestionar Falla */}
+              {!failureDetail?.workOrder || failureDetail?.workOrder?.status !== 'RESUELTA' ? (
+                <button
+                  onClick={() => setShowManageModal(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+                >
+                  <span>🔧</span>
+                  <span>Gestionar Falla</span>
+                </button>
+              ) : (
+                <div className="px-4 py-2 bg-green-50 text-green-700 rounded-lg border border-green-200 text-sm font-medium flex items-center gap-2">
+                  <span>✅</span>
+                  <span>Falla Resuelta</span>
+                </div>
+              )}
+
+              {/* Botón de Eliminar Falla - Admin/Soporte/Técnico/Anfitrión */}
+              {(user?.role_id === 1 || user?.role_id === 2 || user?.role_id === 3 || user?.role_id === 4) && (
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center gap-2"
+                  title="Eliminar falla permanentemente"
+                >
+                  <span>🗑️</span>
+                  <span>Eliminar</span>
+                </button>
+              )}
+              
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 text-2xl p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           {/* Información Principal */}
@@ -430,10 +466,21 @@ const FailureDetailModal = ({
 
           {/* Información de OT y Repuestos */}
           {failureDetail?.workOrder && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <span className="mr-2">🔧</span>Orden de Trabajo y Repuestos
-              </h3>
+            <>
+              {/* Sección de Fallas Enlazadas */}
+              <LinkedFailuresSection 
+                failureId={failure.id}
+                currentFailureOrderId={failureDetail.failure_order_id}
+                onUnlink={() => {
+                  loadFailureDetail();
+                  if (onSuccess) onSuccess();
+                }}
+              />
+
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <span className="mr-2">🔧</span>Orden de Trabajo y Repuestos
+                </h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Información de OT */}
                 <div className="bg-blue-50 rounded-lg p-5">
@@ -455,12 +502,53 @@ const FailureDetailModal = ({
                         </p>
                       </div>
                     </div>
-                    {failureDetail.workOrder.description && (
+                    
+                    {failureDetail.workOrder.activity_performed && (
                       <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-1">Descripción</label>
+                        <label className="text-sm font-medium text-gray-700 block mb-1">Actividad Realizada</label>
                         <p className="text-gray-900 bg-white p-3 rounded border text-sm">
-                          {failureDetail.workOrder.description}
+                          {failureDetail.workOrder.activity_performed}
                         </p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {failureDetail.workOrder.start_time && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 block mb-1">Inicio</label>
+                          <p className="text-gray-900 bg-white p-2 rounded border text-xs">
+                            {formatDate(failureDetail.workOrder.start_time)}
+                          </p>
+                        </div>
+                      )}
+                      {failureDetail.workOrder.end_time && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 block mb-1">Fin</label>
+                          <p className="text-gray-900 bg-white p-2 rounded border text-xs">
+                            {formatDate(failureDetail.workOrder.end_time)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {failureDetail.workOrder.resolver && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 block mb-1">Resuelto Por</label>
+                        <p className="text-gray-900 bg-white p-2 rounded border text-sm">
+                          {failureDetail.workOrder.resolver.user_name}
+                        </p>
+                      </div>
+                    )}
+
+                    {failureDetail.workOrder.evidence_url && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 block mb-1">Evidencia</label>
+                        <img
+                          src={`${process.env.NEXT_PUBLIC_API || "http://localhost:5000"}${failureDetail.workOrder.evidence_url}`}
+                          alt="Evidencia OT"
+                          className="w-full h-32 object-cover rounded border cursor-pointer hover:opacity-90"
+                          onClick={() => window.open(`${process.env.NEXT_PUBLIC_API || "http://localhost:5000"}${failureDetail.workOrder.evidence_url}`, '_blank')}
+                        />
                       </div>
                     )}
                   </div>
@@ -473,24 +561,44 @@ const FailureDetailModal = ({
                   </h4>
                   {failureDetail.workOrder.parts && failureDetail.workOrder.parts.length > 0 ? (
                     <div className="space-y-3">
-                      {failureDetail.workOrder.parts.map((workOrderPart, index) => (
-                        <div key={index} className="bg-white p-4 rounded border">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                              <label className="text-xs font-medium text-gray-600 block">Repuesto</label>
-                              <p className="text-gray-900 text-sm font-medium">
-                                {workOrderPart.inventory?.item_name || workOrderPart.inventory?.part_name || 'Repuesto desconocido'}
-                              </p>
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-600 block">Cantidad Utilizada</label>
-                              <p className="text-gray-900 text-sm">
-                                {workOrderPart.quantity_used} unidades
-                              </p>
+                      {failureDetail.workOrder.parts.map((workOrderPart, index) => {
+                        const quantity = workOrderPart.quantity_used || 0;
+
+                        return (
+                          <div key={index} className="bg-white p-4 rounded border">
+                            <div className="space-y-2">
+                              <div>
+                                <label className="text-xs font-medium text-gray-600 block">Repuesto</label>
+                                <p className="text-gray-900 text-sm font-medium">
+                                  {workOrderPart.inventory?.part_name || 'Repuesto desconocido'}
+                                </p>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-xs font-medium text-gray-600 block">Cantidad</label>
+                                  <p className="text-gray-900 text-sm">
+                                    {quantity}
+                                  </p>
+                                </div>
+                                <div>
+                                  <label className="text-xs font-medium text-gray-600 block">Categoría</label>
+                                  <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
+                                    {workOrderPart.inventory?.category || 'N/A'}
+                                  </span>
+                                </div>
+                              </div>
+                              {workOrderPart.inventory?.location && (
+                                <div>
+                                  <label className="text-xs font-medium text-gray-600 block">Ubicación</label>
+                                  <p className="text-gray-900 text-xs">
+                                    {workOrderPart.inventory.location}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="bg-white p-4 border text-center">
@@ -500,6 +608,7 @@ const FailureDetailModal = ({
                 </div>
               </div>
             </div>
+            </>
           )}
 
           {/* Firmas */}
@@ -653,6 +762,35 @@ const FailureDetailModal = ({
           onClose={() => setShowSignaturePad(false)}
           onSave={handleSignatureSave}
           title={signatureType === 'ADMIN' ? 'Firma de Administrador' : 'Firma de Reporte'}
+        />
+      )}
+
+      {/* Modal de Gestión de Falla */}
+      {showManageModal && failureDetail && (
+        <ManageFailureModal
+          show={showManageModal}
+          onClose={() => setShowManageModal(false)}
+          failure={failureDetail}
+          user={user}
+          onSuccess={() => {
+            setShowManageModal(false);
+            loadFailureDetail();
+            if (onSuccess) onSuccess();
+          }}
+        />
+      )}
+
+      {/* Modal de Eliminación de Falla */}
+      {showDeleteModal && failureDetail && (
+        <DeleteFailureModal
+          show={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          failure={failureDetail}
+          onSuccess={() => {
+            setShowDeleteModal(false);
+            onClose(); // Cerrar el modal de detalles también
+            if (onSuccess) onSuccess();
+          }}
         />
       )}
     </div>

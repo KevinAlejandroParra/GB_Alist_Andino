@@ -13,9 +13,12 @@ import AttractionManagement from '../../components/admin/AttractionManagement';
 import QrCodeManagement from '../../components/admin/QrCodeManagement';
 import InventoryManagement from '../../components/admin/InventoryManagement';
 import RequisitionManagement from '../../components/admin/RequisitionManagement';
+import RetroactiveSignatureManagement from '../../components/admin/RetroactiveSignatureManagement';
+import SupportChecklistManagement from '../../components/admin/SupportChecklistManagement';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('users');
+  const [userRoleId, setUserRoleId] = useState(null);
   const router = useRouter();
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -48,6 +51,7 @@ export default function AdminDashboard() {
       const role_id = decoded.role_id;
 
       console.log('Decoded Role ID:', role_id);
+      setUserRoleId(role_id);
 
       if (role_id !== 1 && role_id !== 2) { // Admin y Soporte
         setErrorMessage('Tu rol no tiene permisos para acceder a este panel.');
@@ -82,10 +86,31 @@ export default function AdminDashboard() {
         return <InventoryManagement />;
       case 'requisitions':
         return <RequisitionManagement />;
+      case 'retroactive-signatures':
+        return <RetroactiveSignatureManagement />;
+      case 'support-checklists':
+        return <SupportChecklistManagement />;
       default:
         return <UserManagement />;
     }
   };
+
+  // Definir las pestañas disponibles según el rol
+  const getAvailableTabs = () => {
+    const baseTabs = [
+      'users', 'premises', 'entities', 'roles', 'families', 
+      'devices', 'attractions', 'qr-codes', 'inventory', 'requisitions'
+    ];
+
+    // Solo agregar pestañas especiales si el usuario es Soporte (role_id: 2)
+    if (userRoleId === 2) {
+      return [...baseTabs, 'retroactive-signatures', 'support-checklists'];
+    }
+
+    return baseTabs;
+  };
+
+  const availableTabs = getAvailableTabs();
 
   return (
     <div className="container mx-auto p-4">
@@ -102,7 +127,7 @@ export default function AdminDashboard() {
 
       <nav className="mb-6">
         <ul className="flex flex-wrap justify-center space-x-2 md:space-x-4 gap-2">
-          {['users', 'premises', 'entities', 'roles', 'families', 'devices', 'attractions', 'qr-codes', 'inventory', 'requisitions'].map((tab) => (
+          {availableTabs.map((tab) => (
             <li key={tab}>
               <button
                 className={`px-4 py-2 rounded-md transition-all duration-200 ${activeTab === tab
@@ -169,6 +194,30 @@ export default function AdminDashboard() {
                   <>
                     <i className="fa fa-clipboard-check mr-2"></i>
                     Requisiciones
+                  </>
+                )}
+                {tab === 'retroactive-signatures' && (
+                  <>
+                    <i className="fa fa-signature mr-2"></i>
+                    <span className="relative">
+                      Firmas Retroactivas
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                      </span>
+                    </span>
+                  </>
+                )}
+                {tab === 'support-checklists' && (
+                  <>
+                    <i className="fa fa-user-shield mr-2"></i>
+                    <span className="relative">
+                      Soporte Checklists
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
+                      </span>
+                    </span>
                   </>
                 )}
               </button>

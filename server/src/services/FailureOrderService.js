@@ -572,6 +572,113 @@ class FailureOrderService {
   }
 
   /**
+   * Eliminar una Orden de Falla permanentemente
+   * Elimina la falla, su WorkOrder asociada, repuestos y la imagen de evidencia del servidor
+   * ⚠️ ADVERTENCIA: Esta acción es IRREVERSIBLE
+   */
+  async deleteFailureOrder(failureOrderId) {
+    const fs = require('fs').promises;
+    const path = require('path');
+    const { WorkOrder, WorkOrderPart } = require('../models');
+
+    try {
+      console.log('🗑️ [DELETE FAILURE] Iniciando eliminación de OF:', failureOrderId);
+
+      // Buscar la falla con todas sus relaciones
+      const failureOrder = await FailureOrder.findByPk(failureOrderId, {
+        include: [
+          {
+            model: WorkOrder,
+            as: 'workOrder',
+            include: [
+              {
+                model: WorkOrderPart,
+                as: 'parts'
+              }
+            ]
+          }
+        ]
+      });
+
+      if (!failureOrder) {
+        throw new Error(`Orden de falla ${failureOrderId} no encontrada`);
+      }
+
+      console.log('🗑️ [DELETE FAILURE] Falla encontrada:', failureOrder.failure_order_id);
+
+      // Guardar información para el log
+      const deletionInfo = {
+        failure_order_id: failureOrder.failure_order_id,
+        description: failureOrder.description,
+        evidence_url: failureOrder.evidence_url,
+        had_work_order: !!failureOrder.workOrder,
+        work_order_id: failureOrder.workOrder?.work_order_id,
+        had_parts: failureOrder.workOrder?.parts?.length > 0,
+        parts_count: failureOrder.workOrder?.parts?.length || 0
+      };
+
+      // 1. Eliminar imagen de evidencia del servidor si existe
+      if (failureOrder.evidence_url) {
+        try {
+          // La URL viene como /media/filename.jpg
+          const filename = failureOrder.evidence_url.replace('/media/', '');
+          // ✅ CORRECCIÓN: Ruta correcta a public/media
+          const mediaPath = path.join(__dirname, '../../public/media', filename);
+          
+          console.log('🗑️ [DELETE FAILURE] Intentando eliminar imagen:', mediaPath);
+          
+          // Verificar si el archivo existe antes de intentar eliminarlo
+          try {
+            await fs.access(mediaPath);
+            await fs.unlink(mediaPath);
+            console.log('✅ [DELETE FAILURE] Imagen eliminada exitosamente:', filename);
+          } catch (accessError) {
+            if (accessError.code === 'ENOENT') {
+              console.log('⚠️ [DELETE FAILURE] Imagen no encontrada en el servidor:', filename);
+            } else {
+              throw accessError;
+            }
+          }
+        } catch (fileError) {
+          console.error('❌ [DELETE FAILURE] Error eliminando imagen:', fileError.message);
+          // No lanzar error, continuar con la eliminación de la falla
+        }
+      }
+
+      // 2. Si tiene WorkOrder, eliminar primero los repuestos asociados
+      if (failureOrder.workOrder) {
+        console.log('🗑️ [DELETE FAILURE] Eliminando WorkOrder asociada:', failureOrder.workOrder.work_order_id);
+        
+        // Eliminar repuestos
+        if (failureOrder.workOrder.parts && failureOrder.workOrder.parts.length > 0) {
+          await WorkOrderPart.destroy({
+            where: { work_order_id: failureOrder.workOrder.id }
+          });
+          console.log('✅ [DELETE FAILURE] Repuestos eliminados:', failureOrder.workOrder.parts.length);
+        }
+
+        // Eliminar WorkOrder
+        await failureOrder.workOrder.destroy();
+        console.log('✅ [DELETE FAILURE] WorkOrder eliminada');
+      }
+
+      // 3. Eliminar la Orden de Falla
+      await failureOrder.destroy();
+      console.log('✅ [DELETE FAILURE] Orden de Falla eliminada exitosamente');
+
+      return {
+        success: true,
+        message: 'Orden de falla eliminada permanentemente',
+        deletedInfo: deletionInfo
+      };
+
+    } catch (error) {
+      console.error('❌ [DELETE FAILURE] Error eliminando OF:', error);
+      throw new Error(`Error al eliminar orden de falla: ${error.message}`);
+    }
+  }
+
+  /**
    * Generar ID único para Orden de Falla
    */
   generateFailureOrderId() {

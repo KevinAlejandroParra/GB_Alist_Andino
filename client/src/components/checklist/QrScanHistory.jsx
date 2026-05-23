@@ -149,16 +149,15 @@ function QrProgressIndicator({
    const completedQrScans = qrScans.length;
    const progressPercentage = totalQrPartitions > 1 ? (completedQrScans / totalQrPartitions) * 100 : 100;
 
+   // No mostrar nada si no hay información relevante de QR
+   if (!nextQrInfo || !nextQrInfo.isRequired) {
+     return null;
+   }
+
    return (
      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-       <div className="flex items-center justify-between mb-3">
-         <div className="flex items-center">
-           
-         </div>
-         </div>
-
        {nextQrInfo && nextQrInfo.isRequired && (
-         <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-300">
+         <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-300">
            <div className="flex items-center">
              <span className="text-yellow-600 mr-2">⚠️</span>
              <div>
@@ -272,7 +271,22 @@ export default function QrScanHistory({
    );
 
   function formatDateTime(dateString) {
-    const date = new Date(dateString);
+    if (!dateString) return { time: 'N/A', date: 'N/A' };
+    
+    // Parsear la fecha correctamente: si viene de la BD sin 'Z', es UTC
+    let date;
+    if (typeof dateString === "string" && dateString.match(/^\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}/)) {
+      // Si no tiene 'Z' al final ni información de zona horaria, asumimos que es UTC
+      if (!dateString.endsWith('Z') && !dateString.match(/[+-]\d{2}:\d{2}$/)) {
+        const normalizedString = dateString.replace(' ', 'T') + 'Z'
+        date = new Date(normalizedString)
+      } else {
+        date = new Date(dateString)
+      }
+    } else {
+      date = new Date(dateString)
+    }
+    
     return {
       time: date.toLocaleTimeString('es-CO', {
         hour: '2-digit',

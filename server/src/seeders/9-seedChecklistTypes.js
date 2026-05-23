@@ -1,4 +1,4 @@
-'use strict';
+-'use strict';
 const fs = require('fs');
 const path = require('path');
 
@@ -86,7 +86,8 @@ module.exports = {
             replacements: {
               name: definition.name,
               description: definition.description,
-              frequency: definition.frequency,
+              // Si no se especifica frequency, usar 'diario' para atracciones y 'semanal' para familias
+              frequency: definition.frequency || (type_category === 'family' ? 'semanal' : 'diario'),
               version_label: definition.version_label,
               role_id: definition.role_id,
               type_category: type_category,

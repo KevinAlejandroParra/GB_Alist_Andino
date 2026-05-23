@@ -89,12 +89,14 @@ export function useSimplifiedChecklistData(checklistTypeId, checklistType) {
         params.inspectableId = checklistTypeDetails.associated_id;
       }
 
-      console.log(`📋 Fetching checklist data:`, {
+      console.log(`📋 [useSimplifiedChecklistData] Fetching checklist data:`, {
         checklistType,
+        checklistTypeId,
         endpoint,
         params,
         createInstance: dataConfig.createInstance,
-        generateDynamicTemplate: dataConfig.generateDynamicTemplate
+        generateDynamicTemplate: dataConfig.generateDynamicTemplate,
+        fullUrl: `${API_URL}${endpoint}`
       });
 
       // Para checklists de atracción con createInstance, necesitamos hacer dos llamadas:
@@ -125,6 +127,16 @@ export function useSimplifiedChecklistData(checklistTypeId, checklistType) {
       }
 
       if (response.data) {
+        console.log(`✅ [useSimplifiedChecklistData] Checklist data received:`, {
+          hasData: !!response.data,
+          checklistId: response.data.checklist_id,
+          weekIdentifier: response.data.week_identifier,
+          weekInfo: response.data.week_info,
+          typeCategory: response.data.type?.type_category,
+          frequency: response.data.type?.frequency,
+          itemsCount: response.data.items?.length || 0
+        });
+        
         // Si hay datos y es un checklist de atracción, agrupar items
         if (response.data.type && response.data.type.type_category === 'attraction') {
           if (response.data.items && Array.isArray(response.data.items)) {
@@ -137,6 +149,7 @@ export function useSimplifiedChecklistData(checklistTypeId, checklistType) {
         setChecklist(response.data)
         return response.data
       } else {
+        console.warn(`⚠️ [useSimplifiedChecklistData] No data in response`);
         setChecklist(null)
         if (!dataConfig.createInstance && !dataConfig.generateDynamicTemplate) {
           setError("No checklist found for today")

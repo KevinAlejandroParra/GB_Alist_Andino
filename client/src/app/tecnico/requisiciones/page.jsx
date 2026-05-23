@@ -7,6 +7,7 @@ import useFailureRequisitionSystem from '../../../components/checklist/hooks/use
 import CreateRequisitionModal from '../../../components/checklist/requisitions/CreateRequisitionModal';
 import Swal from 'sweetalert2';
 import { getImageSrc } from '../../../utils/imageUrl';
+import { formatLocalDateTimeWithOptions } from '../../../utils/dateUtils';
 
 const TecnicoRequisitionsPage = () => {
   const { user } = useAuth();
@@ -50,10 +51,9 @@ const TecnicoRequisitionsPage = () => {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('es-ES', {
+    return formatLocalDateTimeWithOptions(dateString, {
       year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
+    }, 'es-ES');
   };
 
   // Use shared helper getImageSrc from utils/imageUrl

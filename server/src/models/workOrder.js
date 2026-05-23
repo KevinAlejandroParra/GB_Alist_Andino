@@ -95,6 +95,13 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       comment: 'ID del técnico/usuario que resolvió la falla'
     },
+
+    // ✅ NUEVO: Campo para rastrear fallas enlazadas (sincronización)
+    linked_failure_ids: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: 'JSON array de IDs de FailureOrders enlazadas que comparten esta información de OT'
+    },
   }, {
     sequelize,
     modelName: 'WorkOrder',

@@ -522,30 +522,41 @@ class QrCodeController {
         return res.json({ success: true, data: { requires_qr: false, message: 'No hay códigos QR configurados para este tipo de checklist' } });
       }
 
-      const qrScans = await ChecklistQrScan.findAll({ where: { checklist_id }, order: [['scanned_at', 'ASC']] });
-
-      // Filtrar items desbloqueados por checklist específico - obtener QR codes asociados al checklist
-      const checklistQrCodes = await ChecklistQrCode.findAll({
-        where: { checklist_type_id: checklist.type.checklist_type_id },
-        attributes: ['qr_id']
+      // ✅ CORRECCIÓN: Obtener escaneos QR específicos de ESTE checklist
+      const qrScans = await ChecklistQrScan.findAll({ 
+        where: { checklist_id }, 
+        include: [{ model: ChecklistQrCode, as: 'qrCode' }],
+        order: [['scanned_at', 'ASC']] 
       });
-      const qrIds = checklistQrCodes.map(qr => qr.qr_id);
 
-      // Obtener items desbloqueados filtrados por checklist
-      const unlockedItems = await ChecklistQrItemAssociation.findAll({
+      // ✅ CORRECCIÓN: Determinar items desbloqueados basándose en los QR escaneados para ESTE checklist
+      const scannedQrIds = qrScans.map(scan => scan.qr_id);
+      
+      // Obtener todos los items asociados a los QR codes que fueron escaneados
+      const unlockedItemAssociations = await ChecklistQrItemAssociation.findAll({
         where: {
-          qr_id: qrIds,
-          is_unlocked: true
+          qr_id: scannedQrIds
         },
         include: [{
           model: ChecklistItem,
           as: 'checklistItem',
-          where: { checklist_type_id: checklist.type.checklist_type_id } // Asegurar que los items pertenezcan al tipo correcto
+          where: { checklist_type_id: checklist.type.checklist_type_id }
         }]
       });
 
+      // Mapear items desbloqueados con información de cuándo se desbloquearon
+      const unlockedItems = unlockedItemAssociations.map(assoc => {
+        const scan = qrScans.find(s => s.qr_id === assoc.qr_id);
+        return {
+          checklist_item_id: assoc.checklistItem.checklist_item_id,
+          is_unlocked: true,
+          unlocked_at: scan ? scan.scanned_at : null,
+          qr_group: scan ? scan.qrCode.group_number : null
+        };
+      });
+
       const lastScan = qrScans.length > 0 ? qrScans[qrScans.length - 1] : null;
-      const lastValidatedPartition = lastScan ? (await lastScan.getQrCode()).group_number : 0;
+      const lastValidatedPartition = lastScan ? lastScan.qrCode.group_number : 0;
       const nextQrRequired = QrCodeController.calculateNextRequiredQr(qrCodes, unlockedItems.length, lastValidatedPartition);
 
       // Verificar si TODOS los QR han sido completados
@@ -557,21 +568,28 @@ class QrCodeController {
       const actuallyRequiresQr = nextQrRequired && nextQrRequired.qr_code;
 
       // Agregar información de debug
-      console.log(`🔍 Debug QR - Total QR codes: ${totalQrCodes}, Total scans: ${totalScans}, All completed: ${allQrCompleted}`);
-      console.log(`🔍 Debug QR - Next QR required:`, nextQrRequired);
-      console.log(`🔍 Debug QR - Actually requires QR: ${actuallyRequiresQr}`);
+      console.log(`🔍 Debug QR Authorization - Checklist ${checklist_id}:`);
+      console.log(`   Total QR codes: ${totalQrCodes}`);
+      console.log(`   Total scans: ${totalScans}`);
+      console.log(`   Scanned QR IDs: [${scannedQrIds.join(', ')}]`);
+      console.log(`   Unlocked items count: ${unlockedItems.length}`);
+      console.log(`   Last validated partition: ${lastValidatedPartition}`);
+      console.log(`   Next QR required:`, nextQrRequired);
+      console.log(`   Actually requires QR: ${actuallyRequiresQr}`);
 
       res.json({
         success: true,
         data: {
           requires_qr: actuallyRequiresQr,
           next_qr_required: nextQrRequired,
-          scan_history: qrScans,
-          unlocked_items: unlockedItems.map(item => ({
-            checklist_item_id: item.checklistItem.checklist_item_id,
-            is_unlocked: item.is_unlocked,
-            unlocked_at: item.unlocked_at
+          scan_history: qrScans.map(scan => ({
+            scan_id: scan.scan_id,
+            qr_code: scan.qrCode.qr_code,
+            group_number: scan.qrCode.group_number,
+            scanned_at: scan.scanned_at,
+            scanned_by: scan.scanned_by
           })),
+          unlocked_items: unlockedItems,
           available_qr_codes: qrCodes.map(qr => ({
             qr_id: qr.qr_id,
             qr_code: qr.qr_code,

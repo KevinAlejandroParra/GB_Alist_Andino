@@ -2,6 +2,7 @@
 
 const { WorkOrder, FailureOrder, User, Inventory, WorkOrderPart, Sequelize } = require('../models');
 const { Op } = Sequelize;
+const failureOrderService = require('./FailureOrderService');
 
 class WorkOrderService {
   /**
@@ -49,7 +50,8 @@ class WorkOrderService {
       const workOrder = await WorkOrder.create({
         work_order_id,
         failure_order_id,
-        status: 'EN_PROCESO'
+        status: 'EN_PROCESO',
+        linked_failure_ids: JSON.stringify([failure_order_id]) // ✅ Inicializar con su propia falla
       });
 
       // Cargar con relaciones
@@ -506,6 +508,11 @@ class WorkOrderService {
         });
 
         console.log(`✅ Repuesto agregado a OT ${workOrder.work_order_id}`);
+        
+        // ✅ SINCRONIZACIÓN: Sincronizar repuestos con WorkOrders enlazadas
+        const WorkOrderSyncService = require('./WorkOrderSyncService');
+        await WorkOrderSyncService.syncLinkedWorkOrderParts(workOrder.id);
+        
         return workOrderPart;
       }
     } catch (error) {
@@ -800,10 +807,64 @@ class WorkOrderService {
 
       await workOrder.update(updateData);
 
+      // ✅ SINCRONIZACIÓN: Sincronizar con WorkOrders enlazadas
+      const WorkOrderSyncService = require('./WorkOrderSyncService');
+      const syncResult = await WorkOrderSyncService.syncLinkedWorkOrders(workOrderId, updateData);
+      
+      if (syncResult.success && syncResult.synced > 0) {
+        console.log(`✅ [SYNC] ${syncResult.synced} WorkOrders enlazadas sincronizadas`);
+      }
+
       return await this.getWorkOrderById(workOrderId);
     } catch (error) {
       console.error('❌ Error actualizando campos WorkOrder:', error);
       throw new Error(`Error al actualizar campos: ${error.message}`);
+    }
+  }
+
+  /**
+   * Manejar la creación automática de OF y OT desde una respuesta de checklist
+   * @param {Object} data - Datos de la respuesta
+   * @param {Object} transaction - Transacción de Sequelize
+   */
+  async handleWorkOrderForResponse(data, transaction) {
+    try {
+      const { checklist_id, checklist_item_id, inspectable_id, responded_by, response_compliance, comment, evidence_url } = data;
+
+      // 1. Crear la Orden de Falla (OF)
+      const failureResult = await failureOrderService.createFromChecklist({
+        description: comment || `Falla reportada en checklist: ${response_compliance}`,
+        severity: 'LEVE',
+        evidenceUrl: evidence_url || '/media/defaults/no-evidence.png',
+        inspectableId: inspectable_id,
+        checklistItemId: checklist_item_id,
+        reportedBy: responded_by,
+        type_maintenance: 'TECNICA'
+      });
+
+      if (!failureResult.success) {
+        throw new Error(failureResult.message || 'Error al crear la orden de falla automática');
+      }
+
+      const failureOrder = failureResult.data;
+
+      // 2. Crear la Orden de Trabajo (OT) vinculada
+      const workOrderId = await this.generateWorkOrderId();
+      
+      await WorkOrder.create({
+        work_order_id: workOrderId,
+        failure_order_id: failureOrder.id,
+        status: 'EN_PROCESO',
+        start_time: new Date(),
+        linked_failure_ids: JSON.stringify([failureOrder.id]) // ✅ Inicializar con su propia falla
+      }, { transaction });
+
+      console.log(`✅ Flujo automático completado: OF ${failureOrder.failure_order_id} -> OT ${workOrderId}`);
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Error en handleWorkOrderForResponse:', error);
+      throw error;
     }
   }
 

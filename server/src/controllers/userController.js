@@ -771,6 +771,41 @@ class UserController {
             });
         }
     }
+
+    // Obtener lista de técnicos para asignar trabajos
+    static async getTechnicians(req, res) {
+        try {
+            // Obtener técnicos (role_id = 3) y anfitriones (role_id = 4)
+            const technicians = await User.findAll({
+                where: {
+                    role_id: [3, 4], // Técnicos y Anfitriones
+                    user_state: 'activo'
+                },
+                attributes: ['user_id', 'user_name', 'user_email', 'role_id'],
+                include: [
+                    {
+                        model: Role,
+                        as: 'role',
+                        attributes: ['role_name']
+                    }
+                ],
+                order: [['user_name', 'ASC']]
+            });
+
+            res.status(200).json({
+                success: true,
+                data: technicians,
+                message: 'Técnicos obtenidos correctamente'
+            });
+        } catch (error) {
+            console.error('Error al obtener técnicos:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error al obtener la lista de técnicos',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    }
 }
 
 module.exports = UserController;

@@ -391,6 +391,9 @@ const getChecklistHistory = async (req, res) => {
 }
 
 const downloadChecklistPDF = async (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
   try {
     const { id } = req.params;
 
@@ -400,20 +403,40 @@ const downloadChecklistPDF = async (req, res) => {
       return res.status(404).json({ error: "Checklist not found" })
     }
 
-    const htmlContent = generateChecklistHTML(checklistData)
+    // ✅ OPTIMIZACIÓN: Pre-procesar todas las imágenes antes de generar HTML
+    const htmlContent = await generateChecklistHTML(checklistData)
 
-    const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-accelerated-2d-canvas",
-        "--disable-gpu"
-      ],
-      headless: 'new'
-    })
+    // ✅ Escribir a un archivo temporal para evitar colapsar la conexión WebSocket con Puppeteer
+    const tempFileName = `checklist_${id}_${Date.now()}.html`;
+    const tempFilePath = path.join(os.tmpdir(), tempFileName);
+    // Convertir a path absoluto de Windows
+    const fileUrl = tempFilePath.replace(/\\/g, '/');
+    fs.writeFileSync(tempFilePath, htmlContent);
+
+    // ✅ OPTIMIZACIÓN: Usar navegador singleton para evitar lanzar uno nuevo cada vez
+    const browser = await getBrowserInstance();
     const page = await browser.newPage()
-    await page.setContent(htmlContent, { waitUntil: "networkidle2" })
+    
+    // ✅ OPTIMIZACIÓN: Configurar página para renderizado más rápido
+    await page.setViewport({ width: 1200, height: 1600 });
+    
+    // ✅ OPTIMIZACIÓN: Deshabilitar recursos innecesarios
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      // Bloquear recursos externos que no necesitamos
+      const resourceType = request.resourceType();
+      if (['font', 'media', 'websocket'].includes(resourceType)) {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+    
+    // ✅ Usar page.goto con el archivo local
+    await page.goto(`file:///${fileUrl}`, { 
+      waitUntil: "domcontentloaded",
+      timeout: 30000 // Reducir timeout a 30 segundos
+    })
 
     // Inject a style tag to handle page breaks
     await page.addStyleTag({
@@ -425,9 +448,12 @@ const downloadChecklistPDF = async (req, res) => {
     `,
     })
 
+    // ✅ OPTIMIZACIÓN: Configuración de PDF optimizada
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
+      timeout: 30000, // Reducir timeout
+      preferCSSPageSize: false, // Más rápido
       margin: {
         top: "80px",
         right: "50px",
@@ -449,7 +475,17 @@ const downloadChecklistPDF = async (req, res) => {
       `,
     })
 
-    await browser.close()
+    await page.close() // ✅ Explicitly close page
+    // ✅ NO cerrar el navegador, mantenerlo abierto para reutilizar
+    
+    // Limpieza
+    try {
+      if (fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
+    } catch (cleanupError) {
+      console.warn("Could not remove temp file:", tempFilePath);
+    }
 
     res.set({
       "Content-Type": "application/pdf",
@@ -459,9 +495,77 @@ const downloadChecklistPDF = async (req, res) => {
 
     res.send(pdfBuffer)
   } catch (error) {
-    res.status(500).json({ error: "Error al generar el PDF" })
+    console.error('💥 Error crítico en downloadChecklistPDF:', error);
+    res.status(500).json({
+      error: "Error al generar el PDF",
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
   }
 }
+
+// ✅ OPTIMIZACIÓN: Singleton del navegador para reutilizar instancia
+let browserInstance = null;
+let browserLaunchPromise = null;
+
+const getBrowserInstance = async () => {
+  // Si ya hay un navegador, devolverlo
+  if (browserInstance && browserInstance.isConnected()) {
+    return browserInstance;
+  }
+
+  // Si ya se está lanzando, esperar a que termine
+  if (browserLaunchPromise) {
+    return browserLaunchPromise;
+  }
+
+  // Lanzar nuevo navegador
+  browserLaunchPromise = puppeteer.launch({
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--disable-gpu",
+      "--disable-web-security",
+      "--disable-features=IsolateOrigins,site-per-process", // ✅ Más rápido
+      "--disable-blink-features=AutomationControlled" // ✅ Evitar detección
+    ],
+    headless: true,
+    timeout: 30000 // ✅ Timeout de lanzamiento
+  }).then(browser => {
+    browserInstance = browser;
+    browserLaunchPromise = null;
+    
+    // Manejar cierre inesperado
+    browser.on('disconnected', () => {
+      console.log('⚠️ Navegador desconectado, se creará uno nuevo en la próxima solicitud');
+      browserInstance = null;
+    });
+    
+    return browser;
+  }).catch(error => {
+    browserLaunchPromise = null;
+    throw error;
+  });
+
+  return browserLaunchPromise;
+};
+
+// ✅ Cerrar navegador al apagar el servidor
+process.on('SIGINT', async () => {
+  if (browserInstance) {
+    await browserInstance.close();
+  }
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  if (browserInstance) {
+    await browserInstance.close();
+  }
+  process.exit(0);
+});
 
 const getChecklistTypes = async (req, res) => {
   try {
@@ -472,7 +576,118 @@ const getChecklistTypes = async (req, res) => {
   }
 };
 
-const generateChecklistHTML = (data) => {
+const generateChecklistHTML = async (data) => {
+  const fs = require('fs');
+  const path = require('path');
+  
+  // ✅ Intentar cargar Sharp, pero tener fallback si falla
+  let sharp = null;
+  let useSharp = false;
+  try {
+    sharp = require('sharp');
+    useSharp = true;
+    console.log('✅ Sharp cargado correctamente para optimización de imágenes');
+  } catch (error) {
+    console.warn('⚠️ Sharp no disponible, usando conversión directa (sin optimización):', error.message);
+    useSharp = false;
+  }
+  
+  // ✅ Función para convertir imágenes a base64 (con o sin Sharp)
+  const getImageAsBase64 = async (imagePath) => {
+    if (!imagePath) return null;
+    
+    try {
+      let cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+      const absolutePath = path.join(__dirname, '../../public', cleanPath);
+      
+      if (!fs.existsSync(absolutePath)) {
+        return null;
+      }
+
+      const fileData = fs.readFileSync(absolutePath);
+      
+      // Si Sharp está disponible, optimizar
+      if (useSharp && sharp) {
+        try {
+          const buffer = await sharp(fileData)
+            .resize(800, 600, {
+              fit: 'inside',
+              withoutEnlargement: true
+            })
+            .jpeg({ 
+              quality: 75,
+              progressive: true
+            })
+            .toBuffer();
+          
+          return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+        } catch (sharpError) {
+          console.warn('⚠️ Error con Sharp, usando fallback:', sharpError.message);
+          // Continuar con fallback abajo
+        }
+      }
+      
+      // Fallback: conversión directa sin optimización
+      const ext = path.extname(absolutePath).toLowerCase().replace('.', '');
+      let mimeType = 'image/jpeg';
+      if (ext === 'png') mimeType = 'image/png';
+      else if (ext === 'gif') mimeType = 'image/gif';
+      else if (ext === 'webp') mimeType = 'image/webp';
+      
+      return `data:${mimeType};base64,${fileData.toString('base64')}`;
+      
+    } catch (error) {
+      console.error('❌ Error al procesar imagen para PDF:', imagePath, error.message);
+      return null;
+    }
+  };
+
+  // ✅ PRE-PROCESAR TODAS LAS IMÁGENES ANTES DE GENERAR HTML
+  const imageCache = {};
+  
+  // Procesar imagen del usuario
+  if (data.creator?.user_image) {
+    imageCache[data.creator.user_image] = await getImageAsBase64(data.creator.user_image);
+  }
+  
+  // Procesar imágenes de respuestas y fallas
+  if (data.items) {
+    for (const item of data.items) {
+      // Para checklists de familia, procesar subItems
+      if (item.subItems) {
+        for (const subItem of item.subItems) {
+          if (subItem.responses && subItem.responses[0]?.evidence_url) {
+            const url = subItem.responses[0].evidence_url;
+            if (!imageCache[url]) {
+              imageCache[url] = await getImageAsBase64(url);
+            }
+          }
+        }
+      }
+      
+      // Para checklists normales, procesar respuestas directas
+      if (item.responses && item.responses[0]?.evidence_url) {
+        const url = item.responses[0].evidence_url;
+        if (!imageCache[url]) {
+          imageCache[url] = await getImageAsBase64(url);
+        }
+      }
+    }
+  }
+  
+  // Procesar imágenes de fallas
+  if (data.failures?.failures_by_item) {
+    for (const itemFailures of Object.values(data.failures.failures_by_item)) {
+      for (const failure of itemFailures) {
+        if (failure.evidence_url && !imageCache[failure.evidence_url]) {
+          imageCache[failure.evidence_url] = await getImageAsBase64(failure.evidence_url);
+        }
+      }
+    }
+  }
+  
+  console.log(`✅ Pre-procesadas ${Object.keys(imageCache).length} imágenes para PDF ${useSharp ? '(optimizadas con Sharp)' : '(sin optimización)'}`);
+
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A"
     const date = new Date(dateStr)
@@ -569,14 +784,18 @@ const generateChecklistHTML = (data) => {
           comment = comment ? `${comment} <br/> ${failureDescriptions}` : failureDescriptions;
         }
 
-        // Construir contenido de evidencia (evidencia respuesta + evidencia fallas)
-        let evidence = response.evidence_url ?
-          `<a href="http://localhost:5000${response.evidence_url}" target="_blank"><img src="http://localhost:5000${response.evidence_url}" class="evidence-image"/></a>` : "";
+        // ✅ Usar cache de imágenes pre-procesadas
+        let evidenceBase64 = imageCache[response.evidence_url] || null;
+        let evidence = evidenceBase64 ?
+          `<a href="${evidenceBase64}" target="_blank"><img src="${evidenceBase64}" class="evidence-image"/></a>` : "";
 
         if (itemFailures.length > 0) {
           const failureImages = itemFailures
             .filter(f => f.evidence_url)
-            .map(f => `<a href="http://localhost:5000${f.evidence_url}" target="_blank"><img src="http://localhost:5000${f.evidence_url}" class="evidence-image" style="margin-top: 4px; border-color: #ef4444;"/></a>`)
+            .map(f => {
+               let fEvBase64 = imageCache[f.evidence_url] || null;
+               return fEvBase64 ? `<a href="${fEvBase64}" target="_blank"><img src="${fEvBase64}" class="evidence-image" style="margin-top: 4px; border-color: #ef4444;"/></a>` : '';
+            })
             .join('');
           evidence = evidence + failureImages;
         }
@@ -585,7 +804,7 @@ const generateChecklistHTML = (data) => {
                     <tr class="sub-item-row">
                         <td style="font-size: 9px; font-weight: bold;">${item.item_number}</td>
                         <td style="font-size: 9px; line-height: 1.2; padding: 4px;">
-                            <div style="max-width: 200px; word-wrap: break-word;">${item.question_text}</div>
+                            <div style="max-width: 180px; word-wrap: break-word;">${item.question_text}</div>
                         </td>
                         <td style="text-align: center; font-size: 9px; font-weight: bold; padding: 4px;" class="${displayValue.replace(" ", "-")}">
                             ${displayValue}
@@ -593,7 +812,7 @@ const generateChecklistHTML = (data) => {
                         <td style="font-size: 9px; line-height: 1.0; padding: 2px 4px;">
                             <div style="max-width: 120px; word-wrap: break-word;">${comment}</div>
                         </td>
-                        <td style="text-align: center; padding: 2px;">${evidence}</td>
+                        <td style="text-align: center; padding: 6px; vertical-align: middle;">${evidence}</td>
                     </tr>
                     ${failuresHtml ? `
                     <tr class="failures-row" style="background-color: #fefbeb;">
@@ -608,107 +827,128 @@ const generateChecklistHTML = (data) => {
     return html
   }
 
-  const renderFamilyResponses = (items) => {
+  const renderFamilyResponses = (deviceSections) => {
     let html = ""
-    // Ordenar los ítems antes de renderizar
-    const sortedItems = naturalSortItemNumbers([...items]);
-    sortedItems.forEach((deviceSection) => {
-      // Verificar si es un ítem padre (parent_item_id es null)
-      const isParentItem = !deviceSection.parent_item_id;
 
-      if (isParentItem) {
-        // Renderizar el header de la sección de dispositivo en negrilla
-        html += `
-                <tr class="device-section-row" style="background-color: #7c3aed; color: white;">
-                    <td colspan="5" style="font-size: 10px; font-weight: bold; padding: 6px; color: white;">
-                        <strong>${deviceSection.question_text}</strong>
+    deviceSections.forEach((deviceSection) => {
+      // Encabezado del dispositivo (sección de color morado)
+      html += `
+              <tr class="device-section-row" style="background-color: #7c3aed; color: white;">
+                  <td colspan="5" style="font-size: 10px; font-weight: bold; padding: 8px; color: white;">
+                      <strong>📱 ${deviceSection.item_number}. ${deviceSection.question_text}</strong>
+                  </td>
+              </tr>
+           `
+
+      // Iterar sobre los subItems (padres e hijos del dispositivo)
+      if (deviceSection.subItems && deviceSection.subItems.length > 0) {
+        deviceSection.subItems.forEach((item) => {
+          // Determinar si debe renderizarse como un header de sección o como una pregunta normal
+          // Es un header si es item raíz Y (tiene hijos debajo O es de tipo section) Y no tiene respuestas propias
+          const hasChildren = deviceSection.subItems.some(sub => sub.parent_item_id === item.checklist_item_id);
+          const isSectionHeader = !item.parent_item_id && (hasChildren || item.input_type === 'section') && (!item.responses || item.responses.length === 0);
+
+          if (isSectionHeader) {
+            // Renderizar item padre en negrilla (como separador de categoría)
+            html += `
+                <tr class="parent-item-row" style="background-color: #f8fafc;">
+                    <td colspan="5" style="font-size: 10px; font-weight: bold; padding: 6px; color: #374151;">
+                        <strong>${item.item_number}. ${item.question_text}</strong>
                     </td>
                 </tr>
              `
-      } else {
-        // Es un ítem hijo, renderizar sin negrilla
-        const response = deviceSection.responses && deviceSection.responses[0] ? deviceSection.responses[0] : {}
+          } else {
+            // Item con respuesta o item hijo: mostrar respuesta + fallas
+            const response = item.responses && item.responses[0] ? item.responses[0] : {}
 
-        // Determinar el valor correcto basado en el tipo de respuesta
-        let displayValue = ""
-        if (response.response_compliance) {
-          displayValue = response.response_compliance
-        } else if (response.response_numeric !== null && response.response_numeric !== undefined) {
-          displayValue = response.response_numeric.toString()
-        } else if (response.response_text) {
-          displayValue = response.response_text
-        } else {
-          displayValue = response.value || ""
-        }
+            // Determinar el valor correcto basado en el tipo de respuesta
+            let displayValue = ""
+            if (response.response_compliance) {
+              displayValue = response.response_compliance
+            } else if (response.response_numeric !== null && response.response_numeric !== undefined) {
+              displayValue = response.response_numeric.toString()
+            } else if (response.response_text) {
+              displayValue = response.response_text
+            } else {
+              displayValue = response.value || ""
+            }
 
-        // Obtener las fallas asociadas a este item
-        const itemFailures = data.failures?.failures_by_item?.[deviceSection.checklist_item_id] || [];
+            // Obtener las fallas asociadas a este item de este dispositivo
+            // La clave usa unique_frontend_id que es "{device_ins_id}-{checklist_item_id}"
+            const failureKey = item.unique_frontend_id || item.checklist_item_id;
+            const itemFailures = data.failures?.failures_by_item?.[failureKey] || [];
 
-        let failuresHtml = '';
-        if (itemFailures.length > 0) {
-          failuresHtml = `
-            <div style="margin-top: 6px; padding: 6px; background: #fefbeb; border-radius: 4px;">
-              <strong style="font-size: 9px; color: #92400e;">📋 Órdenes de Falla (${itemFailures.length})</strong>
-              ${itemFailures.map((failure, idx) => `
-                <div style="background: #fff; margin-top: 6px; padding: 6px; border-radius: 3px; border-left: 3px solid ${failure.severity === 'CRITICA' ? '#dc2626' : failure.severity === 'MODERADA' ? '#f59e0b' : '#10b981'};">
-                  <div style="font-size: 8px; margin-bottom: 4px;">
-                    <strong style="color: #1f2937;">${idx + 1}. ${failure.severity || 'N/A'}</strong> - ${failure.description}
-                  </div>
-                  <div style="font-size: 7px; color: #6b7280; margin-bottom: 4px;">
-                    <strong>Asignado:</strong> ${failure.assigned_to_name} | 
-                    <strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez/veces` : 'Primera vez'}
-                  </div>
+            let failuresHtml = '';
+            if (itemFailures.length > 0) {
+              failuresHtml = `
+                <div style="margin-top: 4px; padding: 4px; background: #fefbeb; border-radius: 4px;">
+                  <strong style="font-size: 8px; color: #92400e;">📋 Fallas (${itemFailures.length})</strong>
+                  ${itemFailures.map((failure, idx) => `
+                    <div style="background: #fff; margin-top: 4px; padding: 4px; border-radius: 3px; border-left: 3px solid ${failure.severity === 'CRITICA' ? '#dc2626' : failure.severity === 'MODERADA' ? '#f59e0b' : '#10b981'};">
+                      <div style="font-size: 7px;">
+                        <strong>${idx + 1}. ${failure.severity || 'N/A'}</strong> - ${failure.description}
+                      </div>
+                      <div style="font-size: 7px; color: #6b7280;">
+                        <strong>Área:</strong> ${failure.assigned_to || 'No asignado'} |
+                        <strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez` : 'Primera vez'}
+                      </div>
+                    </div>
+                  `).join('')}
                 </div>
-              `).join('')}
-            </div>
-          `;
-        }
+              `;
+            }
 
-        // Construir contenido de observaciones (comentario + descripciones de fallas)
-        let comment = response.comment || "";
-        if (itemFailures.length > 0) {
-          const failureDescriptions = itemFailures.map(f => `[Falla: ${f.description}]`).join(' ');
-          comment = comment ? `${comment} <br/> ${failureDescriptions}` : failureDescriptions;
-        }
+            let comment = response.comment || "";
+            if (itemFailures.length > 0) {
+              const failureDescriptions = itemFailures.map(f => `[Falla: ${f.description}]`).join(' ');
+              comment = comment ? `${comment} <br/> ${failureDescriptions}` : failureDescriptions;
+            }
 
-        // Construir contenido de evidencia (evidencia respuesta + evidencia fallas)
-        let evidence = response.evidence_url ?
-          `<a href="http://localhost:5000${response.evidence_url}" target="_blank"><img src="http://localhost:5000${response.evidence_url}" class="evidence-image"/></a>` : "";
+            // ✅ Usar cache de imágenes pre-procesadas
+            let evidenceBase64 = imageCache[response.evidence_url] || null;
+            let evidence = evidenceBase64 ?
+              `<a href="${evidenceBase64}" target="_blank"><img src="${evidenceBase64}" class="evidence-image"/></a>` : "";
 
-        if (itemFailures.length > 0) {
-          const failureImages = itemFailures
-            .filter(f => f.evidence_url)
-            .map(f => `<a href="http://localhost:5000${f.evidence_url}" target="_blank"><img src="http://localhost:5000${f.evidence_url}" class="evidence-image" style="margin-top: 4px; border-color: #ef4444;"/></a>`)
-            .join('');
-          evidence = evidence + failureImages;
-        }
+            if (itemFailures.length > 0) {
+              const failureImages = itemFailures
+                .filter(f => f.evidence_url)
+                .map(f => {
+                   let fEvBase64 = imageCache[f.evidence_url] || null;
+                   return fEvBase64 ? `<a href="${fEvBase64}" target="_blank"><img src="${fEvBase64}" class="evidence-image" style="margin-top: 4px; border-color: #ef4444;"/></a>` : '';
+                })
+                .join('');
+              evidence = evidence + failureImages;
+            }
 
-        html += `
-                    <tr class="sub-item-row">
-                        <td style="font-size: 9px; font-weight: bold;">${deviceSection.item_number}</td>
-                        <td style="font-size: 9px; line-height: 1.2; padding: 4px;">
-                            <div style="max-width: 200px; word-wrap: break-word;">${deviceSection.question_text}</div>
-                        </td>
-                        <td style="text-align: center; font-size: 9px; font-weight: bold; padding: 4px;" class="${displayValue.replace(" ", "-")}">
-                            ${displayValue}
-                        </td>
-                        <td style="font-size: 9px; line-height: 1.0; padding: 2px 4px;">
-                            <div style="max-width: 120px; word-wrap: break-word;">${comment}</div>
-                        </td>
-                        <td style="text-align: center; padding: 2px;">${evidence}</td>
-                    </tr>
-                    ${failuresHtml ? `
-                    <tr class="failures-row" style="background-color: #fefbeb;">
-                        <td colspan="5" style="padding: 4px 8px; border-top: 1px solid #e5e7eb;">
-                            ${failuresHtml}
-                        </td>
-                    </tr>
-                    ` : ''}
-                `
+            html += `
+                        <tr class="sub-item-row">
+                            <td style="font-size: 9px; font-weight: bold;">${item.item_number}</td>
+                            <td style="font-size: 9px; line-height: 1.2; padding: 4px;">
+                                <div style="max-width: 180px; word-wrap: break-word;">${item.question_text}</div>
+                            </td>
+                            <td style="text-align: center; font-size: 9px; font-weight: bold; padding: 4px;" class="${displayValue.replace(" ", "-")}">
+                                ${displayValue}
+                            </td>
+                            <td style="font-size: 9px; line-height: 1.0; padding: 2px 4px;">
+                                <div style="max-width: 120px; word-wrap: break-word;">${comment}</div>
+                            </td>
+                            <td style="text-align: center; padding: 6px; vertical-align: middle;">${evidence}</td>
+                        </tr>
+                        ${failuresHtml ? `
+                        <tr class="failures-row" style="background-color: #fefbeb;">
+                            <td colspan="5" style="padding: 4px 8px; border-top: 1px solid #e5e7eb;">
+                                ${failuresHtml}
+                            </td>
+                        </tr>
+                        ` : ''}
+                     `
+          }
+        })
       }
     })
     return html
   }
+
 
   const signaturesHTML = data.signatures
     .map(
@@ -776,41 +1016,67 @@ const generateChecklistHTML = (data) => {
                 }
                 
                 .header { 
-                    background: linear-gradient(135deg, var(--primary-purple) 0%, var(--dark-blue) 100%);
+                    background: white;
+                    padding: 0;
+                    position: relative;
+                    border-bottom: 3px solid #00bcd4;
+                }
+                
+                .header-banner {
+                    display: flex;
+                    height: 60px;
+                    overflow: hidden;
+                }
+                
+                .header-cyan {
+                    background: #00bcd4;
+                    flex: 0 0 40%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0 20px;
+                }
+                
+                .header-lime {
+                    background: #c0d725;
+                    flex: 0 0 60%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-start;
+                    padding: 0 20px;
+                }
+                
+                .header-cyan h1 {
                     color: white;
-                    text-align: center; 
-                    padding: 24px 20px;
-                    position: relative;
-                }
-                
-                .header::before {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-                    opacity: 0.1;
-                }
-                
-                .header-content {
-                    position: relative;
-                    z-index: 1;
-                }
-                
-                .app-title {
-                    font-size: 24px;
-                    font-weight: 700;
-                    letter-spacing: -0.025em;
+                    font-size: 32px;
+                    font-weight: 300;
+                    letter-spacing: 0.05em;
                     margin: 0;
+                    font-family: 'Arial', sans-serif;
                 }
                 
-                .report-title {
-                    font-size: 16px;
-                    font-weight: 500;
-                    opacity: 0.9;
-                    margin: 8px 0 0 0;
+                .header-lime h2 {
+                    color: white;
+                    font-size: 20px;
+                    font-weight: 300;
+                    letter-spacing: 0.05em;
+                    margin: 0;
+                    text-transform: uppercase;
+                    font-family: 'Arial', sans-serif;
+                }
+                
+                .header-nit {
+                    background: white;
+                    padding: 8px 20px;
+                    text-align: left;
+                }
+                
+                .header-nit p {
+                    color: #00bcd4;
+                    font-size: 14px;
+                    font-weight: 400;
+                    margin: 0;
+                    font-family: 'Arial', sans-serif;
                 }
                 
                 .info-section { 
@@ -964,8 +1230,10 @@ const generateChecklistHTML = (data) => {
                 }
                 
                 .sub-item-row td:nth-child(5) { 
-                    width: 25%; 
+                    width: 30%; 
                     text-align: center;
+                    vertical-align: middle;
+                    padding: 8px;
                 }
                 
                 /* Estados de respuesta con colores mejorados */
@@ -994,16 +1262,18 @@ const generateChecklistHTML = (data) => {
                 }
                 
                 .evidence-image {
-                    max-width: 80px;
-                    max-height: 60px;
+                    max-width: 180px;
+                    max-height: 140px;
                     border-radius: 6px;
-                    border: 2px solid var(--slate-200);
-                    object-fit: cover;
-                    transition: transform 0.2s ease;
+                    border: 1px solid var(--slate-300);
+                    object-fit: contain;
+                    margin: 4px;
+                    background: #f1f5f9;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                 }
                 
                 .evidence-image:hover {
-                    transform: scale(1.05);
+                    transform: scale(1.02);
                 }
                 
                 .signatures-section { 
@@ -1095,9 +1365,16 @@ const generateChecklistHTML = (data) => {
         <body>
             <div class="report-container">
                 <div class="header">
-                    <div class="header-content">
-                        <h1 class="app-title">Alist GBX</h1>
-                        <p class="report-title">Reporte de Checklist</p>
+                    <div class="header-banner">
+                        <div class="header-cyan">
+                            <h2>RECREATEC SAS</h2>
+                        </div>
+                        <div class="header-lime">
+                            <h2>TECNOLOGÍA EN RECREACIÓN</h2>
+                        </div>
+                    </div>
+                    <div class="header-nit">
+                        <p>Nit. 800.195.487-1</p>
                     </div>
                 </div>
                 
@@ -1107,14 +1384,18 @@ const generateChecklistHTML = (data) => {
                         <tr>
                             <th>Checklist ID</th>
                             <td>${data.checklist_id}</td>
-                            <th>Fecha</th>
+                            <th>Fecha de Creación</th>
                             <td>${formatDate(data.createdAt)}</td>
                         </tr>
                         <tr>
                             <th>Realizado por</th>
                             <td colspan="3">
                                 <div class="user-info">
-                                    ${data.creator.user_image ? `<img src="http://localhost:5000/${data.creator.user_image}" alt="User Image" class="user-avatar" onerror="this.style.display='none';"/>` : ''}
+                                    ${(() => {
+                                        if (!data.creator.user_image) return '';
+                                        const imgB64 = imageCache[data.creator.user_image] || null;
+                                        return imgB64 ? `<img src="${imgB64}" alt="User Image" class="user-avatar" onerror="this.style.display='none';"/>` : '';
+                                    })()}
                                     <div>
                                         <strong>${data.creator.user_name}</strong><br/>
                                         <small style="color: var(--slate-600);">${data.creator.role.role_name}</small>
@@ -1129,21 +1410,44 @@ const generateChecklistHTML = (data) => {
                                 <small style="color: var(--slate-600);">${data.type.description}</small>
                             </td>
                         </tr>
+                        ${data.type.type_category === 'family' ? `
                         <tr>
-                            <th>Elemento Inspeccionado</th>
+                            <th>Período</th>
                             <td colspan="3">
-                                <strong>${data.inspectable?.name || 'N/A'}</strong>
+                                <strong>Checklist de la Semana</strong><br/>
+                                <small style="color: var(--slate-600);">
+                                    ${data.week_info ? `${formatDate(data.week_info.start_date)} - ${formatDate(data.week_info.end_date)}` : 'Rango no disponible'}
+                                </small>
                             </td>
                         </tr>
+                        ` : ''}
+                        ${data.type.type_category === 'attraction' ? `
+                        <tr>
+                            <th>Información de QR</th>
+                            <td colspan="3">
+                                <div style="font-size: 10px;">
+                                    <strong>Informe de Códigos QR Desbloqueados</strong><br/>
+                                    ${data.qr_scans && data.qr_scans.length > 0 ? 
+                                        data.qr_scans.map(scan => 
+                                            `<div style="margin-top: 4px; padding: 4px; background: var(--slate-50); border-radius: 4px;">
+                                                <strong>${scan.qr_code}</strong> - Desbloqueado: ${new Date(scan.scanned_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
+                                            </div>`
+                                        ).join('') 
+                                        : '<small style="color: var(--slate-500);">No hay registros de QR desbloqueados</small>'
+                                    }
+                                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--slate-200);">
+                                        <strong>Hora de Creación del Checklist:</strong> ${new Date(data.createdAt).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        ` : ''}
                         <tr>
                             <th>Ubicación</th>
                             <td colspan="3">
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <span style="color: var(--primary-purple-dark); font-weight: 600;">📍</span>
-                                    <span>
-                                        ${data.inspectable?.premise?.premise_name || 'Sede no especificada'}
-                                        ${data.inspectable?.name ? ` > ${data.inspectable.name}` : ''}
-                                    </span>
+                                    <span><strong>GAME BOX ANDINO local 404</strong></span>
                                 </div>
                             </td>
                         </tr>
@@ -1155,15 +1459,15 @@ const generateChecklistHTML = (data) => {
                     <table class="items-table">
                         <thead>
                             <tr>
-                                <th style="width: 10%;">Item</th>
-                                <th style="width: 35%;">Descripción</th>
+                                <th style="width: 8%;">Item</th>
+                                <th style="width: 32%;">Descripción</th>
                                 <th style="width: 15%;">Respuesta</th>
                                 <th style="width: 15%;">Observaciones</th>
-                                <th style="width: 25%;">Evidencia</th>
+                                <th style="width: 30%;">Evidencia</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${data.type.family_id ? renderFamilyResponses(data.items) : renderResponses(data.items)}
+                            ${data.type.type_category === 'family' ? renderFamilyResponses(data.items) : renderResponses(data.items)}
                         </tbody>
                     </table>
                 </div>
@@ -1290,13 +1594,31 @@ const getLatestChecklistByType = async (req, res) => {
   try {
     const { checklistTypeId } = req.params
     const { user_id, role_id } = req.user
+    
+    console.log(`📥 [getLatestChecklistByType] Request received:`, {
+      checklistTypeId,
+      user_id,
+      role_id,
+      query: req.query
+    });
+    
     const checklist = await checklistService.getLatestChecklistByType({
       checklistTypeId: Number.parseInt(checklistTypeId),
       user_id,
       role_id,
     })
+    
+    console.log(`📤 [getLatestChecklistByType] Response:`, {
+      checklistId: checklist?.checklist_id,
+      weekIdentifier: checklist?.week_identifier,
+      hasWeekInfo: !!checklist?.week_info,
+      typeCategory: checklist?.type?.type_category,
+      frequency: checklist?.type?.frequency
+    });
+    
     res.status(200).json(checklist)
   } catch (error) {
+    console.error(`❌ [getLatestChecklistByType] Error:`, error.message);
     res.status(500).json({ error: error.message })
   }
 }

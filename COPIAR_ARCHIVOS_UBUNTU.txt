@@ -1,0 +1,28 @@
+=== INSTRUCCIONES RÁPIDAS ===
+
+1. COPIAR ESTOS ARCHIVOS CON WINSCP:
+   Desde: C:\Users\mante\Downloads\GB_Alist_Andino_copia\GB_Alist_Andino\server\src
+   Hacia: /home/andino/GB_Alist_Andino/server/src
+   
+   Archivos modificados:
+   - src/controllers/userController.js
+   - src/models/user.js
+
+2. EN UBUNTU, EJECUTAR:
+   cd /home/andino/GB_Alist_Andino/server
+   pm2 restart api-andino
+   pm2 logs api-andino
+
+3. VERIFICAR:
+   Si ves "🚀 Servidor corriendo en puerto 3001" = ¡FUNCIONA!
+
+=== ADVERTENCIAS ===
+⚠️ Las contraseñas NO están encriptadas temporalmente
+⚠️ Solo para desarrollo/pruebas
+⚠️ Instalar bcryptjs después para producción
+
+=== PARA INSTALAR BCRYPTJS DESPUÉS ===
+cd /home/andino/GB_Alist_Andino/server
+npm install bcryptjs@2.4.3
+# Luego descomentar el código en userController.js y user.js
+pm2 restart api-andino

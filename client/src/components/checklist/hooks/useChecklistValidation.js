@@ -26,9 +26,9 @@ export const useChecklistValidation = (config) => {
         (response.response_compliance &&
          ['cumple', 'no cumple', 'observación'].includes(response.response_compliance));
       
-      if (!hasValidResponse) {
-        newErrors.push(`Pregunta ${itemId} sin responder`)
-      }
+      // if (!hasValidResponse) {
+      //   newErrors.push(`Pregunta ${itemId} sin responder`)
+      // }
 
       // Validar comentarios y evidencias para respuestas no cumple/observación
       if (normalizedResponseType === 'no_cumple' || normalizedResponseType === 'observaciones') {

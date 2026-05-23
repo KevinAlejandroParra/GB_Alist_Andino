@@ -18,6 +18,12 @@ router.use(verifyToken);
 // POST /api/work-orders - Crear nueva OT
 router.post('/', (req, res) => workOrderController.createWorkOrder(req, res));
 
+// POST /api/work-orders/create-for-failure - Crear OT para una falla existente
+router.post('/create-for-failure', (req, res) => {
+  const FailureController = require('../controllers/FailureController');
+  FailureController.createWorkOrderForFailure(req, res);
+});
+
 // GET /api/work-orders - Obtener lista de OT con filtros
 router.get('/', (req, res) => workOrderController.getWorkOrders(req, res));
 
@@ -47,6 +53,12 @@ router.put('/:id/resolve', (req, res) => workOrderController.resolveWorkOrder(re
 
 // PUT /api/work-orders/:id/cancel - Cancelar OT
 router.put('/:id/cancel', (req, res) => workOrderController.cancelWorkOrder(req, res));
+
+// DELETE /api/work-orders/:id - Eliminar OT (solo si está vacía)
+router.delete('/:id', (req, res) => {
+  const FailureController = require('../controllers/FailureController');
+  FailureController.deleteWorkOrder(req, res);
+});
 
 // POST /api/work-orders/:id/parts - Agregar un repuesto a una OT
 router.post('/:id/parts', (req, res) => workOrderController.addWorkOrderPart(req, res));

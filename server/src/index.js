@@ -19,46 +19,36 @@ const failureRequisitionRoutes = require("./routes/failureRequisitionRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const requisitionRoutes = require("./routes/requisitionRoutes");
 const qrCodeRoutes = require("./routes/qrCodeRoutes");
+const retroactiveSignatureRoutes = require("./routes/retroactiveSignatureRoutes");
+const supportChecklistRoutes = require("./routes/supportChecklistRoutes");
 const swaggerUi = require('swagger-ui-express');
 const swaggerFile = require('./swagger-output.json');
 const path = require("path");
 const cors = require('cors');
 
-// Importar configuración de Multer para uso global
 const multerConfig = require('./config/multerConfig');
-const upload = multerConfig; // Alias para compatibilidad
+const upload = multerConfig;
 
-// Configurar middleware en orden correcto
 app.use(cors({
-  origin: ["https://tfdbsvwq-3000.use2.devtunnels.ms"],
+  origin: [
+    "https://192.168.57.96",
+    "https://192.168.57.96:443",
+    "https://192.168.57.96:8443",
+    "http://192.168.57.96",
+    "http://192.168.57.96:3001",
+    "http://localhost:3000",
+    "https://localhost:3000"
+  ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 }));
 
-// Configurar body parsing DESPUÉS de CORS
+app.options('/{*path}', cors());
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
-app.use(express.static(path.join(__dirname, "../public"), {
-   setHeaders: (res, path) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-
-
-    // Headers adicionales críticos
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-    // Header para tipos MIME
-    if (path.endsWith(".png")) {
-      res.setHeader("Content-Type", "image/png");
-    }
-    if (path.endsWith(".jpg") || path.endsWith(".jpeg")) {
-      res.setHeader("Content-Type", "image/jpeg");
-    }
-  }
-}));
-
-// Servir archivos estáticos desde el directorio de medios
+app.use(express.static(path.join(__dirname, "../public")));
 app.use('/media', express.static(path.join(__dirname, '../public/media')));
 
 app.use("/api/users", userRoutes);
@@ -66,9 +56,9 @@ app.use("/api/premises", premiseRoutes);
 app.use("/api/entities", entityRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/families", familyRoutes);
-app.use("/api/devices", deviceRoutes); 
-app.use("/api/attractions", attractionRoutes); 
-app.use("/api/inspectables", inspectableRoutes); 
+app.use("/api/devices", deviceRoutes);
+app.use("/api/attractions", attractionRoutes);
+app.use("/api/inspectables", inspectableRoutes);
 app.use("/api/checklists", checklistRoutes);
 app.use("/api/checklists", familyChecklistRoutes);
 app.use("/api", checklistTypeRoutes);
@@ -79,11 +69,12 @@ app.use("/api", failureRequisitionRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/requisitions", requisitionRoutes);
 app.use("/api", qrCodeRoutes);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
+app.use("/api/retroactive-signatures", retroactiveSignatureRoutes);
+app.use("/api/support", supportChecklistRoutes);
 
-module.exports = {
-    app,
-};
+// app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
+
+module.exports = { app };
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor escuchando en http://0.0.0.0:${port}`);

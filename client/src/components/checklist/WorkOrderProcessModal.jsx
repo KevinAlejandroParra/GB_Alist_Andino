@@ -36,6 +36,8 @@ export default function WorkOrderProcessModal({
     const [loadingParts, setLoadingParts] = useState(false)
     const [signaturesInfo, setSignaturesInfo] = useState(null)
     const [loadingSignatures, setLoadingSignatures] = useState(false)
+    const [technicians, setTechnicians] = useState([])
+    const [loadingTechnicians, setLoadingTechnicians] = useState(false)
 
     const [formData, setFormData] = useState({
         activityPerformed: '',
@@ -43,7 +45,8 @@ export default function WorkOrderProcessModal({
         evidence: null,
         signature: null,
         endTime: null,
-        startTime: ''
+        startTime: '',
+        resolvedById: null
     })
     const [evidencePreview, setEvidencePreview] = useState(null)
     const [uploadedEvidenceUrl, setUploadedEvidenceUrl] = useState(null)
@@ -75,6 +78,22 @@ export default function WorkOrderProcessModal({
         }
     };
 
+    // Función para cargar lista de técnicos
+    const loadTechnicians = async () => {
+        setLoadingTechnicians(true);
+        try {
+            const response = await axiosInstance.get(`${API_URL}/api/users/technicians`);
+            if (response.data.success) {
+                setTechnicians(response.data.data || []);
+            }
+        } catch (error) {
+            console.error('Error cargando técnicos:', error);
+            setTechnicians([]);
+        } finally {
+            setLoadingTechnicians(false);
+        }
+    };
+
     useEffect(() => {
         if (isOpen && workOrder) {
             setFormData({
@@ -83,7 +102,8 @@ export default function WorkOrderProcessModal({
                 evidence: null,
                 signature: workOrder.closure_signature || null,
                 endTime: workOrder.end_time || null,
-                startTime: ''
+                startTime: '',
+                resolvedById: workOrder.resolved_by_id || null
             })
 
             // Verificar si ya existe evidencia cargada
@@ -104,6 +124,8 @@ export default function WorkOrderProcessModal({
 
             // Cargar repuestos de la orden de trabajo
             loadWorkOrderParts()
+            // Cargar lista de técnicos
+            loadTechnicians()
         }
     }, [isOpen, workOrder])
 
@@ -134,7 +156,7 @@ export default function WorkOrderProcessModal({
                 { headers: { Authorization: `Bearer ${user.token}` } }
             )
 
-            Swal.fire({
+            await Swal.fire({
                 icon: 'success',
                 title: 'Hora de Inicio Registrada',
                 text: `Inicio: ${startTime.toLocaleString()}`,
@@ -201,7 +223,7 @@ export default function WorkOrderProcessModal({
                 { headers: { Authorization: `Bearer ${user.token}` } }
             )
 
-            Swal.fire('Evidencia guardada', 'La imagen se ha subido exitosamente', 'success')
+            await Swal.fire('Evidencia guardada', 'La imagen se ha subido exitosamente', 'success')
             onUpdate && onUpdate({ ...workOrder, evidence_url: newFilePath })
 
             // Limpiar el formulario
@@ -249,7 +271,7 @@ export default function WorkOrderProcessModal({
                 { headers: { Authorization: `Bearer ${user.token}` } }
             )
 
-            Swal.fire({
+            await Swal.fire({
                 icon: 'success',
                 title: 'Actividad Guardada',
                 timer: 1500,
@@ -261,6 +283,40 @@ export default function WorkOrderProcessModal({
         } catch (error) {
             console.error('Error saving activity:', error)
             Swal.fire('Error', 'No se pudo guardar la actividad', 'error')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleSaveResolvedBy = async () => {
+        if (!formData.resolvedById) {
+            Swal.fire('Atención', 'Debes seleccionar un técnico', 'warning')
+            return
+        }
+
+        setLoading(true)
+        try {
+            await axiosInstance.put(
+                `${API_URL}/api/work-orders/${workOrder.id}/update`,
+                { resolved_by_id: formData.resolvedById },
+                { headers: { Authorization: `Bearer ${user.token}` } }
+            )
+
+            const selectedTech = technicians.find(t => t.user_id === parseInt(formData.resolvedById))
+
+            await Swal.fire({
+                icon: 'success',
+                title: 'Técnico Asignado',
+                text: `Trabajo realizado por: ${selectedTech?.user_name || 'Técnico'}`,
+                timer: 2000,
+                showConfirmButton: false,
+                customClass: { popup: 'rounded-xl' }
+            })
+
+            onUpdate && onUpdate({ ...workOrder, resolved_by_id: formData.resolvedById })
+        } catch (error) {
+            console.error('Error saving resolved by:', error)
+            Swal.fire('Error', 'No se pudo asignar el técnico', 'error')
         } finally {
             setLoading(false)
         }
@@ -288,7 +344,7 @@ export default function WorkOrderProcessModal({
                 setWorkOrderParts([])
             }
 
-            Swal.fire({
+            await Swal.fire({
                 icon: 'success',
                 title: newValue ? 'Repuestos requeridos' : 'Sin repuestos requeridos',
                 timer: 1000,
@@ -315,7 +371,7 @@ export default function WorkOrderProcessModal({
             )
 
             setFormData(prev => ({ ...prev, endTime: new Date() }))
-            Swal.fire({
+            await Swal.fire({
                 icon: 'success',
                 title: 'Hora de Finalización Registrada',
                 timer: 1500,
@@ -346,7 +402,7 @@ export default function WorkOrderProcessModal({
                 { headers: { Authorization: `Bearer ${user.token}` } }
             )
 
-            Swal.fire({
+            await Swal.fire({
                 icon: 'success',
                 title: 'Estado Actualizado',
                 text: `El estado de la orden ha sido cambiado a ${newStatus}`,
@@ -450,8 +506,8 @@ export default function WorkOrderProcessModal({
                 }
             }
 
-            // Mostrar alerta educativa
-            Swal.fire({
+            // Mostrar alerta educativa y esperar a que se cierre
+            await Swal.fire({
                 icon: 'success',
                 title: 'Orden Finalizada Exitosamente',
                 text: 'La orden de trabajo ha sido marcada como RESUELTA con todos los campos obligatorios completos.',
@@ -464,12 +520,12 @@ export default function WorkOrderProcessModal({
                     title: 'text-slate-800 font-bold',
                     content: 'text-slate-600'
                 }
-            }).then(() => {
-                // Actualizar estado local y cerrar modal con información de finalización
-                const updatedWorkOrder = { ...workOrder, status: 'RESUELTA' }
-                onUpdate && onUpdate(updatedWorkOrder)
-                onClose(updatedWorkOrder)
-            })
+            });
+
+            // Después de que el usuario cierre el SweetAlert, actualizar y cerrar modal
+            const updatedWorkOrder = { ...workOrder, status: 'RESUELTA' }
+            onUpdate && onUpdate(updatedWorkOrder)
+            onClose(updatedWorkOrder)
 
         } catch (error) {
             console.error('Error finalizando orden:', error)
@@ -848,6 +904,59 @@ export default function WorkOrderProcessModal({
                                                 >
                                                     {loading ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faClipboardCheck} />}
                                                     {loading ? 'Guardando...' : (workOrder.activity_performed ? 'Actualizar Actividad' : 'Guardar Actividad')}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Campo para especificar quién realizó el trabajo */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                            <FontAwesomeIcon icon={faPenNib} className="text-blue-600" />
+                                            Trabajo Realizado Por
+                                            <span className="text-xs font-normal text-slate-500 ml-1">(Opcional)</span>
+                                        </label>
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                                            <p className="text-xs text-blue-800">
+                                                💡 <strong>¿Para qué sirve este campo?</strong> Si otra persona realizó el trabajo pero no lo documentó 
+                                                (por ejemplo, por incapacidad o ausencia), puedes seleccionar su nombre aquí para mantener el historial correcto.
+                                            </p>
+                                        </div>
+                                        {loadingTechnicians ? (
+                                            <div className="flex items-center justify-center py-3">
+                                                <FontAwesomeIcon icon={faSpinner} spin className="text-blue-600 mr-2" />
+                                                <span className="text-sm text-slate-600">Cargando técnicos...</span>
+                                            </div>
+                                        ) : (
+                                            <select
+                                                value={formData.resolvedById || ''}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, resolvedById: e.target.value ? parseInt(e.target.value) : null }))}
+                                                disabled={!isWorkOrderActive()}
+                                                className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-slate-100 text-slate-700"
+                                            >
+                                                <option value="">Seleccionar técnico...</option>
+                                                {technicians.map(tech => (
+                                                    <option key={tech.user_id} value={tech.user_id}>
+                                                        {tech.user_name} - {tech.role?.role_name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        )}
+                                        {formData.resolvedById && (
+                                            <p className="text-xs text-slate-600 mt-2 flex items-center gap-1">
+                                                <span>👤</span>
+                                                <span>Trabajo realizado por: <strong>{technicians.find(t => t.user_id === formData.resolvedById)?.user_name}</strong></span>
+                                            </p>
+                                        )}
+                                        {isWorkOrderActive() && (
+                                            <div className="mt-3 flex justify-end">
+                                                <button
+                                                    onClick={handleSaveResolvedBy}
+                                                    disabled={loading || !formData.resolvedById}
+                                                    className="text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                                                >
+                                                    {loading ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPenNib} />}
+                                                    {loading ? 'Guardando...' : (workOrder.resolved_by_id ? 'Actualizar Técnico' : 'Asignar Técnico')}
                                                 </button>
                                             </div>
                                         )}

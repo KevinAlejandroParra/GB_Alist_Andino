@@ -70,7 +70,8 @@ class FailureRequisitionService {
         description: `Trabajo de reparación para: ${description.substring(0, 100)}...`,
         priority_level: severity === 'CRITICA' ? 'EMERGENCY' : severity === 'MODERADA' ? 'URGENTE' : 'NORMAL',
         status: 'ASIGNADO',
-        failure_order_id: failureOrder.id
+        failure_order_id: failureOrder.id,
+        linked_failure_ids: JSON.stringify([failureOrder.id]) // ✅ Inicializar con su propia falla
       }, { transaction });
 
       let requisition = null;

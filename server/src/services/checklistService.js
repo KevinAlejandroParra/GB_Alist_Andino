@@ -20,6 +20,7 @@ const {
 } = require("../models");
 const { Sequelize } = require("../models");
 const workOrderService = require("./workOrderService");
+const weekUtils = require("../utils/weekUtils");
 const Op = Sequelize.Op
 
 const getTodayNormalizedUTC = () => {
@@ -136,18 +137,28 @@ const processSpecificChecklistItems = async (checklistTypeId, checklists = [], a
 
 const processFamilyChecklistItems = async (checklistTypeId, checklistId) => {
   const checklistType = await ChecklistType.findByPk(checklistTypeId);
+
+  // Solo incluir dispositivos activos (public_flag === 'Sí')
   const devices = await Device.findAll({
-    where: { family_id: checklistType.associated_id },
+    where: {
+      family_id: checklistType.associated_id,
+      public_flag: 'Sí'
+    },
     include: { model: Inspectable, as: "parentInspectable" },
   });
 
   if (!devices || devices.length === 0) {
-    throw new Error(`No se encontraron dispositivos para la familia con ID ${checklistType.associated_id}`);
+    console.error(`[processFamilyChecklistItems] No se encontraron dispositivos activos (public_flag='Sí') para la familia con ID ${checklistType.associated_id}`);
+    return [];
   }
 
   const templateItems = await ChecklistItem.findAll({
     where: { checklist_type_id: checklistTypeId },
   });
+
+  // Separar items padre e hijos
+  const parentTemplateItems = templateItems.filter(t => t.parent_item_id === null);
+  const childTemplateItems = templateItems.filter(t => t.parent_item_id !== null);
 
   const allResponses = await ChecklistResponse.findAll({
     where: { checklist_id: checklistId },
@@ -160,26 +171,52 @@ const processFamilyChecklistItems = async (checklistTypeId, checklistId) => {
   });
 
   const items = devices.map((device, index) => {
-    const deviceSection = {
+    // Construir sección por dispositivo con grupos jerarquicos (padre → hijos)
+    const deviceSubItems = [];
+
+    parentTemplateItems.forEach((parentItem) => {
+      // Buscar respuesta para el item padre (en checklists de familia, el padre suele ser el item contestable si no hay hijos)
+      const parentKey = `${device.ins_id}-${parentItem.checklist_item_id}`;
+      const parentResponse = responseMap.get(parentKey);
+      const mappedParentResponse = parentResponse ? [parentResponse] : [];
+
+      deviceSubItems.push({
+        ...parentItem.toJSON(),
+        unique_frontend_id: `${device.ins_id}-${parentItem.checklist_item_id}`,
+        inspectable_id_for_response: device.ins_id,
+        parent_item_id: null,
+        responses: mappedParentResponse,
+        response_compliance: mappedParentResponse[0]?.response_compliance || null,
+        response_type: mappedParentResponse[0]?.response_type || null
+      });
+
+      // Agregar hijos del padre
+      const children = childTemplateItems.filter(
+        (c) => c.parent_item_id === parentItem.checklist_item_id
+      );
+      children.forEach((childItem) => {
+        const key = `${device.ins_id}-${childItem.checklist_item_id}`;
+        const response = responseMap.get(key);
+        const mappedResponse = response ? [response] : [];
+        deviceSubItems.push({
+          ...childItem.toJSON(),
+          unique_frontend_id: `${device.ins_id}-${childItem.checklist_item_id}`,
+          inspectable_id_for_response: device.ins_id,
+          responses: mappedResponse,
+          response_compliance: mappedResponse[0]?.response_compliance || null,
+          response_type: mappedResponse[0]?.response_type || null,
+        });
+      });
+    });
+
+    return {
       checklist_item_id: `device-${device.ins_id}`,
       item_number: `${index + 1}`,
       question_text: device.parentInspectable.name,
       input_type: "section",
-      subItems: templateItems.map((template) => {
-        const key = `${device.ins_id}-${template.checklist_item_id}`;
-        const response = responseMap.get(key);
-        const mappedResponse = response ? [response] : [];
-        return {
-          ...template.toJSON(),
-          unique_frontend_id: `${device.ins_id}-${template.checklist_item_id}`,
-          inspectable_id_for_response: device.ins_id,
-          responses: mappedResponse,
-          response_compliance: mappedResponse[0]?.response_compliance || null,
-          response_type: mappedResponse[0]?.response_type || null
-        }
-      })
-    }
-    return deviceSection;
+      device_id: device.ins_id,
+      subItems: deviceSubItems,
+    };
   });
 
   return items;
@@ -310,19 +347,28 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, created_by, 
       checklistTypeInstance = await getChecklistTypeForInspectable(inspectableId, role_id, transaction);
     }
 
-    const today = getTodayNormalizedUTC();
-    const startOfDay = new Date(today);
-    startOfDay.setUTCHours(0, 0, 0, 0);
-    const endOfDay = new Date(today);
-    endOfDay.setUTCHours(23, 59, 59, 999);
+    // Obtener los límites de fecha según el tipo de checklist (diario o semanal)
+    const { startDate, endDate, identifier, isWeekly } = weekUtils.getDateBoundsForChecklistType(checklistTypeInstance);
+
+    console.log(`[ensureChecklistInstance] Tipo: ${checklistTypeInstance.type_category}, Frecuencia: ${checklistTypeInstance.frequency}, Semanal: ${isWeekly}`);
+    console.log(`[ensureChecklistInstance] Rango de búsqueda: ${startDate.toISOString()} - ${endDate.toISOString()}`);
+    if (identifier) {
+      console.log(`[ensureChecklistInstance] Identificador de semana: ${identifier}`);
+    }
 
     // Construir la cláusula where para buscar checklist existente
     const whereClause = {
       checklist_type_id: checklistTypeInstance.checklist_type_id,
       createdAt: {
-        [Op.between]: [startOfDay, endOfDay],
+        [Op.between]: [startDate, endDate],
       }
     };
+    
+    // Para checklists semanales de familia, agregar week_identifier
+    if (isWeekly && identifier) {
+      whereClause.week_identifier = identifier;
+    }
+    
     if (inspectableId !== null && inspectableId !== undefined) {
       whereClause.inspectable_id = inspectableId;
     }
@@ -364,35 +410,54 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, created_by, 
 
     // Si el checklist existe, lo retornamos
     if (existingChecklist) {
-      console.log('Checklist existente encontrado:', existingChecklist.checklist_id);
+      const message = isWeekly 
+        ? `Checklist semanal existente encontrado (Semana ${identifier})`
+        : 'Checklist diario existente encontrado';
+      console.log(`[ensureChecklistInstance] ${message}:`, existingChecklist.checklist_id);
       await transaction.commit();
       return {
         checklist: existingChecklist,
         isNew: false,
-        message: 'Checklist existente encontrado'
+        message,
+        isWeekly,
+        weekIdentifier: identifier
       };
     }
 
     // Si no existe, lo creamos
-    const newChecklist = await Checklist.create({
+    const createData = {
       checklist_type_id: checklistTypeInstance.checklist_type_id,
       inspectable_id: inspectableId,
       premise_id: effectivePremiseId,
       created_by,
       version_label: checklistTypeInstance.version_label,
-    }, { transaction });
+    };
+    
+    // Agregar week_identifier solo para checklists semanales
+    if (isWeekly && identifier) {
+      createData.week_identifier = identifier;
+    }
 
-    console.log('Nuevo checklist creado:', {
+    const newChecklist = await Checklist.create(createData, { transaction });
+
+    const message = isWeekly
+      ? `Nueva instancia de checklist semanal creada (Semana ${identifier})`
+      : 'Nueva instancia de checklist diario creada exitosamente';
+
+    console.log(`[ensureChecklistInstance] ${message}:`, {
       checklist_id: newChecklist.checklist_id,
       inspectable_id: newChecklist.inspectable_id,
       version_label: newChecklist.version_label,
+      week_identifier: newChecklist.week_identifier
     });
 
     await transaction.commit();
     return {
       checklist: newChecklist,
       isNew: true,
-      message: 'Nueva instancia de checklist creada exitosamente'
+      message,
+      isWeekly,
+      weekIdentifier: identifier
     };
 
   } catch (error) {
@@ -403,12 +468,6 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, created_by, 
 };
 
 const getLatestChecklist = async ({ inspectableId, role_id, checklist_type_id }) => {
-  const today = getTodayNormalizedUTC();
-  const startOfDay = new Date(today);
-  startOfDay.setUTCHours(0, 0, 0, 0);
-  const endOfDay = new Date(today);
-  endOfDay.setUTCHours(23, 59, 59, 999);
-
   let definitiveChecklistType;
 
   if (checklist_type_id) {
@@ -421,12 +480,24 @@ const getLatestChecklist = async ({ inspectableId, role_id, checklist_type_id })
     definitiveChecklistType = await getChecklistTypeForInspectable(inspectableId, queryRole);
   }
 
+  // Obtener los límites de fecha según el tipo de checklist (diario o semanal)
+  const { startDate, endDate, identifier, isWeekly } = weekUtils.getDateBoundsForChecklistType(definitiveChecklistType);
+
+  console.log(`[getLatestChecklist] Tipo: ${definitiveChecklistType.type_category}, Semanal: ${isWeekly}`);
+  console.log(`[getLatestChecklist] Buscando en rango: ${startDate.toISOString()} - ${endDate.toISOString()}`);
+
   const whereClause = {
     createdAt: {
-      [Op.between]: [startOfDay, endOfDay],
+      [Op.between]: [startDate, endDate],
     },
     checklist_type_id: definitiveChecklistType.checklist_type_id
   };
+  
+  // Para checklists semanales, agregar week_identifier
+  if (isWeekly && identifier) {
+    whereClause.week_identifier = identifier;
+  }
+  
   if (inspectableId !== null && inspectableId !== undefined) {
     whereClause.inspectable_id = inspectableId;
   }
@@ -439,7 +510,10 @@ const getLatestChecklist = async ({ inspectableId, role_id, checklist_type_id })
   });
 
   // Si no existe una instancia, retornar null en lugar de crear una nueva
-  if (!checklist) return null;
+  if (!checklist) {
+    console.log(`[getLatestChecklist] No se encontró checklist para el ${isWeekly ? 'semana' : 'día'} actual`);
+    return null;
+  }
 
   if (!checklist.type) {
     throw new Error(`Checklist with ID ${checklist.checklist_id} has a missing or invalid checklist type.`);
@@ -601,12 +675,25 @@ const getLatestChecklist = async ({ inspectableId, role_id, checklist_type_id })
     order: [['createdAt', 'ASC']]
   });
 
-  return {
+  // Agregar información de semana si es un checklist semanal
+  const result = {
     ...checklist.toJSON(),
     items,
     signatures,
     pending_work_orders
+  };
+
+  if (isWeekly && identifier) {
+    result.week_info = {
+      week_identifier: identifier,
+      week_range: weekUtils.formatWeekRange(startDate, endDate),
+      days_remaining: weekUtils.getDaysRemainingInWeek(),
+      start_date: startDate,
+      end_date: endDate
+    };
   }
+
+  return result;
 }
 
 
@@ -801,20 +888,23 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
       console.log('inspectableIds encontrados para la creación dinámica:', inspectableIds);
 
       if (checklist.type.type_category === 'family') {
-        console.log('Procesando checklist de FAMILIA');
+        console.log('Procesando checklist de FAMILIA (SEMANAL)');
+        
+        // Obtener el identificador de la semana actual
+        const { identifier: weekIdentifier } = weekUtils.getDateBoundsForChecklistType(checklist.type);
+        console.log(`Buscando checklist de familia para semana: ${weekIdentifier}`);
+        
         const familyChecklist = await Checklist.findOne({
           where: {
             checklist_type_id: checklist.checklist_type_id,
-            createdAt: {
-              [Op.between]: [startOfDay, endOfDay],
-            },
+            week_identifier: weekIdentifier, // ⭐ Buscar por semana, no por día
             inspectable_id: null
           },
           transaction
         });
 
         if (familyChecklist) {
-          console.log(`Checklist de familia encontrado. ID: ${familyChecklist.checklist_id}`);
+          console.log(`Checklist de familia semanal encontrado. ID: ${familyChecklist.checklist_id}, Semana: ${weekIdentifier}`);
           // Asignar el ID del checklist de familia a todas las respuestas
           responses.forEach(response => {
             response.checklist_id = familyChecklist.checklist_id;
@@ -828,7 +918,7 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
           }
         } else {
           // Esto es un fallback y no debería ocurrir en el flujo normal.
-          console.warn('ADVERTENCIA: No se encontró un checklist de familia preexistente. Se intentará crear uno.');
+          console.warn(`ADVERTENCIA: No se encontró un checklist de familia para la semana ${weekIdentifier}. Se intentará crear uno.`);
           const firstInspectableId = responses[0]?.inspectable_id;
           if (firstInspectableId) {
             const inspectable = await Inspectable.findByPk(firstInspectableId, { transaction });
@@ -838,19 +928,18 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
               const [createdChecklist] = await Checklist.findOrCreate({
                 where: {
                   checklist_type_id: checklist.checklist_type_id,
-                  createdAt: {
-                    [Op.between]: [startOfDay, endOfDay],
-                  },
+                  week_identifier: weekIdentifier, // ⭐ Usar week_identifier
                   inspectable_id: null,
                 },
                 defaults: {
                   premise_id: premise_id,
                   created_by: responded_by,
                   version_label: checklist.type.version_label,
+                  week_identifier: weekIdentifier, // ⭐ Asegurar que se guarde
                 },
                 transaction,
               });
-              console.log(`Checklist de familia CREADO (fallback). ID: ${createdChecklist.checklist_id}`);
+              console.log(`Checklist de familia semanal CREADO (fallback). ID: ${createdChecklist.checklist_id}, Semana: ${weekIdentifier}`);
               responses.forEach(response => {
                 response.checklist_id = createdChecklist.checklist_id;
               });
@@ -1028,28 +1117,9 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
       }
       console.log('Upsert exitoso, response_id:', checklistResponse.response_id);
 
-      // Manejar fallas basado en response_compliance - Integración real con workOrderService
-      const hasFailure = responseData.response_compliance === "no cumple" || responseData.response_compliance === "observación";
-      if (hasFailure) {
-        // CREAR/ACTUALIZAR WORKORDER AUTOMÁTICAMENTE
-        try {
-          await workOrderService.handleWorkOrderForResponse({
-            checklist_id: responseData.checklist_id,
-            checklist_item_id,
-            inspectable_id: responseData.inspectable_id,
-            responded_by: responded_by,
-            response_compliance: responseData.response_compliance,
-            // Los campos comment y evidence_url se eliminaron - ahora van en failure_orders
-            // ✅ NO enviar severity - se asigna automáticamente en workOrderService
-          }, transaction);
-          console.log(`WorkOrder creada/actualizada para item ${checklist_item_id} con severity automático`);
-        } catch (woError) {
-          console.error(`Error creando WorkOrder para item ${checklist_item_id}:`, woError);
-          // No lanzar error para no interrumpir el flujo principal
-        }
-      } else {
-        console.log(`No hay falla para item ${checklist_item_id}`);
-      }
+      // Las fallas ya NO se crean automáticamente al guardar respuestas.
+      // El usuario debe registrarlas manualmente a través del RecurringFailureModal.
+      console.log(`Respuesta guardada para item ${checklist_item_id} con compliance: ${responseData.response_compliance}`);
     }
 
     // Special logic for "Apoyo - Técnico (Premios)" checklist
@@ -1124,51 +1194,123 @@ const signChecklist = async ({ checklist_id, user_id, role_id, digital_token }) 
     }
 
     // Verificar si el checklist ya tiene todas las respuestas necesarias antes de firmar
-    if (Number(role_id) === 3) { // Solo verificar para técnicos (role_id 3)
-      // Obtener todas las respuestas existentes
-      const existingResponses = await ChecklistResponse.findAll({
-        where: { checklist_id: checklist.checklist_id },
+    // Obtener el tipo de checklist para determinar la estrategia de validación
+    const checklistType = await ChecklistType.findByPk(checklist.checklist_type_id, { transaction });
+    
+    if (!checklistType) {
+      throw new Error(`ChecklistType with ID ${checklist.checklist_type_id} not found`);
+    }
+    
+    // Obtener todas las respuestas existentes
+    const existingResponses = await ChecklistResponse.findAll({
+      where: { checklist_id: checklist.checklist_id },
+      transaction
+    });
+
+    // Obtener todos los ítems del checklist (excluyendo secciones)
+    const checklistItems = await ChecklistItem.findAll({
+      where: { 
+        checklist_type_id: checklist.checklist_type_id,
+        input_type: { [Op.ne]: 'section' } // Excluir secciones
+      },
+      transaction
+    });
+
+    // Verificar si hay ítems sin responder o con respuestas vacías
+    const incompleteItems = [];
+    
+    if (checklistType.type_category === 'family') {
+      // Para checklists de familia: cada dispositivo debe tener respuestas para todos los items
+      const devices = await Device.findAll({
+        where: {
+          family_id: checklistType.associated_id,
+          public_flag: 'Sí'
+        },
         transaction
       });
-
-      // Obtener todos los ítems del checklist
-      const checklistItems = await ChecklistItem.findAll({
-        where: { checklist_type_id: checklist.checklist_type_id },
-        transaction
+      
+      // Crear mapa de respuestas por dispositivo e item
+      const responseMap = new Map();
+      existingResponses.forEach(r => {
+        const key = `${r.inspectable_id}-${r.checklist_item_id}`;
+        responseMap.set(key, r);
       });
-
-      // Verificar si hay ítems sin responder
-      const incompleteItems = [];
+      
+      // Validar que cada dispositivo tenga respuestas para todos los items
+      devices.forEach(device => {
+        checklistItems.forEach(item => {
+          const key = `${device.ins_id}-${item.checklist_item_id}`;
+          const response = responseMap.get(key);
+          
+          // Item sin respuesta
+          if (!response) {
+            incompleteItems.push({
+              item_number: item.item_number,
+              question_text: `${device.device_name || device.ins_id} - ${item.question_text}`
+            });
+            return;
+          }
+          
+          // Item con respuesta pero sin valor válido
+          const hasValidValue = 
+            response.response_compliance || 
+            (response.response_numeric !== null && response.response_numeric !== undefined) ||
+            response.response_text;
+          
+          if (!hasValidValue) {
+            incompleteItems.push({
+              item_number: item.item_number,
+              question_text: `${device.device_name || device.ins_id} - ${item.question_text}`
+            });
+          }
+        });
+      });
+    } else {
+      // Para checklists normales (atracción, estático, etc.)
       const responseMap = new Map(existingResponses.map(r => [r.checklist_item_id, r]));
 
       checklistItems.forEach(item => {
-        if (!responseMap.has(item.checklist_item_id) && item.input_type !== 'section') {
+        const response = responseMap.get(item.checklist_item_id);
+        
+        // Item sin respuesta
+        if (!response) {
+          incompleteItems.push({
+            item_number: item.item_number,
+            question_text: item.question_text
+          });
+          return;
+        }
+        
+        // Item con respuesta pero sin valor válido
+        const hasValidValue = 
+          response.response_compliance || 
+          (response.response_numeric !== null && response.response_numeric !== undefined) ||
+          response.response_text;
+        
+        if (!hasValidValue) {
           incompleteItems.push({
             item_number: item.item_number,
             question_text: item.question_text
           });
         }
       });
-
-      if (incompleteItems.length > 0) {
-        const error = new Error(`El checklist tiene ${incompleteItems.length} ítems sin responder.`);
-        error.incompleteItems = incompleteItems;
-        error.incompleteCount = incompleteItems.length;
-        throw error;
-      }
     }
 
-    // Verificar y cargar el ChecklistType manualmente si es necesario
-    let checklistType = null;
-    if (checklist.checklist_type_id) {
-      checklistType = await ChecklistType.findByPk(checklist.checklist_type_id, { transaction });
+    if (incompleteItems.length > 0) {
+      const error = new Error(`El checklist tiene ${incompleteItems.length} ítems sin responder o con respuestas vacías.`);
+      error.incompleteItems = incompleteItems;
+      error.incompleteCount = incompleteItems.length;
+      throw error;
     }
 
+    // Verificar y cargar el ChecklistType manualmente si es necesario para la firma
+    let checklistTypeForSignature = checklistType; // Reutilizar el tipo ya cargado
+    
     // Si no tiene checklist_type_id, intentar encontrar el tipo correcto
-    if (!checklistType) {
+    if (!checklistTypeForSignature) {
       console.log('Checklist sin checklist_type_id, buscando tipo apropiado...');
       // Buscar un ChecklistType estático para técnicos de mantenimiento
-      checklistType = await ChecklistType.findOne({
+      checklistTypeForSignature = await ChecklistType.findOne({
         where: {
           role_id: 7, // Técnico de mantenimiento
           type_category: 'static'
@@ -1176,21 +1318,21 @@ const signChecklist = async ({ checklist_id, user_id, role_id, digital_token }) 
         transaction
       });
 
-      if (checklistType) {
+      if (checklistTypeForSignature) {
         // Actualizar el checklist con el tipo encontrado
         await checklist.update({
-          checklist_type_id: checklistType.checklist_type_id
+          checklist_type_id: checklistTypeForSignature.checklist_type_id
         }, { transaction });
-        console.log('Checklist actualizado con checklist_type_id:', checklistType.checklist_type_id);
+        console.log('Checklist actualizado con checklist_type_id:', checklistTypeForSignature.checklist_type_id);
       }
     }
 
-    if (!checklistType) {
+    if (!checklistTypeForSignature) {
       throw new Error(`No se pudo encontrar un ChecklistType válido para el checklist ${checklist_id}`);
     }
 
     // Agregar el tipo al checklist manualmente
-    checklist.type = checklistType;
+    checklist.type = checklistTypeForSignature;
 
     console.log('=== DEBUG signChecklist ===');
     console.log('checklist_id:', checklist_id);
@@ -1487,57 +1629,85 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
     };
 
   } else if (definitiveChecklistType.type_category === 'family') {
+    // ===== LÓGICA SEMANAL PARA CHECKLISTS DE FAMILIA =====
+    // Obtener los límites de la semana actual (Lunes-Domingo)
+    const { startDate: startOfWeek, endDate: endOfWeek, identifier: weekIdentifier } = weekUtils.getDateBoundsForChecklistType(definitiveChecklistType);
+    
+    console.log(`[getLatestChecklistByType] Checklist de FAMILIA - Semana ${weekIdentifier}`);
+    console.log(`[getLatestChecklistByType] Buscando en rango: ${startOfWeek.toISOString()} - ${endOfWeek.toISOString()}`);
+
+    // Buscar checklist de la semana actual usando week_identifier
     let familyChecklist = await Checklist.findOne({
       where: {
         checklist_type_id: checklistTypeId,
-        createdAt: {
-          [Op.between]: [startOfDay, endOfDay],
-        },
+        week_identifier: weekIdentifier,
         inspectable_id: null,
       },
+      include: [{ model: ChecklistType, as: "type" }]
     });
 
+    // Obtener dispositivos de la familia (solo activos)
     const devices = await Device.findAll({
-      where: { family_id: definitiveChecklistType.associated_id },
+      where: { 
+        family_id: definitiveChecklistType.associated_id,
+        public_flag: 'Sí' // Solo dispositivos activos
+      },
       include: { model: Inspectable, as: "parentInspectable" },
     });
 
+    // Si no existe checklist para esta semana, crearlo
     if (!familyChecklist) {
       if (devices.length === 0) {
+        console.log('[getLatestChecklistByType] No hay dispositivos activos para esta familia');
         return {
           checklist_id: null,
           type: definitiveChecklistType.toJSON(),
           items: [],
           signatures: [],
           pending_work_orders: [],
+          week_info: {
+            week_identifier: weekIdentifier,
+            week_range: weekUtils.formatWeekRange(startOfWeek, endOfWeek),
+            days_remaining: weekUtils.getDaysRemainingInWeek(),
+            start_date: startOfWeek,
+            end_date: endOfWeek
+          }
         };
       }
+      
       const firstDeviceInspectable = devices[0].parentInspectable;
       if (!firstDeviceInspectable || !firstDeviceInspectable.premise_id) {
         throw new Error('Cannot create family checklist: premise_id not found on the first device.');
       }
-      // Crear checklist con fechas explícitas para evitar 'Invalid date'
+      
+      // Crear checklist semanal con week_identifier
       const checklistDefaults = {
         premise_id: firstDeviceInspectable.premise_id,
         created_by: user_id,
         version_label: definitiveChecklistType.version_label,
-        createdAt: new Date(), // Asegurar que createdAt sea una fecha válida
-        updatedAt: new Date()  // También actualizar updatedAt
+        week_identifier: weekIdentifier, // ⭐ Campo clave para checklists semanales
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
 
-      console.log('Intentando crear checklist con defaults:', checklistDefaults);
+      console.log(`[getLatestChecklistByType] Creando nuevo checklist semanal para semana ${weekIdentifier}`);
 
       const [createdChecklist] = await Checklist.findOrCreate({
         where: {
           checklist_type_id: checklistTypeId,
-          createdAt: {
-            [Op.between]: [startOfDay, endOfDay],
-          },
+          week_identifier: weekIdentifier,
           inspectable_id: null,
         },
         defaults: checklistDefaults,
       });
-      familyChecklist = createdChecklist;
+      
+      familyChecklist = await Checklist.findByPk(createdChecklist.checklist_id, {
+        include: [{ model: ChecklistType, as: "type" }]
+      });
+      
+      console.log(`[getLatestChecklistByType] Checklist semanal creado con ID: ${familyChecklist.checklist_id}`);
+    } else {
+      console.log(`[getLatestChecklistByType] Checklist semanal existente encontrado (ID: ${familyChecklist.checklist_id})`);
     }
 
     if (devices.length === 0) {
@@ -1547,6 +1717,13 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
         items: [],
         signatures: [],
         pending_work_orders: [],
+        week_info: {
+          week_identifier: weekIdentifier,
+          week_range: weekUtils.formatWeekRange(startOfWeek, endOfWeek),
+          days_remaining: weekUtils.getDaysRemainingInWeek(),
+          start_date: startOfWeek,
+          end_date: endOfWeek
+        }
       };
     }
 
@@ -1590,12 +1767,20 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
 
     const checklistData = familyChecklist.toJSON();
 
+    // ⭐ Agregar información de la semana para el frontend
     return {
       ...checklistData,
       type: definitiveChecklistType.toJSON(),
       items,
       signatures,
       pending_work_orders: [],
+      week_info: {
+        week_identifier: weekIdentifier,
+        week_range: weekUtils.formatWeekRange(startOfWeek, endOfWeek),
+        days_remaining: weekUtils.getDaysRemainingInWeek(),
+        start_date: startOfWeek,
+        end_date: endOfWeek
+      }
     };
   } else {
     throw new Error(`Checklist type category '${definitiveChecklistType.type_category}' is not supported by this function.`);
@@ -1746,43 +1931,97 @@ const getChecklistDataForPDF = async (checklistId) => {
       return null;
     }
 
-    const items = await ChecklistItem.findAll({
-      where: {
-        checklist_type_id: checklist.checklist_type_id
-      },
-      include: [
-        {
-          model: ChecklistResponse,
-          as: "responses",
-          where: { checklist_id: checklistId },
-          required: false,
-          include: [
-            { model: User, as: "respondedBy", attributes: ["user_id", "user_name"] }
-          ]
-        }
-      ]
-    });
+    const isFamilyChecklist = checklist.type?.type_category === 'family';
+    let items;
 
-    const sortedItems = naturalSortItemNumbers(items);
+    if (isFamilyChecklist) {
+      // Para checklists de familia: usar la función dinámica que mapea dispositivos + hijos + respuestas
+      items = await processFamilyChecklistItems(checklist.checklist_type_id, checklistId);
+    } else {
+      // Para checklists normales (atracción, etc.)
+      const rawItems = await ChecklistItem.findAll({
+        where: {
+          checklist_type_id: checklist.checklist_type_id
+        },
+        include: [
+          {
+            model: ChecklistResponse,
+            as: "responses",
+            where: { checklist_id: checklistId },
+            required: false,
+            include: [
+              { model: User, as: "respondedBy", attributes: ["user_id", "user_name"] }
+            ]
+          }
+        ]
+      });
+      items = naturalSortItemNumbers(rawItems);
+    }
 
     // Obtener órdenes de falla
     let failuresData = { failures_by_item: {}, total_failures: 0 };
     try {
-      failuresData = await getChecklistFailures(checklistId);
+      failuresData = await getChecklistFailures(checklistId, isFamilyChecklist);
     } catch (failureError) {
       console.error('Error obteniendo fallas para PDF:', failureError);
     }
 
+    // Obtener información de QR scans para checklists de atracción
+    let qrScans = [];
+    if (checklist.type?.type_category === 'attraction') {
+      try {
+        const { ChecklistQrScan, ChecklistQrCode } = require('../models');
+        const scans = await ChecklistQrScan.findAll({
+          where: { checklist_id: checklistId },
+          include: [
+            {
+              model: ChecklistQrCode,
+              as: 'qrCode',
+              attributes: ['qr_code', 'group_number', 'attraction_name']
+            }
+          ],
+          order: [['scanned_at', 'ASC']],
+          attributes: ['scan_id', 'scanned_at', 'scanned_by']
+        });
+        
+        // Formatear los datos para el PDF
+        qrScans = scans.map(scan => ({
+          qr_code: scan.qrCode?.qr_code || 'N/A',
+          attraction_name: scan.qrCode?.attraction_name || 'N/A',
+          scanned_at: scan.scanned_at,
+          group_number: scan.qrCode?.group_number
+        }));
+        
+        console.log('✅ QR Scans obtenidos para PDF:', qrScans.length);
+      } catch (qrError) {
+        console.error('Error obteniendo QR scans para PDF:', qrError);
+      }
+    }
+
+    // Obtener información de semana para checklists de familia
+    let weekInfo = null;
+    if (isFamilyChecklist && checklist.week_identifier) {
+      try {
+        const { getWeekDates } = require('../utils/weekUtils');
+        weekInfo = getWeekDates(checklist.week_identifier);
+      } catch (weekError) {
+        console.error('Error obteniendo información de semana para PDF:', weekError);
+      }
+    }
+
     return {
       ...checklist.toJSON(),
-      items: sortedItems,
-      failures: failuresData
+      items,
+      failures: failuresData,
+      qr_scans: qrScans,
+      week_info: weekInfo
     };
   } catch (error) {
     console.error('Error in getChecklistDataForPDF:', error);
     throw error;
   }
 };
+
 
 const getWorkOrdersByStatus = async ({ checklist_id, status }) => {
   try {
@@ -1871,21 +2110,21 @@ const updateWorkOrder = async (updateData) => {
 const getWorkOrdersByChecklistType = async ({ checklist_type_id }) => {
   try {
     console.log(`🔍 [getWorkOrdersByChecklistType] Filtrando por checklist_type_id: ${checklist_type_id}`);
-    
+
     // PASO 1: Obtener los checklist_item_id que pertenecen al checklist_type_id específico
     const checklistItems = await ChecklistItem.findAll({
       where: { checklist_type_id },
       attributes: ['checklist_item_id']
     });
-    
+
     const checklistItemIds = checklistItems.map(item => item.checklist_item_id);
     console.log(`🔍 [getWorkOrdersByChecklistType] Encontrados ${checklistItemIds.length} items para el checklist_type_id ${checklist_type_id}`);
-    
+
     if (checklistItemIds.length === 0) {
       console.log(`🔍 [getWorkOrdersByChecklistType] No hay items para el checklist_type_id ${checklist_type_id}, retornando array vacío`);
       return [];
     }
-    
+
     // PASO 2: Obtener las FailureOrders asociadas a esos checklist_item_id
     const failureOrders = await FailureOrder.findAll({
       where: {
@@ -1906,16 +2145,16 @@ const getWorkOrdersByChecklistType = async ({ checklist_type_id }) => {
         }
       ]
     });
-    
+
     console.log(`🔍 [getWorkOrdersByChecklistType] Encontradas ${failureOrders.length} failure orders`);
-    
+
     if (failureOrders.length === 0) {
       return [];
     }
-    
+
     // PASO 3: Obtener las WorkOrders asociadas a esas FailureOrders
     const failureOrderIds = failureOrders.map(fo => fo.id);
-    
+
     const workOrders = await WorkOrder.findAll({
       where: {
         failure_order_id: {
@@ -1943,14 +2182,14 @@ const getWorkOrdersByChecklistType = async ({ checklist_type_id }) => {
       ],
       order: [['createdAt', 'DESC']]
     });
-    
+
     console.log(`🔍 [getWorkOrdersByChecklistType] Encontradas ${workOrders.length} work orders para el checklist_type_id ${checklist_type_id}`);
 
     // PASO 4: Filtrar solo las fallas activas (no resueltas ni canceladas)
     const activeWorkOrders = workOrders.filter(wo => {
       return !['RESUELTA', 'CANCELADO'].includes(wo.status);
     });
-    
+
     console.log(`🔍 [getWorkOrdersByChecklistType] ${activeWorkOrders.length} work orders activas filtradas`);
 
     // Transformar para que coincida con el formato esperado
@@ -1980,9 +2219,24 @@ const getWorkOrdersByChecklistType = async ({ checklist_type_id }) => {
 // FUNCIONES DE ÓRDENES DE FALLA Y PDF
 // ============================================
 
-const getChecklistFailures = async (checklistId) => {
+const getChecklistFailures = async (checklistId, isFamilyChecklist = false) => {
   try {
-    const checklist = await Checklist.findByPk(checklistId);
+    const checklist = await Checklist.findByPk(checklistId, {
+      include: [
+        {
+          model: ChecklistType,
+          as: 'type',
+          attributes: ['frequency', 'type_category']
+        },
+        {
+          model: ChecklistSignature,
+          as: 'signatures',
+          attributes: ['signed_at'],
+          order: [['signed_at', 'DESC']]
+        }
+      ]
+    });
+    
     if (!checklist) {
       throw new Error(`Checklist con ID ${checklistId} no encontrado`);
     }
@@ -1998,10 +2252,42 @@ const getChecklistFailures = async (checklistId) => {
       return { failures_by_item: {}, total_failures: 0 };
     }
 
-    // Calcular fecha límite (Final del día de creación del checklist)
-    // Esto asegura que no se muestren fallas de días posteriores si se visualiza un checklist antiguo
-    const cutoffDate = new Date(checklist.createdAt);
-    cutoffDate.setHours(23, 59, 59, 999);
+    // ============================================
+    // CALCULAR FECHA LÍMITE CORRECTA
+    // ============================================
+    let cutoffDate;
+    
+    // Determinar la fecha de finalización del checklist
+    // Prioridad: última firma > fecha de creación
+    let checklistCompletionDate;
+    if (checklist.signatures && checklist.signatures.length > 0) {
+      // Usar la fecha de la última firma
+      const lastSignature = checklist.signatures.reduce((latest, sig) => {
+        return new Date(sig.signed_at) > new Date(latest.signed_at) ? sig : latest;
+      });
+      checklistCompletionDate = new Date(lastSignature.signed_at);
+    } else {
+      // Si no hay firmas, usar la fecha de creación
+      checklistCompletionDate = new Date(checklist.createdAt);
+    }
+
+    // Determinar si es checklist semanal
+    const frequency = (checklist.type?.frequency || '').toLowerCase().trim();
+    const isWeeklyFrequency = frequency === 'weekly' || frequency === 'semanal';
+    const isWeeklyChecklist = (checklist.type?.type_category === 'family' && isWeeklyFrequency) || 
+                              (checklist.week_identifier !== null && checklist.week_identifier !== undefined);
+
+    if (isWeeklyChecklist) {
+      // Para checklists semanales: usar el domingo de esa semana a las 23:59:59
+      const { getSundayOfWeek } = require('../utils/weekUtils');
+      cutoffDate = getSundayOfWeek(checklistCompletionDate);
+      console.log(`[getChecklistFailures] Checklist ${checklistId} es SEMANAL. Fecha de corte: ${cutoffDate.toISOString()} (domingo de la semana)`);
+    } else {
+      // Para checklists diarios: usar el final del día de finalización
+      cutoffDate = new Date(checklistCompletionDate);
+      cutoffDate.setHours(23, 59, 59, 999);
+      console.log(`[getChecklistFailures] Checklist ${checklistId} es DIARIO. Fecha de corte: ${cutoffDate.toISOString()} (fin del día de finalización)`);
+    }
 
     const failureOrders = await FailureOrder.findAll({
       where: {
@@ -2026,28 +2312,71 @@ const getChecklistFailures = async (checklistId) => {
         {
           model: WorkOrder,
           as: 'workOrder',
-          required: false, // Include failures even if they don't have a Work Order
-          attributes: ['status']
+          required: false,
+          attributes: ['status', 'updatedAt', 'createdAt']
         }
       ],
       order: [['createdAt', 'DESC']]
     });
 
-    // Filter out resolved/cancelled failures
+    // ============================================
+    // FILTRAR FALLAS SEGÚN ESTADO EN LA FECHA DE CORTE
+    // ============================================
+    // Una falla debe aparecer en el PDF SI:
+    // 1. Fue reportada antes o durante el período del checklist (ya filtrado arriba)
+    // 2. Y cumple UNA de estas condiciones:
+    //    a) No tiene WorkOrder asociada (aún no se ha trabajado en ella)
+    //    b) Tiene WorkOrder pero NO estaba resuelta/cancelada en la fecha de corte
+    //       (es decir, fue resuelta DESPUÉS de la fecha de corte del checklist)
+    
     const activeFailureOrders = failureOrders.filter(fo => {
-      if (!fo.workOrder) return true; // Include if no WO
-      return !['RESUELTA', 'CANCELADO'].includes(fo.workOrder.status);
-    });
-
-    // Organizar fallas por checklist_item_id
-    const failuresByItem = {};
-    activeFailureOrders.forEach(failureOrder => {
-      const itemId = failureOrder.checklist_item_id;
-      if (!failuresByItem[itemId]) {
-        failuresByItem[itemId] = [];
+      // Si no tiene WorkOrder, la falla estaba activa
+      if (!fo.workOrder) {
+        return true;
       }
 
-      failuresByItem[itemId].push({
+      const woStatus = fo.workOrder.status;
+      
+      // Si el estado actual NO es resuelto/cancelado, incluirla
+      if (!['RESUELTA', 'CANCELADO'].includes(woStatus)) {
+        return true;
+      }
+
+      // Si está RESUELTA o CANCELADO, verificar CUÁNDO se resolvió
+      // Si se resolvió DESPUÉS de la fecha de corte del checklist, debe aparecer
+      // porque en el momento del checklist aún estaba activa
+      const woUpdatedAt = new Date(fo.workOrder.updatedAt);
+      
+      // Si la WorkOrder se actualizó (resolvió) DESPUÉS de la fecha de corte,
+      // significa que durante el checklist estaba activa
+      if (woUpdatedAt > cutoffDate) {
+        console.log(`[getChecklistFailures] Falla ${fo.failure_order_id} incluida: resuelta DESPUÉS del checklist (WO actualizada: ${woUpdatedAt.toISOString()}, corte: ${cutoffDate.toISOString()})`);
+        return true;
+      }
+
+      // Si se resolvió ANTES de la fecha de corte, NO debe aparecer
+      console.log(`[getChecklistFailures] Falla ${fo.failure_order_id} excluida: resuelta ANTES del checklist (WO actualizada: ${woUpdatedAt.toISOString()}, corte: ${cutoffDate.toISOString()})`);
+      return false;
+    });
+
+    // Organizar fallas por item_id
+    // Para checklists de familia: clave compuesta "{affected_id}-{checklist_item_id}"
+    // Para otros: clave simple "{checklist_item_id}"
+    const failuresByItem = {};
+    activeFailureOrders.forEach(failureOrder => {
+      let itemKey;
+      if (isFamilyChecklist && failureOrder.affected_id) {
+        // Usar la misma clave compuesta que usa el frontend: "{device_ins_id}-{checklist_item_id}"
+        itemKey = `${failureOrder.affected_id}-${failureOrder.checklist_item_id}`;
+      } else {
+        itemKey = failureOrder.checklist_item_id;
+      }
+
+      if (!failuresByItem[itemKey]) {
+        failuresByItem[itemKey] = [];
+      }
+
+      failuresByItem[itemKey].push({
         id: failureOrder.id,
         failure_order_id: failureOrder.failure_order_id,
         description: failureOrder.description,
@@ -2080,6 +2409,169 @@ const getChecklistFailures = async (checklistId) => {
 };
 
 
+/**
+ * Obtener un checklist completo por ID
+ * Usado por la funcionalidad de soporte
+ */
+const getChecklistById = async (checklistId) => {
+  try {
+    const checklist = await Checklist.findByPk(checklistId, {
+      include: [
+        {
+          model: ChecklistType,
+          as: 'type',
+          include: [
+            {
+              model: ChecklistItem,
+              as: 'items',
+              where: { parent_item_id: null },
+              required: false,
+              include: [
+                {
+                  model: ChecklistItem,
+                  as: 'subItems',
+                  required: false,
+                }
+              ]
+            }
+          ]
+        },
+        {
+          model: User,
+          as: 'creator',
+          include: [
+            {
+              model: Role,
+              as: 'role'
+            }
+          ]
+        },
+        {
+          model: User,
+          as: 'support_user',
+          attributes: ['user_id', 'user_name', 'user_email'],
+          required: false
+        },
+        {
+          model: Inspectable,
+          as: 'inspectable',
+          required: false,
+          include: [
+            {
+              model: Premise,
+              as: 'premise'
+            }
+          ]
+        },
+        {
+          model: ChecklistResponse,
+          as: 'responses',
+          required: false,
+          include: [
+            {
+              model: ChecklistItem,
+              as: 'checklistItem'
+            }
+          ]
+        },
+        {
+          model: ChecklistSignature,
+          as: 'signatures',
+          required: false,
+          include: [
+            {
+              model: User,
+              as: 'user'
+            },
+            {
+              model: Role,
+              as: 'role'
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!checklist) {
+      return null;
+    }
+
+    const failures = await getChecklistFailures(
+      checklistId,
+      checklist.type?.type_category === 'family'
+    );
+
+    let items;
+
+    if (checklist.type?.type_category === 'family') {
+      // Para checklists de familia, construir la estructura dinámica por dispositivo
+      // igual que hace getLatestChecklistByType, para que el frontend reciba
+      // los items padre (máquinas) con sus subItems (preguntas)
+      items = await processFamilyChecklistItems(
+        checklist.checklist_type_id,
+        checklistId
+      );
+
+      // Calcular week_info a partir del week_identifier guardado o del tipo
+      let week_info = null;
+      try {
+        const weekId = checklist.week_identifier;
+        if (weekId) {
+          const { startDate, endDate } = weekUtils.getDateBoundsForChecklistType(checklist.type);
+          week_info = {
+            week_identifier: weekId,
+            week_range: weekUtils.formatWeekRange(startDate, endDate),
+            days_remaining: weekUtils.getDaysRemainingInWeek(),
+            start_date: startDate,
+            end_date: endDate
+          };
+        }
+      } catch (e) {
+        console.warn('[getChecklistById] No se pudo calcular week_info:', e.message);
+      }
+
+      return {
+        ...checklist.toJSON(),
+        items,
+        failures,
+        ...(week_info && { week_info })
+      };
+    } else {
+      // Para otros tipos, combinar template plano con respuestas
+      items = (checklist.type?.items || []).map(templateItem => {
+        const responses = checklist.responses.filter(
+          r => r.checklist_item_id === templateItem.checklist_item_id
+        );
+        const subItems = (templateItem.subItems || []).map(templateSubItem => {
+          const subResponses = checklist.responses.filter(
+            r => r.checklist_item_id === templateSubItem.checklist_item_id
+          );
+          return {
+            ...templateSubItem.toJSON(),
+            responses: subResponses,
+            unique_frontend_id: templateSubItem.checklist_item_id.toString(),
+          };
+        });
+        return {
+          ...templateItem.toJSON(),
+          responses,
+          subItems,
+          unique_frontend_id: templateItem.checklist_item_id.toString(),
+        };
+      });
+    }
+
+    return {
+      ...checklist.toJSON(),
+      items,
+      failures
+    };
+  } catch (error) {
+    console.error('[getChecklistById] Error:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -2093,5 +2585,6 @@ module.exports = {
   updateWorkOrder,
   getWorkOrdersByChecklistType,
   getChecklistFailures,
-  resetQrCodesForChecklist
+  resetQrCodesForChecklist,
+  getChecklistById
 };

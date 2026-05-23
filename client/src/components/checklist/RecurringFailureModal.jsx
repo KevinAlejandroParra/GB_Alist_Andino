@@ -5,6 +5,7 @@ import axiosInstance from '../../utils/axiosConfig'
 import WorkOrderProcessModal from './WorkOrderProcessModal'
 import SignaturePad from './SignaturePad'
 import Swal from 'sweetalert2'
+import { formatLocalDate } from '../../utils/dateUtils'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faTools,
@@ -38,7 +39,7 @@ export default function RecurringFailureModal({
   onWorkOrdersUpdate,
   responseData,
   checklistItemId,
-  inspectableId // ✅ NUEVO: ID del dispositivo/inspectable del checklist
+  inspectableId // ID del dispositivo/inspectable del checklist
 }) {
   const [activeTab, setActiveTab] = useState('new')
   const [selectedWorkOrderIndex, setSelectedWorkOrderIndex] = useState(0)
@@ -63,8 +64,25 @@ export default function RecurringFailureModal({
   const selectedWorkOrder = workOrders?.[selectedWorkOrderIndex]
   const effectiveChecklistItemId = checklistItemId || responseData?.checklistItemId || responseData?.uniqueResponseId
   const isNewFailure = !workOrders || workOrders.length === 0
+  const isAdmin = user?.role_id === 1 || user?.role_id === 2
 
   const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
+
+  // Calcula días transcurridos desde la creación de una falla
+  const getDaysOpen = (createdAt) => {
+    if (!createdAt) return 0;
+    const created = new Date(createdAt);
+    const now = new Date();
+    return Math.floor((now - created) / (1000 * 60 * 60 * 24));
+  };
+
+  // Retorna config visual de la alerta según días transcurridos
+  const getDaysAlertConfig = (days) => {
+    if (days >= 60) return { bg: 'bg-red-100', border: 'border-red-400', text: 'text-red-800', icon: '🔴', label: 'Crítico' };
+    if (days >= 30) return { bg: 'bg-orange-100', border: 'border-orange-400', text: 'text-orange-800', icon: '🟠', label: 'Urgente' };
+    if (days >= 14) return { bg: 'bg-yellow-100', border: 'border-yellow-400', text: 'text-yellow-800', icon: '🟡', label: 'Atención' };
+    return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: '🔵', label: 'Activa' };
+  };
 
   useEffect(() => {
     // Siempre empezar con el tab adecuado
@@ -127,7 +145,7 @@ export default function RecurringFailureModal({
     };
 
     checkWorkOrders();
-  }, [workOrders, user.token]);
+  }, [workOrders, user?.user_id]); // Cambiado de user.token a user?.user_id
 
   if (!isOpen) return null
 
@@ -160,39 +178,30 @@ export default function RecurringFailureModal({
     }
   }
 
-  // Opción 1: Mantener Falla
+  // Opción 1: Mantener Falla — incrementa el contador de recurrencia
   const handleMaintainFailure = async () => {
     setLoading(true)
     try {
       const response = await axiosInstance.put(
-        `${API_URL}/api/failures/${selectedWorkOrder.id}`,
-        {
-          notes: formData.maintainReason || 'Falla mantenida como recurrente',
-          status: 'PENDIENTE'
-        },
+        `${API_URL}/api/failures/${selectedWorkOrder.id}/increment-recurrence`,
+        {},
         { headers: { Authorization: `Bearer ${user.token}` } }
       )
 
-      const updatedResponseData = {
-        ...responseData,
-        comment: formData.maintainReason,
-        updated: true
-      }
-
-      onSuccess && onSuccess('maintain', response.data, updatedResponseData)
+      onSuccess && onSuccess('maintain', response.data)
       onWorkOrdersUpdate && onWorkOrdersUpdate()
       onClose()
 
       Swal.fire({
         icon: 'success',
-        title: 'Falla Mantenida',
-        text: 'Se ha registrado la recurrencia exitosamente',
-        timer: 1500,
+        title: 'Recurrencia Registrada',
+        text: `La falla ahora tiene ${response.data.data?.recurrence_count} reporte(s) de recurrencia`,
+        timer: 2000,
         showConfirmButton: false
       })
     } catch (error) {
       console.error(error)
-      Swal.fire('Error', 'No se pudo  mantener la falla', 'error')
+      Swal.fire('Error', 'No se pudo registrar la recurrencia', 'error')
     } finally {
       setLoading(false)
     }
@@ -379,10 +388,10 @@ export default function RecurringFailureModal({
           <div className="border-b border-slate-200 bg-white px-8">
             <nav className="flex gap-6">
               {[
-                { id: 'maintain', label: 'Mantener Falla', icon: faSync, disabledWhenNew: true },
-                { id: 'new', label: 'Nueva Falla', icon: faPlusCircle, disabledWhenNew: false },
+                { id: 'maintain', label: isAdmin ? 'Ver Fallas' : 'Mantener Falla', icon: faSync, disabledWhenNew: true },
+                { id: 'new', label: 'Nueva Falla', icon: faPlusCircle, disabledWhenNew: false, hiddenForAdmin: isAdmin && !isNewFailure },
                 { id: 'resolve', label: 'Resolver / Gestionar', icon: faHardHat, disabledWhenNew: true }
-              ].map((tab) => (
+              ].filter(tab => !tab.hiddenForAdmin).map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -416,8 +425,14 @@ export default function RecurringFailureModal({
                     <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-4">
                       <FontAwesomeIcon icon={faInfoCircle} className="text-blue-500 text-xl mt-1" />
                       <div>
-                        <h4 className="font-bold text-blue-900">Mantener Falla Existente</h4>
-                        <p className="text-sm text-blue-700">Seleccione la falla que persiste. Se incrementará su contador de recurrencia.</p>
+                        <h4 className="font-bold text-blue-900">
+                          {isAdmin ? 'Historial de Fallas Activas' : 'Mantener Falla Existente'}
+                        </h4>
+                        <p className="text-sm text-blue-700">
+                          {isAdmin
+                            ? 'Vista de revisión. Las fallas activas para este ítem se muestran a continuación.'
+                            : 'Seleccione la falla que persiste. Se incrementará su contador de recurrencia.'}
+                        </p>
                       </div>
                     </div>
 
@@ -445,10 +460,22 @@ export default function RecurringFailureModal({
                           : `${API_URL}${selectedWorkOrder.evidence_url}`)
                         : null
 
+                      const daysOpen = getDaysOpen(selectedWorkOrder.createdAt);
+                      const alertConfig = getDaysAlertConfig(daysOpen);
+
                       return (
                         <div className="border border-slate-200 rounded-xl p-6 bg-white hover:shadow-lg transition-all">
                           <div className="space-y-6">
-                            {/* Header con ID y Recurrencia */}
+                            {/* Alerta de días sin resolver */}
+                            <div className={`${alertConfig.bg} border ${alertConfig.border} rounded-lg p-3 flex items-center gap-3`}>
+                              <span className="text-xl">{alertConfig.icon}</span>
+                              <div>
+                                <span className={`font-bold text-sm ${alertConfig.text}`}>{alertConfig.label} — </span>
+                                <span className={`text-sm ${alertConfig.text}`}>
+                                  Esta falla lleva <strong>{daysOpen} día{daysOpen !== 1 ? 's' : ''}</strong> sin resolverse
+                                </span>
+                              </div>
+                            </div>
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-3">
                                 <span className="font-mono font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded text-sm">
@@ -509,7 +536,7 @@ export default function RecurringFailureModal({
                                   <span className="text-sm font-bold text-purple-900">Creado</span>
                                 </div>
                                 <span className="text-sm text-purple-800 font-medium">
-                                  {selectedWorkOrder.createdAt ? new Date(selectedWorkOrder.createdAt).toLocaleDateString() : 'N/A'}
+                                  {formatLocalDate(selectedWorkOrder.createdAt)}
                                 </span>
                               </div>
                             </div>
@@ -710,11 +737,23 @@ export default function RecurringFailureModal({
                           : `${API_URL}${wo.evidence_url}`)
                         : null
 
+                      const daysOpen = getDaysOpen(wo.createdAt);
+                      const alertConfig = getDaysAlertConfig(daysOpen);
+
                       return (
                         <div key={wo.id} className="border border-slate-200 rounded-xl p-6 bg-white hover:shadow-lg transition-all">
                           <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
                             <div className="flex-1 space-y-4">
-                              {/* Header con ID y Recurrencia */}
+                              {/* Alerta de días sin resolver */}
+                              <div className={`${alertConfig.bg} border ${alertConfig.border} rounded-lg p-3 flex items-center gap-3`}>
+                                <span className="text-xl">{alertConfig.icon}</span>
+                                <div>
+                                  <span className={`font-bold text-sm ${alertConfig.text}`}>{alertConfig.label} — </span>
+                                  <span className={`text-sm ${alertConfig.text}`}>
+                                    Esta falla lleva <strong>{daysOpen} día{daysOpen !== 1 ? 's' : ''}</strong> sin resolverse
+                                  </span>
+                                </div>
+                              </div>
                               <div className="flex items-center gap-3 mb-3">
                                 <span className="font-mono font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded text-sm">
                                   {wo.failure_order_id || `OF-${wo.id}`}
@@ -770,7 +809,7 @@ export default function RecurringFailureModal({
                                     <span className="text-sm font-bold text-purple-900">Creado</span>
                                   </div>
                                   <span className="text-sm text-purple-800 font-medium">
-                                    {wo.createdAt ? new Date(wo.createdAt).toLocaleDateString() : 'N/A'}
+                                    {formatLocalDate(wo.createdAt)}
                                   </span>
                                 </div>
                               </div>
@@ -834,7 +873,7 @@ export default function RecurringFailureModal({
               Cancelar
             </button>
 
-            {activeTab === 'maintain' && !isNewFailure && (
+            {activeTab === 'maintain' && !isNewFailure && !isAdmin && (
               <button
                 onClick={handleMaintainFailure}
                 disabled={loading}

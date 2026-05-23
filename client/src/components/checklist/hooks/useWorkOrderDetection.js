@@ -47,35 +47,45 @@ export function useWorkOrderDetection(checklist, items, user) {
       console.log(`🔍 Buscando fallas para ${allItemIds.length} items: [${allItemIds.join(', ')}]`);
       console.log(`🔍 Inspectable ID del checklist: ${checklist.inspectable_id}`);
 
-      // ✅ NUEVO: Incluir inspectable_id en los parámetros para filtrar por dispositivo específico
-      // Esto evita que se muestren fallas de otros dispositivos de la misma familia
+     
       const params = {
         item_ids: allItemIds.join(','),
         status: 'active'
       };
 
-      // ✅ NUEVO: Extraer inspectable_id del checklist o del primer item si tiene formato "device-X"
-      let inspectableId = checklist.inspectable_id;
-
-      // Si no está en checklist, intentar extraerlo del primer item con formato "device-X"
-      if (!inspectableId && allItemIds.length > 0) {
-        const firstItemId = String(allItemIds[0]);
-        if (firstItemId.startsWith('device-')) {
-          // Extraer el número después de "device-"
-          const deviceIdMatch = firstItemId.match(/^device-(\d+)$/);
-          if (deviceIdMatch) {
-            inspectableId = parseInt(deviceIdMatch[1]);
-            console.log(`🔍 Inspectable ID extraído del item "${firstItemId}": ${inspectableId}`);
-          }
-        }
+      const inspectableIds = new Set();
+      
+      if (checklist.inspectable_id) {
+        inspectableIds.add(checklist.inspectable_id);
       }
 
-      // Solo agregar inspectable_id si existe
-      if (inspectableId) {
-        params.inspectable_id = inspectableId;
-        console.log(`✅ Usando inspectable_id: ${inspectableId}`);
+      // Buscar en todos los ids de item para "device-X"
+      allItemIds.forEach(itemId => {
+        const strId = String(itemId);
+        if (strId.startsWith('device-')) {
+          const match = strId.match(/^device-(\d+)$/);
+          if (match) inspectableIds.add(parseInt(match[1]));
+        }
+      });
+
+      // Buscar también en inspectable_id_for_response recorriendo los items y subitems
+      const findInspectables = (itemsArray) => {
+        itemsArray.forEach(item => {
+           if (item.inspectable_id_for_response) {
+               inspectableIds.add(item.inspectable_id_for_response);
+           }
+           if (item.subItems && item.subItems.length > 0) {
+               findInspectables(item.subItems);
+           }
+        });
+      };
+      findInspectables(items);
+
+      if (inspectableIds.size > 0) {
+        params.inspectable_id = Array.from(inspectableIds).join(',');
+        console.log(`✅ Usando inspectable_ids: ${params.inspectable_id}`);
       } else {
-        console.warn('⚠️ No se pudo determinar el inspectable_id');
+        console.warn('⚠️ No se pudo determinar el/los inspectable_id');
       }
 
       console.log('🔍 Parámetros de búsqueda:', params);
