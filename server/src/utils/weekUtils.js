@@ -91,7 +91,8 @@ const getDateBoundsForChecklistType = (checklistType, referenceDate = new Date()
   const frequency = (checklistType.frequency || '').toLowerCase().trim();
   const isWeeklyFrequency = frequency === 'weekly' || frequency === 'semanal';
   
-  if (checklistType.type_category === 'family' && isWeeklyFrequency) {
+  const isWeeklyCategory = checklistType.type_category === 'family' || checklistType.type_category === 'static';
+  if (isWeeklyCategory && isWeeklyFrequency) {
     const { startOfWeek, endOfWeek } = getWeekBounds(referenceDate);
     return {
       startDate: startOfWeek,

@@ -157,6 +157,9 @@ export default function ChecklistDetailPage() {
         case 'specific':
           router.push(`/checklists/premios/${checklistTypeId}`);
           break;
+        case 'static':
+          router.push(`/checklists/locativo/${checklistTypeId}`);
+          break;
         default:
           console.warn(`Tipo de checklist desconocido: ${typeCategory}`);
           // Fallback a atracción por compatibilidad
@@ -310,8 +313,22 @@ export default function ChecklistDetailPage() {
 
           {/* Fallas Activas */}
           <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Fallas Activas ({failures.length})</h2>
-            <p className="text-sm text-gray-600 mb-4">Fallas reportadas que aún están pendientes de resolución o en proceso.</p>
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Fallas Activas ({failures.length})</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Vista resumida de este checklist. Para búsqueda, gráficas y gestión completa use el libro unificado.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push(`/fallas?checklistTypeId=${checklistTypeId}`)}
+                className="px-4 py-2 text-sm font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors shrink-0"
+              >
+                <i className="fas fa-book-medical mr-2" />
+                Ver en Libro de Fallas
+              </button>
+            </div>
             <OptimizedActiveFailuresList failures={failures} user={user} onUpdate={fetchChecklistData} />
           </div>
 

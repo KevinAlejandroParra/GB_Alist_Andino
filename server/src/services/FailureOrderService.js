@@ -26,6 +26,11 @@ class FailureOrderService {
       if (!evidenceUrl) throw new Error('evidence_url es requerido');
       if (!reportedBy) throw new Error('reportedBy es requerido');
 
+      // ✅ PUNTO 1: Validar inspectableId para fallas desde checklist (no independientes)
+      if (checklistItemId && !inspectableId) {
+        throw new Error('Para fallas desde checklist, el inspectableId es obligatorio cuando checklistItemId existe');
+      }
+
       // Normalizar severidad
       let normalizedSeverity = severity;
       if (!['LEVE', 'MODERADA', 'CRITICA'].includes(normalizedSeverity)) {
@@ -54,6 +59,12 @@ class FailureOrderService {
       console.log('🔢 checklistItemId recibido:', checklistItemId);
       console.log('📝 description:', description);
       console.log('🔍 ==================================================');
+
+      // ✅ PROTECCIÓN: Advertir si inspectableId es null (no bloquear, pero loguear claramente)
+      if (!inspectableId) {
+        console.warn('⚠️ [CREATE FROM CHECKLIST] ADVERTENCIA: inspectableId es null/undefined. La falla se creará sin dispositivo asociado.');
+        console.warn('⚠️ [CREATE FROM CHECKLIST] checklistItemId:', checklistItemId, '- description:', description?.substring(0, 50));
+      }
 
       // Generar ID único
       const failureOrderId = this.generateFailureOrderId();
@@ -289,7 +300,10 @@ class FailureOrderService {
         // ✅ NUEVO: Campos de recurrencia
         'is_recurring',
         'recurrence_count',
-        'report_signature'
+        'report_signature',
+        // ✅ NUEVO: Firma de reporte retroactiva
+        'report_signature_user_name',
+        'report_signature_role_name'
       ];
 
       const filteredData = {};

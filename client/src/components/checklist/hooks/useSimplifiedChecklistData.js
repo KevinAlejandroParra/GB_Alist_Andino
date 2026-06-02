@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import axiosInstance from '../../../utils/axiosConfig'
 import { useAuth } from '../../AuthContext'
 import { 
-  CHECKLIST_TYPES, 
   getChecklistTypeConfig, 
   getFormattedEndpoint,
   getDataConfig 
@@ -16,9 +15,22 @@ export function useSimplifiedChecklistData(checklistTypeId, checklistType) {
   const { user, isLoading: authLoading } = useAuth()
 
   const [checklist, setChecklist] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(!!checklistTypeId)
   const [error, setError] = useState(null)
   const [checklistTypeDetails, setChecklistTypeDetails] = useState(null)
+
+  // Ref para evitar fetches simultáneos y guardar las dependencias actuales
+  const fetchInProgress = useRef(false)
+  // Refs para acceder a los valores más recientes dentro de callbacks sin recrearlos
+  const userRef = useRef(user)
+  const checklistTypeDetailsRef = useRef(checklistTypeDetails)
+  const checklistTypeRef = useRef(checklistType)
+  const checklistTypeIdRef = useRef(checklistTypeId)
+
+  useEffect(() => { userRef.current = user }, [user])
+  useEffect(() => { checklistTypeDetailsRef.current = checklistTypeDetails }, [checklistTypeDetails])
+  useEffect(() => { checklistTypeRef.current = checklistType }, [checklistType])
+  useEffect(() => { checklistTypeIdRef.current = checklistTypeId }, [checklistTypeId])
 
   // Obtener configuración específica del tipo de checklist
   const typeConfig = getChecklistTypeConfig(checklistType)
@@ -32,11 +44,24 @@ export function useSimplifiedChecklistData(checklistTypeId, checklistType) {
   }, []);
 
   /**
+   * Función para agrupar items padre e hijo (solo para checklists de atracción)
+   */
+  const groupItems = useCallback((items) => {
+    if (!items || !Array.isArray(items) || items.length === 0) return [];
+    const parentItems = items.filter(item => item && item.parent_item_id === null);
+    return parentItems.map(parent => ({
+      ...parent,
+      subItems: items
+        .filter(sub => sub && sub.parent_item_id === parent.checklist_item_id)
+        .sort((a, b) => (a?.item_number || '').localeCompare(b?.item_number || '', 'en', { numeric: true }))
+    }));
+  }, []);
+
+  /**
    * Obtener los detalles del tipo de checklist
    */
   const fetchChecklistTypeDetails = useCallback(async () => {
     if (!user || authLoading || !checklistTypeId) return
-    
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
       const response = await axiosInstance.get(`${API_URL}/api/checklists/type/${checklistTypeId}/details`, {
@@ -46,168 +71,122 @@ export function useSimplifiedChecklistData(checklistTypeId, checklistType) {
     } catch (err) {
       console.error("Error fetching checklist type details:", err);
       setError(err.message || "Failed to fetch checklist type details.");
+      setLoading(false);
     }
   }, [checklistTypeId, user, authLoading]);
 
   /**
-   * Cargar los datos principales del checklist
+   * Cargar los datos principales del checklist.
+   * Usa refs para leer los valores actuales sin necesitar recrearse.
    */
   const fetchChecklistData = useCallback(async () => {
-    // Prevenir ejecuciones múltiples si ya hay una carga en curso
-    if (loading) return;
+    if (fetchInProgress.current) return;
 
-    if (!user || authLoading || !checklistTypeId || !typeConfig || !checklistTypeDetails) {
-      setLoading(false);
+    const currentUser = userRef.current;
+    const currentTypeDetails = checklistTypeDetailsRef.current;
+    const currentChecklistType = checklistTypeRef.current;
+    const currentChecklistTypeId = checklistTypeIdRef.current;
+    const currentTypeConfig = getChecklistTypeConfig(currentChecklistType);
+    const currentDataConfig = getDataConfig(currentChecklistType);
+
+    if (!currentUser || !currentChecklistTypeId || !currentTypeConfig || !currentTypeDetails) {
+      if (!currentChecklistTypeId || !currentTypeConfig) setLoading(false);
       return;
     }
 
-    setLoading(true)
-    setError(null)
+    fetchInProgress.current = true;
+    setLoading(true);
+    setError(null);
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
+      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
       const dateString = getTodayNormalizedUTC().toISOString();
-
-      // Determinar el endpoint correcto basado en la configuración
       let endpoint;
       let params = { date: dateString };
 
-      if (checklistType === 'family' && dataConfig.generateDynamicTemplate) {
-        // Para checklists de familia, usar el endpoint de generación
-        endpoint = getFormattedEndpoint(checklistType, 'generate', { checklistTypeId });
-      } else if (checklistType === 'attraction' && dataConfig.createInstance) {
-        // Para checklists de atracción, primero crear instancia si no existe
-        // El endpoint create crea la instancia pero no devuelve datos completos
-        endpoint = getFormattedEndpoint(checklistType, 'create', { checklistTypeId });
+      if (currentChecklistType === 'family' && currentDataConfig.generateDynamicTemplate) {
+        endpoint = getFormattedEndpoint(currentChecklistType, 'generate', { checklistTypeId: currentChecklistTypeId });
+      } else if (currentChecklistType === 'attraction' && currentDataConfig.createInstance) {
+        endpoint = getFormattedEndpoint(currentChecklistType, 'create', { checklistTypeId: currentChecklistTypeId });
       } else {
-        // Para otros casos, usar el endpoint latest
-        endpoint = getFormattedEndpoint(checklistType, 'latest', { checklistTypeId });
+        endpoint = getFormattedEndpoint(currentChecklistType, 'latest', { checklistTypeId: currentChecklistTypeId });
       }
 
-      // Agregar parámetros específicos del tipo
-      if (checklistType === 'attraction' && checklistTypeDetails.associated_id) {
-        params.inspectableId = checklistTypeDetails.associated_id;
+      if (currentChecklistType === 'attraction' && currentTypeDetails.associated_id) {
+        params.inspectableId = currentTypeDetails.associated_id;
       }
 
-      console.log(`📋 [useSimplifiedChecklistData] Fetching checklist data:`, {
-        checklistType,
-        checklistTypeId,
-        endpoint,
-        params,
-        createInstance: dataConfig.createInstance,
-        generateDynamicTemplate: dataConfig.generateDynamicTemplate,
-        fullUrl: `${API_URL}${endpoint}`
-      });
+      console.log(`📋 [useSimplifiedChecklistData] Fetching:`, { currentChecklistType, currentChecklistTypeId, endpoint });
 
-      // Para checklists de atracción con createInstance, necesitamos hacer dos llamadas:
-      // 1. Crear la instancia (endpoint create)
-      // 2. Obtener los datos completos (endpoint latest)
       let response;
-      if (checklistType === 'attraction' && dataConfig.createInstance) {
-        // Primera llamada: crear instancia
+      if (currentChecklistType === 'attraction' && currentDataConfig.createInstance) {
         await axiosInstance.get(endpoint, {
-          headers: { Authorization: `Bearer ${user.token}` },
+          headers: { Authorization: `Bearer ${currentUser.token}` },
           params
         });
-
-        // Segunda llamada: obtener datos completos
-        const latestEndpoint = getFormattedEndpoint(checklistType, 'latest', { checklistTypeId });
+        const latestEndpoint = getFormattedEndpoint(currentChecklistType, 'latest', { checklistTypeId: currentChecklistTypeId });
         response = await axiosInstance.get(latestEndpoint, {
-          headers: { Authorization: `Bearer ${user.token}` },
-          params: { date: dateString } // Solo la fecha para la segunda llamada
+          headers: { Authorization: `Bearer ${currentUser.token}` },
+          params: { date: dateString }
         });
       } else {
-        // Para otros casos, una sola llamada
         response = await axiosInstance.get(endpoint, {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
+          headers: { Authorization: `Bearer ${currentUser.token}` },
           params
         });
       }
 
       if (response.data) {
-        console.log(`✅ [useSimplifiedChecklistData] Checklist data received:`, {
-          hasData: !!response.data,
-          checklistId: response.data.checklist_id,
-          weekIdentifier: response.data.week_identifier,
-          weekInfo: response.data.week_info,
-          typeCategory: response.data.type?.type_category,
-          frequency: response.data.type?.frequency,
-          itemsCount: response.data.items?.length || 0
-        });
-        
-        // Si hay datos y es un checklist de atracción, agrupar items
-        if (response.data.type && response.data.type.type_category === 'attraction') {
+        if (response.data.type?.type_category === 'attraction') {
           if (response.data.items && Array.isArray(response.data.items)) {
             response.data.items = groupItems(response.data.items);
           } else {
-            console.warn('No items array found or items is not an array for attraction checklist');
             response.data.items = [];
           }
         }
-        setChecklist(response.data)
-        return response.data
+        setChecklist(response.data);
+        return response.data;
       } else {
-        console.warn(`⚠️ [useSimplifiedChecklistData] No data in response`);
-        setChecklist(null)
-        if (!dataConfig.createInstance && !dataConfig.generateDynamicTemplate) {
-          setError("No checklist found for today")
+        setChecklist(null);
+        if (!currentDataConfig.createInstance && !currentDataConfig.generateDynamicTemplate) {
+          setError("No checklist found for today");
         }
-        return null
+        return null;
       }
     } catch (err) {
-      console.error("API Error fetching checklist by type ID:", err)
-      setError(err.message || "Failed to fetch checklist.")
-      return null
+      console.error("API Error fetching checklist by type ID:", err);
+      setError(err.message || "Failed to fetch checklist.");
+      return null;
     } finally {
-      setLoading(false)
+      fetchInProgress.current = false;
+      setLoading(false);
     }
-  }, [
-    checklistTypeId, 
-    user, 
-    authLoading, 
-    checklistType, 
-    typeConfig, 
-    dataConfig, 
-    getTodayNormalizedUTC,
-    checklistTypeDetails
-  ])
-
-  /**
-   * Función para agrupar items padre e hijo (solo para checklists de atracción)
-   */
-  const groupItems = (items) => {
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return [];
-    }
-    
-    const parentItems = items.filter(item => item && item.parent_item_id === null);
-    return parentItems.map(parent => ({
-      ...parent,
-      subItems: items
-        .filter(sub => sub && sub.parent_item_id === parent.checklist_item_id)
-        .sort((a, b) => (a?.item_number || '').localeCompare(b?.item_number || '', 'en', { numeric: true }))
-    }));
-  }
+  // Sin dependencias reactivas — usa refs para leer valores actuales
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getTodayNormalizedUTC, groupItems]);
 
   /**
    * Refrescar datos del checklist
    */
   const refreshChecklistData = useCallback(() => {
-    fetchChecklistData()
-  }, [fetchChecklistData])
+    fetchInProgress.current = false; // Permitir re-fetch manual
+    fetchChecklistData();
+  }, [fetchChecklistData]);
 
-  // Efectos
+  // Cargar detalles del tipo al montar
   useEffect(() => {
     fetchChecklistTypeDetails();
   }, [fetchChecklistTypeDetails]);
 
+  // Cargar checklist una vez que lleguen los detalles del tipo
   useEffect(() => {
     if (checklistTypeDetails) {
       fetchChecklistData();
     }
-  }, [fetchChecklistData, checklistTypeDetails]);
+  // Solo disparar cuando checklistTypeDetails cambia (primera carga)
+  // fetchChecklistData es estable gracias a los refs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checklistTypeDetails]);
 
   return {
     checklist,

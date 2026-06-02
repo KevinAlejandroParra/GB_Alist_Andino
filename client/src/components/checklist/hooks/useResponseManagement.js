@@ -36,7 +36,8 @@ export function useResponseManagement(checklist) {
         if (!items) return;
         items.forEach((item) => {
             if (!item) return;
-            const id = item.unique_frontend_id || item.checklist_item_id;
+            // Normalizar siempre a string para que coincida con Object.keys(itemResponses)
+            const id = String(item.unique_frontend_id || item.checklist_item_id);
             map.set(id, item);
             if (item.subItems) {
                 collectItems(item.subItems);
@@ -85,7 +86,8 @@ export function useResponseManagement(checklist) {
     const processItems = (items) => {
       if (!items) return
       items.forEach((item) => {
-        const id = item.unique_frontend_id || item.checklist_item_id
+        // Normalizar siempre a string para consistencia con Object.keys() y allItemsMap
+        const id = String(item.unique_frontend_id || item.checklist_item_id)
         if (item.input_type !== "section") {
           const existingResponse = item.responses?.[0]
 
@@ -146,14 +148,16 @@ export function useResponseManagement(checklist) {
    * Maneja cambios en respuestas individuales
    */
   const handleResponseChange = useCallback((itemId, field, value) => {
-    const item = allItemsMap.get(itemId);
+    // Normalizar siempre a string para consistencia con allItemsMap
+    const normalizedId = String(itemId);
+    const item = allItemsMap.get(normalizedId);
     if (!item) {
-        console.error(`Could not find item in allItemsMap for ID: ${itemId}`);
+        console.error(`Could not find item in allItemsMap for ID: ${normalizedId}`);
         return;
     }
 
     setItemResponses(prevResponses => {
-      const currentResponse = prevResponses[itemId] || {};
+      const currentResponse = prevResponses[normalizedId] || {};
       
       const newResponse = {
         ...currentResponse,
@@ -189,11 +193,11 @@ export function useResponseManagement(checklist) {
 
       return {
         ...prevResponses,
-        [itemId]: newResponse,
+        [normalizedId]: newResponse,
       };
     });
 
-    setModifiedResponses((prev) => new Set(prev).add(itemId));
+    setModifiedResponses((prev) => new Set(prev).add(normalizedId));
   }, [allItemsMap]);
 
   /**
@@ -214,15 +218,16 @@ export function useResponseManagement(checklist) {
   };
 
   const handleResponseTypeChange = useCallback((itemId, rawResponseType) => {
-    const item = allItemsMap.get(itemId);
+    const normalizedId = String(itemId);
+    const item = allItemsMap.get(normalizedId);
     if (!item) {
-        console.error(`Could not find item in allItemsMap for ID: ${itemId}`);
+        console.error(`Could not find item in allItemsMap for ID: ${normalizedId}`);
         return;
     }
 
     const responseType = normalizeResponseType(rawResponseType);
     setItemResponses((prevResponses) => {
-      const currentResponse = prevResponses[itemId] || {};
+      const currentResponse = prevResponses[normalizedId] || {};
       let response_compliance = null;
 
       switch (responseType) {
@@ -254,10 +259,10 @@ export function useResponseManagement(checklist) {
 
       return {
         ...prevResponses,
-        [itemId]: newResponse
+        [normalizedId]: newResponse
       };
     });
-    setModifiedResponses((prev) => new Set(prev).add(itemId));
+    setModifiedResponses((prev) => new Set(prev).add(normalizedId));
   }, [allItemsMap]);
 
   /**
@@ -411,9 +416,13 @@ export function useResponseManagement(checklist) {
 
   try {
     const endpoint = config.saveEndpoint || `/api/checklists/${checklist.checklist_id}/responses`;
-    await axiosInstance.post(endpoint, {
-      responses: responsesToSend
-    }, {
+    
+    // En modo soporte, agregar impersonate_user_id al body
+    const requestBody = config.supportContext?.isSupportMode
+      ? config.supportContext.addSupportContextToRequest({ responses: responsesToSend })
+      : { responses: responsesToSend };
+
+    await axiosInstance.post(endpoint, requestBody, {
       headers: { Authorization: `Bearer ${user.token}` }
     });
 
@@ -430,8 +439,8 @@ export function useResponseManagement(checklist) {
     // ✅ NUEVO: Actualizar estado hasExistingResponses después de guardar exitosamente
     setHasExistingResponses(true);
 
-    // ✅ MODIFICADO: Retornar las respuestas guardadas
-    if (onSuccess) onSuccess(true, null, responsesToSend);
+    // ✅ MODIFICADO: Retornar las respuestas guardadas (pasamos responsesToSend como segundo argumento)
+    if (onSuccess) onSuccess(true, responsesToSend);
 
   } catch (error) {
     console.error('Error al guardar:', error);

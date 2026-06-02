@@ -125,6 +125,17 @@ export default function AdminDashboard() {
         Panel de Administración
       </h1>
 
+      <div className="mb-6 flex justify-center">
+        <button
+          type="button"
+          onClick={() => router.push('/fallas')}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-semibold shadow-md hover:from-purple-700 hover:to-purple-800 transition-all"
+        >
+          <i className="fa fa-book-medical" />
+          Libro de Fallas
+        </button>
+      </div>
+
       <nav className="mb-6">
         <ul className="flex flex-wrap justify-center space-x-2 md:space-x-4 gap-2">
           {availableTabs.map((tab) => (

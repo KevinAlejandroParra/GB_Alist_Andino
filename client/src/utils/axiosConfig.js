@@ -2,8 +2,13 @@ import axios from 'axios'
 import Swal from 'sweetalert2'
 
 // Crear instancia de axios
+const getBaseUrl = () => {
+  const raw = process.env.NEXT_PUBLIC_API || 'http://localhost:5000'
+  return String(raw).trim().replace(/\/$/, '')
+}
+
 const axiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API || 'http://localhost:5000',
+  baseURL: getBaseUrl(),
 })
 
 // Interceptor de solicitud para agregar el token de autenticación

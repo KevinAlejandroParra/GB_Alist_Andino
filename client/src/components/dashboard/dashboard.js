@@ -51,7 +51,7 @@ export default function Dashboard() {
       title: "Libro de Fallas",
       description: "Gestión y supervisión completa de fallas",
       icon: "fas fa-book",
-      href: "/tecnico/fallas",
+      href: "/fallas",
       color: "bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700"
     }
   ];

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axiosInstance from '../../utils/axiosConfig';
 import Swal from 'sweetalert2';
 import { useRouter } from 'next/navigation';
@@ -244,6 +244,7 @@ export default function SupportChecklistManagement() {
       attraction: `/checklists/attraction/${typeId}?checklist_id=${id}`,
       family: `/checklists/family/${typeId}?checklist_id=${id}`,
       premios: `/checklists/premios/${typeId}?checklist_id=${id}`,
+      static: `/checklists/locativo/${typeId}?checklist_id=${id}`,
     };
     router.push(routes[typeCategory] || `/checklists/detail/${typeId}?checklist_id=${id}`);
   };

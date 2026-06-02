@@ -86,7 +86,7 @@ const transformItems = (rawItems) => {
 module.exports = {
   name: "Checklist Locativo – Mantenimiento General",
   description: "Checklist general de revisión locativa para áreas internas del local. Disponible para técnicos y anfitriones.",
-  frequency: "diario",
+  frequency: "semanal",
   version_label: "V2 DIC 2025 BY: Alejandro Parra",
   role_id: 3, // Rol genérico para técnicos
   attraction_name: null, // No asociado a ninguna atracción específica

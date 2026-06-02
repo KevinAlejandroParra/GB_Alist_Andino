@@ -307,7 +307,12 @@ export default function RetroactiveSignatureManagement() {
           body: JSON.stringify({
             user_id: parseInt(formValues.userId),
             role_id: parseInt(formValues.roleId),
-            signed_at: formValues.signatureDate,
+            // El input datetime-local devuelve "YYYY-MM-DDTHH:mm" sin zona horaria.
+            // Convertimos a ISO con offset local para que el servidor interprete
+            // la hora correctamente (hora Colombia, no UTC del servidor).
+            signed_at: formValues.signatureDate
+              ? new Date(formValues.signatureDate).toISOString()
+              : undefined,
             signature_image: signatureData
           })
         }

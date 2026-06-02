@@ -65,11 +65,17 @@ router.get('/by-items', (req, res) => FailureController.getFailuresByItems(req, 
 // GET /api/failures/recent-failures - Obtener fallas recientes
 router.get('/recent-failures', (req, res) => FailureController.getRecentFailures(req, res));
 
+// GET /api/failures/suggest - Autocomplete agrupado para libro de fallas
+router.get('/suggest', (req, res) => FailureController.getFailureSuggestions(req, res));
+
+// GET /api/failures/stats - Estadísticas para gráficas del libro (filtros reactivos)
+router.get('/stats', (req, res) => FailureController.getFailureBookStats(req, res));
+
+// GET /api/failures/export/excel - Reporte gerencial Excel del libro de fallas
+router.get('/export/excel', (req, res) => FailureController.exportFailuresToExcel(req, res));
+
 // GET /api/failures/statistics - Obtener estadísticas de OF
 router.get('/statistics', (req, res) => FailureController.getFailureOrderStatistics(req, res));
-
-// GET /api/failures/export/excel - Exportar fallas a Excel (gerencial)
-router.get('/export/excel', (req, res) => FailureController.exportFailuresToExcel(req, res));
 
 /**
  * RUTAS GENERALES
@@ -96,12 +102,6 @@ router.delete('/:id/unlink-work-order', (req, res) => FailureController.unlinkFr
 
 // GET /api/failures/:id - Obtener detalles de OF específica
 router.get('/:id', (req, res) => FailureController.getFailureOrderById(req, res));
-
-// GET /api/failures/:id/signatures-check - Verificar firmas requeridas
-router.get('/:id/signatures-check', (req, res) => FailureController.checkRequiredSignatures(req, res));
-
-// POST /api/failures/:id/sign-and-advance - Firmar y avanzar estado
-router.post('/:id/sign-and-advance', (req, res) => FailureController.signAndAdvanceFailure(req, res));
 
 // PUT /api/failures/:id/increment-recurrence - Incrementar contador de recurrencia
 router.put('/:id/increment-recurrence', (req, res) => FailureController.incrementRecurrence(req, res));

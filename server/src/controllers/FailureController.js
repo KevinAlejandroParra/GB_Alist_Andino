@@ -1,6 +1,7 @@
 'use strict';
 
 const FailureOrderService = require('../services/FailureOrderService');
+const FailureBookService = require('../services/FailureBookService');
 const FailureSignatureService = require('../services/FailureSignatureService');
 const upload = require('../config/multerConfig');
 
@@ -100,6 +101,17 @@ class FailureController {
         normalizedAssignedArea = 'TECNICA';
       }
       console.log('🔍 [CREATE FAILURE] Área asignada normalizada:', normalizedAssignedArea);
+
+      // ✅ PUNTO 1: Validar inspectableId para fallas desde checklist (no independientes)
+      if (finalChecklistItemId && !inspectableId) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INSPECTABLE_ID_REQUIRED',
+            message: 'Para fallas desde checklist, el inspectableId es obligatorio cuando checklistItemId existe'
+          }
+        });
+      }
 
       console.log('🔍 [CREATE FAILURE] Llamando al servicio con datos:', {
         description,
@@ -667,27 +679,35 @@ class FailureController {
         page = 1,
         limit = 100,
         sortBy = 'createdAt',
-        sortOrder = 'DESC'
+        sortOrder = 'DESC',
+        allRoles = 'false',
+        searchQuery,
+        checklistTypeId,
+        assigned_to,
+        year,
+        month
       } = req.query;
 
-      const { FailureOrder, User, Inspectable, WorkOrder, WorkOrderPart, Inventory, ChecklistItem } = require('../models');
+      const { FailureOrder, User, Inspectable, WorkOrder, WorkOrderPart, Inventory, ChecklistItem, ChecklistType } = require('../models');
       const { Op } = require('sequelize');
 
-      // Filtrado automático por rol
+      // Filtrado automático por rol (desactivado si allRoles = 'true')
       let assignedToFilter = {};
       const userRole = req.user.role_id;
 
-      if (userRole === 4) {
-        // Anfitrión: solo OPERATIVA
-        assignedToFilter = { assigned_to: 'OPERATIVA' };
-      } else if (userRole === 3) {
-        // Técnico: TECNICA + type_maintenance LOCATIVA
-        assignedToFilter = {
-          [Op.or]: [
-            { assigned_to: 'TECNICA' },
-            { type_maintenance: 'LOCATIVA' }
-          ]
-        };
+      if (allRoles !== 'true') {
+        if (userRole === 4) {
+          // Anfitrión: solo OPERATIVA
+          assignedToFilter = { assigned_to: 'OPERATIVA' };
+        } else if (userRole === 3) {
+          // Técnico: TECNICA + type_maintenance LOCATIVA
+          assignedToFilter = {
+            [Op.or]: [
+              { assigned_to: 'TECNICA' },
+              { type_maintenance: 'LOCATIVA' }
+            ]
+          };
+        }
       }
       // Admin (1) y Soporte (2): sin filtro, ven todo
 
@@ -704,56 +724,166 @@ class FailureController {
         whereConditions.type_maintenance = type_maintenance;
       }
 
+      if (assigned_to && assigned_to !== 'all') {
+        whereConditions.assigned_to = assigned_to;
+      }
+
+      if (checklistTypeId && checklistTypeId !== 'all') {
+        const items = await ChecklistItem.findAll({
+          where: { checklist_type_id: parseInt(checklistTypeId, 10) },
+          attributes: ['checklist_item_id']
+        });
+        const itemIds = items.map((item) => item.checklist_item_id);
+        whereConditions.checklist_item_id =
+          itemIds.length > 0 ? { [Op.in]: itemIds } : -1;
+      }
+
+      const { appendDateFilters } = require('../utils/failureDateFilter');
+      appendDateFilters(whereConditions, { year, month, tableName: 'FailureOrder' });
+
+      // Filtro de búsqueda
+      if (searchQuery) {
+        const pattern = `%${searchQuery}%`;
+        const searchClause = {
+          [Op.or]: [
+            { description: { [Op.like]: pattern } },
+            { failure_order_id: { [Op.like]: pattern } },
+            // Para campos de relaciones que pueden ser null, necesitamos
+            // una condición más compleja que maneje el caso de relación ausente
+            { 
+              [Op.and]: [
+                { '$checklistItem.checklist_item_id$': { [Op.not]: null } },
+                { '$checklistItem.question_text$': { [Op.like]: pattern } }
+              ]
+            },
+            { 
+              [Op.and]: [
+                { '$affectedInspectable.ins_id$': { [Op.not]: null } },
+                { '$affectedInspectable.name$': { [Op.like]: pattern } }
+              ]
+            },
+            { 
+              [Op.and]: [
+                { '$reporter.user_id$': { [Op.not]: null } },
+                { '$reporter.user_name$': { [Op.like]: pattern } }
+              ]
+            }
+          ]
+        };
+        
+        // Si ya hay condiciones en whereConditions, combinar con AND
+        // para no sobreescribir Op.or existente
+        if (Object.keys(whereConditions).length > 0) {
+          if (whereConditions[Op.and] && Array.isArray(whereConditions[Op.and])) {
+            // Si ya existe Op.and, agregar a él
+            whereConditions[Op.and].push(searchClause);
+          } else {
+            // Crear nuevo Op.and con condiciones existentes y nueva cláusula
+            const newWhere = {
+              [Op.and]: [whereConditions, searchClause]
+            };
+            whereConditions = newWhere;
+          }
+        } else {
+          whereConditions = searchClause;
+        }
+      }
+
+      const RESOLVED_STATUSES = ['RESUELTA', 'CANCELADO'];
+
+      if (status === 'pending') {
+        const statusClause = {
+          [Op.or]: [
+            { '$workOrder.id$': { [Op.is]: null } },
+            { '$workOrder.status$': { [Op.notIn]: RESOLVED_STATUSES } }
+          ]
+        };
+        
+        // Si ya hay condiciones en whereConditions, combinar con AND
+        // para no sobreescribir estructura existente
+        if (Object.keys(whereConditions).length > 0) {
+          if (whereConditions[Op.and] && Array.isArray(whereConditions[Op.and])) {
+            // Si ya existe Op.and, agregar a él
+            whereConditions[Op.and].push(statusClause);
+          } else {
+            // Crear nuevo Op.and con condiciones existentes y nueva cláusula
+            const newWhere = {
+              [Op.and]: [whereConditions, statusClause]
+            };
+            whereConditions = newWhere;
+          }
+        } else {
+          whereConditions = statusClause;
+        }
+      }
+
       console.log('🔍 [GET FAILURE ORDERS] Where conditions:', whereConditions);
 
-      // Consultar todas las fallas con relaciones
-      const failures = await FailureOrder.findAll({
-        where: whereConditions,
+      const workOrderInclude = {
+        model: WorkOrder,
+        as: 'workOrder',
+        attributes: ['id', 'work_order_id', 'status', 'start_time', 'end_time', 'activity_performed', 'evidence_url', 'requiere_replacement', 'resolved_by_id'],
+        required: status === 'resolved',
+        where: status === 'resolved' ? { status: { [Op.in]: RESOLVED_STATUSES } } : undefined,
         include: [
           {
             model: User,
-            as: 'reporter',
-            attributes: ['user_id', 'user_name', 'role_id']
-          },
-          {
-            model: ChecklistItem,
-            as: 'checklistItem',
-            attributes: ['checklist_item_id', 'item_number', 'question_text']
-          },
-          {
-            model: Inspectable,
-            as: 'affectedInspectable',
-            attributes: ['ins_id', 'name', 'description', 'type_code']
-          },
-          {
-            model: User,
-            as: 'adminSigner',
+            as: 'resolver',
             attributes: ['user_id', 'user_name']
           },
           {
-            model: WorkOrder,
-            as: 'workOrder',
-            attributes: ['id', 'work_order_id', 'status', 'start_time', 'end_time', 'activity_performed', 'evidence_url', 'requiere_replacement', 'resolved_by_id'],
+            model: WorkOrderPart,
+            as: 'parts',
             include: [
               {
-                model: User,
-                as: 'resolver',
-                attributes: ['user_id', 'user_name']
-              },
-              {
-                model: WorkOrderPart,
-                as: 'parts',
-                include: [
-                  {
-                    model: Inventory,
-                    as: 'inventory',
-                    attributes: ['id', 'part_name', 'category', 'quantity', 'location', 'status']
-                  }
-                ]
+                model: Inventory,
+                as: 'inventory',
+                attributes: ['id', 'part_name', 'category', 'quantity', 'location', 'status']
               }
             ]
           }
-        ],
+        ]
+      };
+
+      const listIncludes = [
+        {
+          model: User,
+          as: 'reporter',
+          attributes: ['user_id', 'user_name', 'role_id']
+        },
+        {
+          model: ChecklistItem,
+          as: 'checklistItem',
+          attributes: ['checklist_item_id', 'item_number', 'question_text', 'checklist_type_id'],
+          required: false,
+          include: [
+            {
+              model: ChecklistType,
+              as: 'checklistType',
+              attributes: ['checklist_type_id', 'name', 'frequency']
+            }
+          ]
+        },
+        {
+          model: Inspectable,
+          as: 'affectedInspectable',
+          attributes: ['ins_id', 'name', 'description', 'type_code'],
+          required: false
+        },
+        {
+          model: User,
+          as: 'adminSigner',
+          attributes: ['user_id', 'user_name']
+        },
+        workOrderInclude
+      ];
+
+      const { count, rows: failures } = await FailureOrder.findAndCountAll({
+        where: whereConditions,
+        distinct: true,
+        col: 'id',
+        subQuery: false,
+        include: listIncludes,
         order: [[sortBy, sortOrder]],
         limit: parseInt(limit),
         offset: (parseInt(page) - 1) * parseInt(limit)
@@ -761,17 +891,8 @@ class FailureController {
 
       console.log('✅ [GET FAILURE ORDERS] Fallas encontradas:', failures.length);
 
-      // Filtros post-consulta
       let filteredFailures = failures;
-
-      // Filtro por estado (pendiente/resuelta)
-      if (status !== 'all') {
-        if (status === 'pending') {
-          filteredFailures = filteredFailures.filter(f => !f.workOrder || !['RESUELTA', 'CANCELADO'].includes(f.workOrder.status));
-        } else if (status === 'resolved') {
-          filteredFailures = filteredFailures.filter(f => f.workOrder && ['RESUELTA', 'CANCELADO'].includes(f.workOrder.status));
-        }
-      }
+      let totalCount = count;
 
       // Filtro por tiene/no tiene OT
       if (hasWorkOrder === 'true') {
@@ -787,6 +908,12 @@ class FailureController {
         filteredFailures = filteredFailures.filter(f => !f.workOrder || !f.workOrder.parts || f.workOrder.parts.length === 0);
       }
 
+      const hasPostQueryFilters =
+        hasWorkOrder === 'true' || hasWorkOrder === 'false' ||
+        hasParts === 'true' || hasParts === 'false';
+
+      totalCount = hasPostQueryFilters ? filteredFailures.length : count;
+
       console.log('✅ [GET FAILURE ORDERS] Fallas filtradas:', filteredFailures.length);
 
       res.status(200).json({
@@ -796,7 +923,7 @@ class FailureController {
           pagination: {
             page: parseInt(page),
             limit: parseInt(limit),
-            total: filteredFailures.length
+            total: totalCount
           },
           filters: {
             role: userRole,
@@ -943,9 +1070,9 @@ class FailureController {
       if (workOrder.activity_performed && workOrder.activity_performed.trim() !== '') {
         return res.status(400).json({
           success: false,
-          error: { 
-            code: 'WORK_ORDER_HAS_ACTIVITY', 
-            message: 'No se puede eliminar una orden de trabajo que ya tiene actividad registrada' 
+          error: {
+            code: 'WORK_ORDER_HAS_ACTIVITY',
+            message: 'No se puede eliminar una orden de trabajo que ya tiene actividad registrada'
           }
         });
       }
@@ -954,9 +1081,9 @@ class FailureController {
       if (workOrder.status === 'RESUELTA') {
         return res.status(400).json({
           success: false,
-          error: { 
-            code: 'WORK_ORDER_RESOLVED', 
-            message: 'No se puede eliminar una orden de trabajo resuelta' 
+          error: {
+            code: 'WORK_ORDER_RESOLVED',
+            message: 'No se puede eliminar una orden de trabajo resuelta'
           }
         });
       }
@@ -1128,9 +1255,9 @@ class FailureController {
       if (!isLinkedWorkOrder) {
         return res.status(400).json({
           success: false,
-          error: { 
-            code: 'CANNOT_UNLINK_ORIGINAL', 
-            message: 'No se puede desenlazar la orden de trabajo original. Solo se pueden desenlazar órdenes enlazadas.' 
+          error: {
+            code: 'CANNOT_UNLINK_ORIGINAL',
+            message: 'No se puede desenlazar la orden de trabajo original. Solo se pueden desenlazar órdenes enlazadas.'
           }
         });
       }
@@ -1197,8 +1324,8 @@ class FailureController {
       console.error('❌ Stack:', error.stack);
       res.status(500).json({
         success: false,
-        error: { 
-          code: 'UNLINK_WORK_ORDER_ERROR', 
+        error: {
+          code: 'UNLINK_WORK_ORDER_ERROR',
           message: error.message,
           details: error.stack
         }
@@ -1282,21 +1409,21 @@ class FailureController {
       if (!originalWorkOrder) {
         return res.status(404).json({
           success: false,
-          error: { 
-            code: 'WORK_ORDER_NOT_FOUND', 
-            message: `No se encontró una orden de trabajo con ID: ${work_order_id}` 
+          error: {
+            code: 'WORK_ORDER_NOT_FOUND',
+            message: `No se encontró una orden de trabajo con ID: ${work_order_id}`
           }
         });
       }
 
       // ✅ PREPARAR: Calcular los IDs enlazados ANTES de crear la WorkOrder
-      const originalLinkedIds = originalWorkOrder.linked_failure_ids 
-        ? JSON.parse(originalWorkOrder.linked_failure_ids) 
+      const originalLinkedIds = originalWorkOrder.linked_failure_ids
+        ? JSON.parse(originalWorkOrder.linked_failure_ids)
         : [originalWorkOrder.failure_order_id];
-      
+
       // Agregar la nueva falla a la lista
       originalLinkedIds.push(failureOrder.id);
-      
+
       console.log('🔗 IDs de fallas que se enlazarán:', originalLinkedIds);
 
       // ✅ SOLUCIÓN: Crear una WorkOrder "espejo" que comparte el mismo work_order_id base
@@ -1324,7 +1451,7 @@ class FailureController {
       // Copiar los repuestos si existen
       if (originalWorkOrder.parts && originalWorkOrder.parts.length > 0) {
         console.log('🔗 Copiando', originalWorkOrder.parts.length, 'repuestos');
-        
+
         for (const part of originalWorkOrder.parts) {
           await WorkOrderPart.create({
             work_order_id: linkedWorkOrder.id,
@@ -1344,8 +1471,8 @@ class FailureController {
       // Recargar la falla con la OT asociada
       await failureOrder.reload({
         include: [
-          { 
-            model: WorkOrder, 
+          {
+            model: WorkOrder,
             as: 'workOrder',
             include: [
               {
@@ -1383,8 +1510,8 @@ class FailureController {
       console.error('❌ Stack:', error.stack);
       res.status(500).json({
         success: false,
-        error: { 
-          code: 'LINK_WORK_ORDER_ERROR', 
+        error: {
+          code: 'LINK_WORK_ORDER_ERROR',
           message: error.message,
           details: error.stack
         }
@@ -1534,6 +1661,58 @@ class FailureController {
   }
 
   /**
+   * Autocomplete para libro de fallas
+   * GET /api/failures/suggest?q=&limit=5&allRoles=true
+   */
+  async getFailureSuggestions(req, res) {
+    try {
+      const { q = '', limit = 5, allRoles = 'true', year, month } = req.query;
+      const data = await FailureBookService.getSuggestions(req.user.role_id, {
+        q,
+        limit,
+        allRoles,
+        year,
+        month
+      });
+
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      console.error('❌ Error en getFailureSuggestions:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'GET_SUGGESTIONS_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * Estadísticas del libro de fallas (gráficas reactivas a filtros)
+   * GET /api/failures/stats?status=&severity=&searchQuery=&checklistTypeId=&allRoles=true
+   */
+  async getFailureBookStats(req, res) {
+    try {
+      const data = await FailureBookService.getDashboardStats(req.user.role_id, {
+        ...req.query,
+        allRoles: req.query.allRoles ?? 'true'
+      });
+
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      console.error('❌ Error en getFailureBookStats:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'GET_BOOK_STATS_ERROR',
+          message: error.message
+        }
+      });
+    }
+  }
+
+  /**
    * Obtener estadísticas de fallas
    * GET /api/failures/statistics
    */
@@ -1675,6 +1854,176 @@ class FailureController {
           code: 'UPDATE_FAILURE_ORDER_ERROR',
           message: error.message
         }
+      });
+    }
+  }
+
+  /**
+   * Asignar o actualizar el inspectable (dispositivo) de una falla
+   * PATCH /api/failures/:id/assign-inspectable
+   * Útil para corregir fallas que quedaron sin dispositivo asociado
+   */
+  async assignInspectable(req, res) {
+    try {
+      const { id } = req.params;
+      const failureOrderId = parseInt(id);
+      const { inspectable_id } = req.body;
+
+      if (isNaN(failureOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_ID', message: 'ID de orden de falla inválido' }
+        });
+      }
+
+      if (!inspectable_id) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INSPECTABLE_ID_REQUIRED', message: 'inspectable_id es requerido' }
+        });
+      }
+
+      const { FailureOrder, Inspectable } = require('../models');
+
+      // Verificar que el inspectable existe
+      const inspectable = await Inspectable.findByPk(inspectable_id, {
+        attributes: ['ins_id', 'name', 'type_code']
+      });
+      if (!inspectable) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'INSPECTABLE_NOT_FOUND', message: 'El dispositivo/atracción indicado no existe' }
+        });
+      }
+
+      const failureOrder = await FailureOrder.findByPk(failureOrderId);
+      if (!failureOrder) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'FAILURE_ORDER_NOT_FOUND', message: 'Orden de falla no encontrada' }
+        });
+      }
+
+      await failureOrder.update({ affected_id: inspectable_id });
+
+      console.log(`✅ [ASSIGN INSPECTABLE] OF-${failureOrder.failure_order_id} → inspectable "${inspectable.name}" (ID: ${inspectable_id})`);
+
+      return res.status(200).json({
+        success: true,
+        message: `Dispositivo "${inspectable.name}" asignado correctamente`,
+        data: {
+          failureOrderId: failureOrder.failure_order_id,
+          inspectable: { id: inspectable.ins_id, name: inspectable.name, type: inspectable.type_code }
+        }
+      });
+    } catch (error) {
+      console.error('❌ [ASSIGN INSPECTABLE] Error:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'ASSIGN_INSPECTABLE_ERROR', message: error.message }
+      });
+    }
+  }
+
+  /**
+   * Actualizar imagen de evidencia de una falla (con upload de archivo)
+   * POST /api/failures/:id/update-image
+   */
+  async updateFailureImage(req, res) {
+    try {
+      const { id } = req.params;
+      const failureOrderId = parseInt(id);
+
+      if (isNaN(failureOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_ID', message: 'ID de orden de falla inválido' }
+        });
+      }
+
+      const { FailureOrder } = require('../models');
+      const failureOrder = await FailureOrder.findByPk(failureOrderId);
+
+      if (!failureOrder) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'FAILURE_ORDER_NOT_FOUND', message: 'Orden de falla no encontrada' }
+        });
+      }
+
+      let evidenceUrl = null;
+      if (req.file) {
+        evidenceUrl = `/media/${req.file.filename}`;
+      } else if (req.body.evidenceUrl) {
+        evidenceUrl = req.body.evidenceUrl;
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'NO_IMAGE_PROVIDED', message: 'Debe proporcionar una imagen' }
+        });
+      }
+
+      // Eliminar imagen anterior si existe
+      if (failureOrder.evidence_url) {
+        try {
+          const fs = require('fs').promises;
+          const path = require('path');
+          const oldFilename = failureOrder.evidence_url.replace('/media/', '');
+          const oldPath = path.join(__dirname, '../../public/media', oldFilename);
+          await fs.access(oldPath).then(() => fs.unlink(oldPath)).catch(() => {});
+        } catch (e) { /* ignorar errores al eliminar imagen anterior */ }
+      }
+
+      await failureOrder.update({ evidence_url: evidenceUrl });
+
+      console.log(`✅ [UPDATE IMAGE] OF-${failureOrder.failure_order_id} imagen actualizada: ${evidenceUrl}`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Imagen actualizada correctamente',
+        data: { evidenceUrl }
+      });
+    } catch (error) {
+      console.error('❌ [UPDATE IMAGE] Error:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'UPDATE_IMAGE_ERROR', message: error.message }
+      });
+    }
+  }
+
+  /**
+   * Obtener listado simplificado de inspectables para el selector del libro
+   * GET /api/failures/inspectables-list
+   */
+  async getInspectablesList(req, res) {
+    try {
+      const { Inspectable } = require('../models');
+      const { search = '' } = req.query;
+      const { Op } = require('sequelize');
+
+      const where = search ? { name: { [Op.like]: `%${search}%` } } : {};
+
+      const inspectables = await Inspectable.findAll({
+        where,
+        attributes: ['ins_id', 'name', 'type_code'],
+        order: [['name', 'ASC']],
+        limit: 200
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: inspectables.map(i => ({
+          id: i.ins_id,
+          name: i.name,
+          type: i.type_code
+        }))
+      });
+    } catch (error) {
+      console.error('❌ [GET INSPECTABLES LIST] Error:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'GET_INSPECTABLES_LIST_ERROR', message: error.message }
       });
     }
   }
@@ -1927,21 +2276,34 @@ class FailureController {
    */
   async exportFailuresToExcel(req, res) {
     try {
-      // Temporalmente deshabilitado - necesita actualización del modelo Inventory
-      return res.status(501).json({
-        success: false,
-        error: {
-          code: 'NOT_IMPLEMENTED',
-          message: 'Exportación a Excel temporalmente deshabilitada. Contacte al administrador.'
-        }
+      const FailureBookExportService = require('../services/FailureBookExportService');
+      const buffer = await FailureBookExportService.generateWorkbook(req.user, {
+        ...req.query,
+        respectFilters: req.query.respectFilters
       });
+
+      const now = new Date();
+      const stamp = now.toISOString().slice(0, 10).replace(/-/g, '');
+      const time = now.toTimeString().slice(0, 5).replace(':', '');
+      const filename = `Libro_Fallas_GB_Alist_${stamp}_${time}.xlsx`;
+
+      const fileBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', fileBuffer.length);
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length');
+      res.send(fileBuffer);
     } catch (error) {
       console.error('❌ Error exportando fallas a Excel:', error);
       res.status(500).json({
         success: false,
         error: {
           code: 'EXPORT_EXCEL_ERROR',
-          message: error.message
+          message: error.message || 'No se pudo generar el reporte Excel'
         }
       });
     }
@@ -1995,16 +2357,9 @@ class FailureController {
 
       const resolvedFailures = await FailureOrder.findAll({
         where: {
-          [Op.or]: [
-            {
-              checklist_item_id: {
-                [Op.in]: itemIds
-              }
-            },
-            {
-              checklist_item_id: null
-            }
-          ]
+          checklist_item_id: {
+            [Op.in]: itemIds
+          }
         },
         include: [
           {
@@ -2025,23 +2380,20 @@ class FailureController {
           {
             model: WorkOrder,
             as: 'workOrder',
-            attributes: ['work_order_id', 'status', 'start_time', 'activity_performed']
+            required: true,
+            attributes: ['work_order_id', 'status', 'start_time', 'activity_performed'],
+            where: { status: { [Op.in]: ['RESUELTA', 'CANCELADO'] } }
           }
         ],
         order: [['createdAt', 'DESC']]
       });
 
-      // Filtrar solo fallas resueltas
-      const resolved = resolvedFailures.filter(fo =>
-        fo.workOrder && fo.workOrder.status === 'RESUELTA'
-      );
-
-      console.log('🔍 [GET RESOLVED FAILURES BY CHECKLIST TYPE] Total fallas resueltas:', resolved.length);
+      console.log('🔍 [GET RESOLVED FAILURES BY CHECKLIST TYPE] Total fallas resueltas:', resolvedFailures.length);
 
       res.status(200).json({
         success: true,
-        data: resolved,
-        count: resolved.length
+        data: resolvedFailures,
+        count: resolvedFailures.length
       });
 
     } catch (error) {
@@ -2110,7 +2462,7 @@ class FailureController {
     } catch (error) {
       console.error('❌ [DELETE FAILURE ORDER] Error:', error);
       console.error('❌ [DELETE FAILURE ORDER] Stack:', error.stack);
-      
+
       res.status(500).json({
         success: false,
         error: {

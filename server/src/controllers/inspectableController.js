@@ -102,7 +102,7 @@ const inspectableController = {
                 includeConditions[0].where = {
                     ...includeConditions[0].where,
                     name: {
-                        [Op.iLike]: `%${search}%`
+                        [Op.like]: `%${search}%`
                     }
                 };
             }

@@ -4,6 +4,43 @@
  */
 
 export const CHECKLIST_TYPES = {
+  static: {
+    type: 'static',
+    displayName: 'Checklist Locativo',
+    description: 'Checklist de revisión locativa general',
+    entityType: 'static',
+    frequency: 'weekly',
+
+    // Configuración de endpoints
+    endpoints: {
+      latest: '/api/checklists/type/{checklistTypeId}/latest',
+      history: '/api/checklists/type/{checklistTypeId}/history',
+      responses: '/api/checklists/{checklistId}/responses',
+      download: '/api/checklists/{checklistId}/download-pdf',
+    },
+
+    // Configuración de UI
+    ui: {
+      icon: (
+        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      ),
+      primaryColor: 'orange',
+      breadcrumbLabel: 'Checklists Locativos',
+    },
+
+    // Configuración de datos
+    data: {
+      requiresEntitySelection: false,
+      generateDynamicTemplate: false,
+      createInstance: false,
+      hasQrValidation: false,
+      hideHistory: false,
+      allowDownload: true,
+    },
+  },
+
   attraction: {
     type: 'attraction',
     displayName: 'Checklist de Atracción',

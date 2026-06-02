@@ -824,7 +824,7 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
     endOfDay.setUTCHours(23, 59, 59, 999);
 
     // Permitir tanto técnicos de mantenimiento (role_id 3) como anfitriones (role_id 4)
-    if (role_id !== 3 && role_id !== 4) {
+    if (role_id !== 3 && role_id !== 4 && role_id !== 2) {
       throw new Error("Sólo los técnicos de mantenimiento y anfitriones pueden rellenar la lista de control.")
     }
 
@@ -1029,7 +1029,11 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
         response_id: response_id || undefined,
         checklist_id: response.checklist_id || checklist_id,
         checklist_item_id,
-        inspectable_id: (checklist.type.type_category === 'specific' || checklist.type.type_category === 'family' || checklist.type.type_category === 'attraction') ? inspectable_id : null,
+        // Para family: respetar el inspectable_id del dispositivo (requerido)
+        // Para todos los demás tipos: siempre null, aunque el frontend envíe undefined o un valor
+        inspectable_id: checklist.type.type_category === 'family'
+          ? (inspectable_id ?? null)
+          : null,
         responded_by,
         responded_at: new Date(),
       };
@@ -1099,12 +1103,14 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
         }
       } else {
         // Since response_id is not present, we look for a conflict manually before creating
+        const conflictWhere = {
+          checklist_id: responseData.checklist_id,
+          checklist_item_id: responseData.checklist_item_id,
+          inspectable_id: responseData.inspectable_id ?? null,
+        };
+
         const conflictingResponse = await ChecklistResponse.findOne({
-          where: {
-            checklist_id: responseData.checklist_id,
-            checklist_item_id: responseData.checklist_item_id,
-            inspectable_id: responseData.inspectable_id,
-          },
+          where: conflictWhere,
           transaction
         });
 
@@ -1537,18 +1543,32 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
     const isStatic = definitiveChecklistType.type_category === 'static';
     const inspectableId = isStatic ? null : definitiveChecklistType.associated_id;
 
-    const whereClause = {
-      createdAt: {
-        [Op.between]: [startOfDay, endOfDay],
-      },
-      checklist_type_id: definitiveChecklistType.checklist_type_id,
-      inspectable_id: inspectableId,
-    };
+    // Determinar si es semanal o diario
+    const { startDate: periodStart, endDate: periodEnd, identifier: weekIdentifier, isWeekly } =
+      weekUtils.getDateBoundsForChecklistType(definitiveChecklistType);
 
-    // Crear consulta para buscar checklist existente del día
+    console.log(`[getLatestChecklistByType] ${definitiveChecklistType.type_category} - isWeekly: ${isWeekly}, identifier: ${weekIdentifier}`);
+
+    // Construir el where para buscar/crear el checklist
+    // Para semanales usamos week_identifier; para diarios usamos el rango de createdAt
+    const searchWhere = isWeekly
+      ? {
+          checklist_type_id: definitiveChecklistType.checklist_type_id,
+          week_identifier: weekIdentifier,
+          inspectable_id: inspectableId,
+        }
+      : {
+          checklist_type_id: definitiveChecklistType.checklist_type_id,
+          inspectable_id: inspectableId,
+        };
 
     let checklist = await Checklist.findOne({
-      where: whereClause,
+      where: isWeekly
+        ? searchWhere
+        : {
+            ...searchWhere,
+            createdAt: { [Op.between]: [periodStart, periodEnd] },
+          },
       order: [["createdAt", "ASC"]],
       include: [{ model: ChecklistType, as: "type" }],
     });
@@ -1569,13 +1589,18 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
         else throw new Error('Could not determine premise_id for checklist creation.');
       }
 
+      const createDefaults = {
+        premise_id: premise_id,
+        created_by: user_id,
+        version_label: definitiveChecklistType.version_label,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...(isWeekly && { week_identifier: weekIdentifier }),
+      };
+
       const [createdChecklist] = await Checklist.findOrCreate({
-        where: whereClause,
-        defaults: {
-          premise_id: premise_id,
-          created_by: user_id,
-          version_label: definitiveChecklistType.version_label,
-        }
+        where: searchWhere,
+        defaults: createDefaults,
       });
       checklist = await Checklist.findByPk(createdChecklist.checklist_id, {
         include: [{ model: ChecklistType, as: "type" }]
@@ -1619,13 +1644,21 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
     }) : [];
 
     const checklistData = checklist.toJSON();
-    const pendingFailures = [];
 
     return {
       ...checklistData,
       items,
       signatures,
       pending_work_orders: [],
+      ...(isWeekly && {
+        week_info: {
+          week_identifier: weekIdentifier,
+          week_range: weekUtils.formatWeekRange(periodStart, periodEnd),
+          days_remaining: weekUtils.getDaysRemainingInWeek(),
+          start_date: periodStart,
+          end_date: periodEnd,
+        }
+      }),
     };
 
   } else if (definitiveChecklistType.type_category === 'family') {
@@ -2538,6 +2571,10 @@ const getChecklistById = async (checklistId) => {
       };
     } else {
       // Para otros tipos, combinar template plano con respuestas
+      const typeCategory = checklist.type?.type_category;
+      // Para attraction, el inspectable_id está en el checklist mismo
+      const inspectableId = checklist.inspectable_id || null;
+
       items = (checklist.type?.items || []).map(templateItem => {
         const responses = checklist.responses.filter(
           r => r.checklist_item_id === templateItem.checklist_item_id
@@ -2549,14 +2586,28 @@ const getChecklistById = async (checklistId) => {
           return {
             ...templateSubItem.toJSON(),
             responses: subResponses,
-            unique_frontend_id: templateSubItem.checklist_item_id.toString(),
+            // Para attraction, propagar inspectable_id_for_response igual que getLatestChecklistByType
+            ...(typeCategory === 'attraction' && inspectableId && {
+              unique_frontend_id: `${inspectableId}-${templateSubItem.checklist_item_id}`,
+              inspectable_id_for_response: inspectableId,
+            }),
+            ...((typeCategory !== 'attraction' || !inspectableId) && {
+              unique_frontend_id: templateSubItem.checklist_item_id.toString(),
+            }),
           };
         });
         return {
           ...templateItem.toJSON(),
           responses,
           subItems,
-          unique_frontend_id: templateItem.checklist_item_id.toString(),
+          // Para attraction, propagar inspectable_id_for_response igual que getLatestChecklistByType
+          ...(typeCategory === 'attraction' && inspectableId && {
+            unique_frontend_id: `${inspectableId}-${templateItem.checklist_item_id}`,
+            inspectable_id_for_response: inspectableId,
+          }),
+          ...((typeCategory !== 'attraction' || !inspectableId) && {
+            unique_frontend_id: templateItem.checklist_item_id.toString(),
+          }),
         };
       });
     }

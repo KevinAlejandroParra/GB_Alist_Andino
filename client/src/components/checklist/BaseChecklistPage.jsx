@@ -22,6 +22,7 @@ import { useChecklistValidation } from './hooks/useChecklistValidation';
 import { useChecklistActions } from './hooks/useChecklistActions';
 import { useQrCode } from './hooks/useQrCode';
 import useFailureRequisitionSystem from './hooks/useFailureRequisitionSystem';
+import useSupportContext from './hooks/useSupportContext';
 import QrScannerModal from './QrScannerModal';
 import CreateFailureWithRequisitionModal from './CreateFailureWithRequisitionModal';
 import InventorySearchModal from './InventorySearchModal';
@@ -83,15 +84,23 @@ export default function BaseChecklistPage({
   // Lógica de checklist viejo (solo aplica cuando NO estamos en modo soporte)
   let isOldDaily = false;
   if (!specificChecklistId && activeChecklist) {
-    const type = originalChecklistData.checklistType;
-    const frequency = (type?.frequency || '').toLowerCase().trim();
+    // Usar checklistTypeDetails (lo que el hook sí retorna) en lugar de checklistType (que no existe)
+    const type = originalChecklistData.checklistTypeDetails;
+    const frequency = (type?.frequency || activeChecklist.type?.frequency || '').toLowerCase().trim();
     const isWeekly = frequency === 'semanal' || frequency === 'weekly';
+    const isFamily = type?.type_category === 'family' || activeChecklist.type?.type_category === 'family';
     const isDaily = frequency === 'diaria' || frequency === 'diario' || frequency === 'daily';
-    const shouldBeTreatedAsDaily = isDaily || (!isWeekly && type?.type_category !== 'family');
+    // Solo tratar como diario si es explícitamente diario Y no es semanal ni de familia
+    const shouldBeTreatedAsDaily = isDaily && !isWeekly && !isFamily;
 
     if (shouldBeTreatedAsDaily) {
-      const instanceDate = new Date(activeChecklist.createdAt).toISOString().split('T')[0];
-      const todayDate = new Date().toISOString().split('T')[0];
+      // Usar hora LOCAL (no UTC) para comparar fechas, de lo contrario un checklist
+      // creado después de las 7pm Colombia (UTC-5) aparece como "del día siguiente" en UTC
+      // y el checklist se cierra incorrectamente mostrando "crear nuevo".
+      const createdAt = new Date(activeChecklist.createdAt);
+      const instanceDate = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}-${String(createdAt.getDate()).padStart(2, '0')}`;
+      const now = new Date();
+      const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       if (instanceDate !== todayDate) {
         isOldDaily = true;
       }
@@ -117,6 +126,7 @@ export default function BaseChecklistPage({
 
   const responseManager = useResponseManagement(checklistData.checklist);
   const failureSystem = useFailureRequisitionSystem(user);
+  const supportContext = useSupportContext();
   const pendingFailuresCount = failureSystem.pendingFailures.length;
 
   const qrParams = useMemo(() => ({
@@ -149,7 +159,7 @@ export default function BaseChecklistPage({
           qrManager.updateProgressFromResponses(checklistData.checklist.items, responseManager.itemResponses);
         }, 200);
       }
-    } else if (!checklistData.loading && !specificChecklistId && !config.createInstance && !checklistData.dataConfig?.generateDynamicTemplate) {
+    } else if (!checklistData.loading && !specificChecklistId && !config.createInstance && !checklistData.dataConfig?.generateDynamicTemplate && checklistData.checklistTypeDetails) {
       router.push(`/checklists/detail/${checklistTypeId}`);
     }
   }, [
@@ -211,11 +221,18 @@ export default function BaseChecklistPage({
   );
 
   const handleSave = useCallback(async () => {
+    // En modo retroactivo (specificChecklistId), usar el endpoint de soporte
+    const saveEndpoint = checklistData.checklist
+      ? (specificChecklistId
+          ? supportContext.getApiUrl(`/api/checklists/${checklistData.checklist.checklist_id}/responses`)
+          : `/api/checklists/${checklistData.checklist.checklist_id}/responses`)
+      : null;
+
     const dynamicConfig = {
       ...config,
-      saveEndpoint: checklistData.checklist
-        ? `/api/checklists/${checklistData.checklist.checklist_id}/responses`
-        : null
+      saveEndpoint,
+      // En modo soporte, pasar impersonate_user_id en el body
+      supportContext: specificChecklistId ? supportContext : null,
     };
 
     if (!user?.token) {
@@ -224,11 +241,23 @@ export default function BaseChecklistPage({
     }
 
     const handleSaveSuccess = (success, savedResponses) => {
-      if (success && savedResponses) {
-        responseManager.updateResponseIds(savedResponses);
+      if (success) {
+        if (savedResponses) {
+          responseManager.updateResponseIds(savedResponses);
+        }
         responseManager.forceUpdateExistingResponses();
 
-        if (failureSystem.pendingFailures.length > 0) {
+        // Recargar el checklist para que las respuestas del servidor estén disponibles
+        // (necesario para que la validación de firma lea datos actualizados)
+        if (specificChecklistId) {
+          axiosInstance.get(`/api/support/checklists/${specificChecklistId}`)
+            .then(r => r.data.success && setSpecificChecklist(r.data.data))
+            .catch(console.error);
+        } else {
+          originalChecklistData.refreshChecklistData();
+        }
+
+        if (savedResponses && failureSystem.pendingFailures.length > 0) {
           try {
             const failureResult = failureSystem.createPendingFailuresAfterSave(savedResponses, user);
             if (failureResult.success && failureResult.created.length > 0) {
@@ -257,6 +286,7 @@ export default function BaseChecklistPage({
     signatureManager.signature, validation, responseManager.saveResponses,
     responseManager.updateResponseIds, responseManager.forceUpdateExistingResponses,
     originalChecklistData.refreshChecklistData, failureSystem,
+    specificChecklistId, supportContext,
   ]);
 
   const handleCreateFailureSuccess = (data) => {
@@ -379,7 +409,7 @@ export default function BaseChecklistPage({
               },
               {
                 label: '📋 Ver Mis Fallas',
-                onClick: () => router.push('/tecnico/fallas'),
+                onClick: () => router.push('/fallas'),
                 className: 'bg-purple-600 hover:bg-purple-700'
               }
             ]}

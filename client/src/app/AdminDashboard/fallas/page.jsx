@@ -1,5 +1,4 @@
-// Redirigir al libro de fallas compartido
-// El filtrado por rol se hace automáticamente en el backend
+// Redirigir al libro de fallas compartido unificado
 'use client'
 
 import { useEffect } from 'react';
@@ -9,14 +8,14 @@ export default function AdminFallasRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/tecnico/fallas');
+    router.replace('/fallas');
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Cargando libro de fallas...</p>
+        <p className="text-gray-400 text-sm">Cargando libro de fallas unificado...</p>
       </div>
     </div>
   );

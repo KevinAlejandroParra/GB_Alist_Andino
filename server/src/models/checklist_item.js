@@ -39,6 +39,12 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'checklist_item_id',
         as: 'qrAssociations'
       });
+
+      // Relación con el tipo de checklist
+      ChecklistItem.belongsTo(models.ChecklistType, {
+        foreignKey: 'checklist_type_id',
+        as: 'checklistType'
+      });
     }
   }
   ChecklistItem.init(
