@@ -4,16 +4,29 @@ const { Model } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
   class WorkOrder extends Model {
     static associate(models) {
-      // Relación con la orden de falla (1:1)
       WorkOrder.belongsTo(models.FailureOrder, {
         foreignKey: 'failure_order_id',
         as: 'failureOrder'
       });
 
-      // Relación con el usuario que resolvió
+      WorkOrder.belongsTo(models.RepairExecution, {
+        foreignKey: 'repair_execution_id',
+        as: 'repairExecution'
+      });
+
       WorkOrder.belongsTo(models.User, {
         foreignKey: 'resolved_by_id',
         as: 'resolver'
+      });
+
+      WorkOrder.belongsTo(models.User, {
+        foreignKey: 'cancelled_by_id',
+        as: 'cancelledBy'
+      });
+
+      WorkOrder.hasMany(models.Requisition, {
+        foreignKey: 'work_order_id',
+        as: 'requisitions'
       });
 
       // Relación con repuestos utilizados (N:N a través de tabla intermedia)
@@ -96,11 +109,27 @@ module.exports = (sequelize, DataTypes) => {
       comment: 'ID del técnico/usuario que resolvió la falla'
     },
 
-    // ✅ NUEVO: Campo para rastrear fallas enlazadas (sincronización)
     linked_failure_ids: {
       type: DataTypes.TEXT,
       allowNull: true,
-      comment: 'JSON array de IDs de FailureOrders enlazadas que comparten esta información de OT'
+      comment: 'Legacy — preferir repair_executions.linked_failure_ids'
+    },
+    repair_execution_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'AR vinculada a esta OT formal'
+    },
+    cancellation_reason: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    cancelled_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    cancelled_by_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
     },
   }, {
     sequelize,

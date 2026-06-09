@@ -1,6 +1,7 @@
 'use strict';
 
-const { FailureOrder, WorkOrder, Requisition, Inventory, User } = require('../models');
+const { FailureOrder, WorkOrder, Requisition, Inventory, User, RepairExecution } = require('../models');
+const repairExecutionService = require('./repairExecutionService');
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 
@@ -64,20 +65,30 @@ class FailureRequisitionService {
       console.log('  - requires_replacement guardado:', failureOrder.requires_replacement, typeof failureOrder.requires_replacement)
       console.log('  - requested_part_info:', failureOrder.requested_part_info)
 
-      // 3. Crear WorkOrder asociada
-      const workOrder = await WorkOrder.create({
-        work_order_id,
-        description: `Trabajo de reparación para: ${description.substring(0, 100)}...`,
-        priority_level: severity === 'CRITICA' ? 'EMERGENCY' : severity === 'MODERADA' ? 'URGENTE' : 'NORMAL',
-        status: 'ASIGNADO',
+      // 3. Crear AR (siempre) y OT formal solo si hay repuesto
+      const repairExecution = await RepairExecution.create({
+        repair_execution_id: work_order_id.replace(/^OT-/, 'AR-'),
         failure_order_id: failureOrder.id,
-        linked_failure_ids: JSON.stringify([failureOrder.id]) // ✅ Inicializar con su propia falla
+        status: 'EN_PROCESO',
+        linked_failure_ids: JSON.stringify([failureOrder.id])
       }, { transaction });
+
+      let workOrder = null;
+      if (requires_replacement) {
+        workOrder = await WorkOrder.create({
+          work_order_id,
+          failure_order_id: failureOrder.id,
+          repair_execution_id: repairExecution.id,
+          requiere_replacement: true,
+          status: 'EN_PROCESO',
+          linked_failure_ids: JSON.stringify([failureOrder.id])
+        }, { transaction });
+      }
 
       let requisition = null;
 
       // 4. Si requiere repuesto, crear Requisition
-      if (requires_replacement && part_info) {
+      if (requires_replacement && part_info && workOrder) {
         // Permitir both camelCase `imageUrl` y snake_case `image_url`
         const imageUrlValue = part_info.image_url || part_info.imageUrl || null;
         requisition = await Requisition.create({

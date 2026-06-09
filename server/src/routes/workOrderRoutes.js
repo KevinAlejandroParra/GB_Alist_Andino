@@ -54,7 +54,7 @@ router.put('/:id/resolve', (req, res) => workOrderController.resolveWorkOrder(re
 // PUT /api/work-orders/:id/cancel - Cancelar OT
 router.put('/:id/cancel', (req, res) => workOrderController.cancelWorkOrder(req, res));
 
-// DELETE /api/work-orders/:id - Eliminar OT (solo si está vacía)
+// DELETE /api/work-orders/:id - Eliminación permanente deshabilitada, usa la cancelación para conservar el historial
 router.delete('/:id', (req, res) => {
   const FailureController = require('../controllers/FailureController');
   FailureController.deleteWorkOrder(req, res);

@@ -27,7 +27,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 
 /**
- * Modal para manejar fallas recurrentes con opciones de mantener, nueva falla o resolver
+ * Modal para manejar fallas que se mantienen con opciones de mantener, nueva falla o resolver
  */
 export default function RecurringFailureModal({
   isOpen,
@@ -52,6 +52,13 @@ export default function RecurringFailureModal({
 
   const [imagePreviews, setImagePreviews] = useState({ newFailure: null })
   const [showSignaturePad, setShowSignaturePad] = useState(false)
+  // Para firmar una falla existente desde el modal
+  const [signingExistingFailureId, setSigningExistingFailureId] = useState(null)
+  // Para actualizar imagen de falla existente
+  const [updatingImageForId, setUpdatingImageForId] = useState(null)
+  const [existingImageFile, setExistingImageFile] = useState(null)
+  const [existingImagePreview, setExistingImagePreview] = useState(null)
+  const [updatingExistingImage, setUpdatingExistingImage] = useState(false)
   const [formData, setFormData] = useState({
     maintainReason: responseData?.userComment || '',
     newFailureDescription: '',
@@ -176,7 +183,7 @@ export default function RecurringFailureModal({
     }
   }
 
-  // Opción 1: Mantener Falla — incrementa el contador de recurrencia
+  // Opción 1: Mantener Falla — incrementa el contador de persistencia
   const handleMaintainFailure = async () => {
     setLoading(true)
     try {
@@ -192,14 +199,48 @@ export default function RecurringFailureModal({
 
       Swal.fire({
         icon: 'success',
-        title: 'Recurrencia Registrada',
-        text: `La falla ahora tiene ${response.data.data?.recurrence_count} reporte(s) de recurrencia`,
+        title: 'Persistencia Registrada',
+        text: `La falla ahora tiene ${response.data.data?.recurrence_count} reporte(s) de persistencia`,
         timer: 2000,
         showConfirmButton: false
       })
     } catch (error) {
       console.error(error)
-      Swal.fire('Error', 'No se pudo registrar la recurrencia', 'error')
+      Swal.fire('Error', 'No se pudo registrar la persistencia', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Opción 1b: Mantener TODAS las fallas del ítem
+  const handleMaintainAllFailures = async () => {
+    if (!workOrders || workOrders.length === 0) return
+    setLoading(true)
+    try {
+      await Promise.all(
+        workOrders.map(wo =>
+          axiosInstance.put(
+            `${API_URL}/api/failures/${wo.id}/increment-recurrence`,
+            {},
+            { headers: { Authorization: `Bearer ${user.token}` } }
+          )
+        )
+      )
+
+      onSuccess && onSuccess('maintain')
+      onWorkOrdersUpdate && onWorkOrdersUpdate()
+      onClose()
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Persistencia Registrada',
+        text: `Se incrementó la persistencia de ${workOrders.length} falla(s)`,
+        timer: 2000,
+        showConfirmButton: false
+      })
+    } catch (error) {
+      console.error(error)
+      Swal.fire('Error', 'No se pudo registrar la persistencia en todas las fallas', 'error')
     } finally {
       setLoading(false)
     }
@@ -216,6 +257,13 @@ export default function RecurringFailureModal({
       console.log('📝 effectiveChecklistItemId:', effectiveChecklistItemId);
       console.log('🔍 ==================================================');
 
+      // Validar inspectableId
+      if (!inspectableId) {
+        Swal.fire('Error', 'No se pudo identificar el dispositivo asociado al checklist. Contacte al administrador.', 'error')
+        setLoading(false)
+        return
+      }
+
       let evidenceUrl = null
       if (formData.newFailureEvidence) {
         evidenceUrl = await uploadEvidenceToServer(formData.newFailureEvidence)
@@ -227,18 +275,40 @@ export default function RecurringFailureModal({
         severity: formData.newFailureSeverity === 'crítica' ? 'CRITICA' : 'LEVE',
         evidenceUrl: evidenceUrl,
         assignedTechnicianArea: formData.assignedTechnicianArea || 'TECNICO',
-        inspectableId: inspectableId // ✅ NUEVO: Asociar la falla al dispositivo específico
+        inspectableId: inspectableId,
+        categoria: formData.assignedTechnicianArea === 'OPERACION' ? 'OPERATIVA' : 'TECNICA'
       }
 
       console.log('🔍 [CREATE NEW FAILURE] Datos de nueva falla:', newFailureData);
-      console.log('🔍 [CREATE NEW FAILURE] inspectableId final:', newFailureData.inspectableId);
 
-      // Crear solo la Failure Order
+      // Crear la Failure Order
       const response = await axiosInstance.post(
         `${API_URL}/api/failures`,
         newFailureData,
         { headers: { Authorization: `Bearer ${user.token}` } }
       )
+
+      const createdFailure = response.data?.data
+      const createdFailureId = createdFailure?.id
+
+      // ✅ PROBLEMA 4: Enviar firma de reporte si se capturó
+      if (createdFailureId && formData.signature) {
+        try {
+          await axiosInstance.post(
+            `${API_URL}/api/failures/${createdFailureId}/report-signature`,
+            {
+              signatureData: formData.signature,
+              userName: user.user_name || user.name || 'Usuario',
+              roleName: user.role_name || 'Operador'
+            },
+            { headers: { Authorization: `Bearer ${user.token}` } }
+          )
+          console.log('✅ [CREATE NEW FAILURE] Firma de reporte guardada correctamente')
+        } catch (sigError) {
+          console.warn('⚠️ [CREATE NEW FAILURE] No se pudo guardar la firma:', sigError.message)
+          // No bloqueamos el flujo; la falla ya fue creada
+        }
+      }
 
       onSuccess && onSuccess('new', response.data)
       onWorkOrdersUpdate && onWorkOrdersUpdate()
@@ -253,7 +323,7 @@ export default function RecurringFailureModal({
       })
     } catch (error) {
       console.error(error)
-      Swal.fire('Error', 'No se pudo crear la falla', 'error')
+      Swal.fire('Error', error.response?.data?.error?.message || 'No se pudo crear la falla', 'error')
     } finally {
       setLoading(false)
     }
@@ -329,10 +399,74 @@ export default function RecurringFailureModal({
     }
   }
 
-  // Función para manejar la firma
+  // Función para manejar la firma (nueva falla)
   const handleSignatureSave = (signatureData) => {
-    setFormData(prev => ({ ...prev, signature: signatureData }))
+    if (signingExistingFailureId) {
+      // Firmar una falla existente
+      handleSaveExistingSignature(signatureData)
+    } else {
+      // Firma para nueva falla
+      setFormData(prev => ({ ...prev, signature: signatureData }))
+      setShowSignaturePad(false)
+    }
+  }
+
+  // Guardar firma en una falla existente (report_signature)
+  const handleSaveExistingSignature = async (signatureData) => {
     setShowSignaturePad(false)
+    try {
+      await axiosInstance.post(
+        `${API_URL}/api/failures/${signingExistingFailureId}/report-signature`,
+        {
+          signatureData,
+          userName: user.user_name || user.name || 'Usuario',
+          roleName: user.role_name || 'Operador'
+        },
+        { headers: { Authorization: `Bearer ${user.token}` } }
+      )
+      Swal.fire({ icon: 'success', title: '✅ Firma guardada', text: 'La firma de reporte fue guardada correctamente', timer: 1500, showConfirmButton: false })
+      onWorkOrdersUpdate && onWorkOrdersUpdate()
+    } catch (err) {
+      Swal.fire('Error', err.response?.data?.error?.message || 'No se pudo guardar la firma', 'error')
+    } finally {
+      setSigningExistingFailureId(null)
+    }
+  }
+
+  const handleOpenSignExisting = (failureId) => {
+    setSigningExistingFailureId(failureId)
+    setShowSignaturePad(true)
+  }
+
+  // Actualizar imagen de una falla existente
+  const handleExistingImageFileChange = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setExistingImageFile(file)
+    const reader = new FileReader()
+    reader.onload = ev => setExistingImagePreview(ev.target.result)
+    reader.readAsDataURL(file)
+  }
+
+  const handleUpdateExistingImage = async () => {
+    if (!existingImageFile || !updatingImageForId) return
+    setUpdatingExistingImage(true)
+    try {
+      const fd = new FormData()
+      fd.append('evidence', existingImageFile)
+      await axiosInstance.post(`${API_URL}/api/failures/${updatingImageForId}/update-image`, fd, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      })
+      Swal.fire({ icon: 'success', title: '✅ Imagen actualizada', timer: 1500, showConfirmButton: false })
+      setUpdatingImageForId(null)
+      setExistingImageFile(null)
+      setExistingImagePreview(null)
+      onWorkOrdersUpdate && onWorkOrdersUpdate()
+    } catch (err) {
+      Swal.fire('Error', err.response?.data?.error?.message || 'No se pudo actualizar la imagen', 'error')
+    } finally {
+      setUpdatingExistingImage(false)
+    }
   }
 
   const clearSignature = () => {
@@ -352,7 +486,7 @@ export default function RecurringFailureModal({
   const getRecurrenceText = (wo) => {
     if (!wo) return ''
     if (wo.recurrence_count <= 1) return 'Primera vez'
-    return `${wo.recurrence_count} recurrencias`
+    return `${wo.recurrence_count} persistencias`
   }
 
 
@@ -429,7 +563,7 @@ export default function RecurringFailureModal({
                         <p className="text-sm text-blue-700">
                           {isAdmin
                             ? 'Vista de revisión. Las fallas activas para este ítem se muestran a continuación.'
-                            : 'Seleccione la falla que persiste. Se incrementará su contador de recurrencia.'}
+                            : 'Seleccione la falla que persiste. Se incrementará su contador de persistencia.'}
                         </p>
                       </div>
                     </div>
@@ -587,6 +721,57 @@ export default function RecurringFailureModal({
                                 </span>
                               </div>
                             </div>
+
+                            {/* ✅ Acciones sobre falla existente: Firmar + Actualizar imagen */}
+                            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
+                              <button
+                                onClick={() => handleOpenSignExisting(selectedWorkOrder.id)}
+                                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors"
+                              >
+                                ✍️ {selectedWorkOrder.report_signature ? 'Re-firmar reporte' : 'Firmar reporte'}
+                              </button>
+                              <button
+                                onClick={() => setUpdatingImageForId(v => v === selectedWorkOrder.id ? null : selectedWorkOrder.id)}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                              >
+                                📷 Actualizar imagen
+                              </button>
+                            </div>
+
+                            {/* Panel de actualizar imagen */}
+                            {updatingImageForId === selectedWorkOrder.id && (
+                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <p className="text-sm font-semibold text-blue-800 mb-3">Nueva imagen de evidencia:</p>
+                                <div className="flex items-start gap-4 flex-wrap">
+                                  {existingImagePreview ? (
+                                    <div className="relative">
+                                      <img src={existingImagePreview} alt="preview" className="w-28 h-28 object-cover rounded-lg border shadow" />
+                                      <button onClick={() => { setExistingImageFile(null); setExistingImagePreview(null); }}
+                                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">×</button>
+                                    </div>
+                                  ) : (
+                                    <label className="flex flex-col items-center justify-center w-28 h-28 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer bg-white hover:bg-blue-50">
+                                      <FontAwesomeIcon icon={faImage} className="text-blue-400 text-2xl mb-1" />
+                                      <span className="text-xs text-blue-600">Subir foto</span>
+                                      <input type="file" className="hidden" accept="image/*" onChange={handleExistingImageFileChange} />
+                                    </label>
+                                  )}
+                                  <div className="flex flex-col gap-2">
+                                    <button
+                                      onClick={handleUpdateExistingImage}
+                                      disabled={!existingImageFile || updatingExistingImage}
+                                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-semibold"
+                                    >
+                                      {updatingExistingImage ? 'Guardando...' : '💾 Guardar'}
+                                    </button>
+                                    <button onClick={() => { setUpdatingImageForId(null); setExistingImageFile(null); setExistingImagePreview(null); }}
+                                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )
@@ -692,7 +877,10 @@ export default function RecurringFailureModal({
                       </div>
                     ) : (
                       <button
-                        onClick={() => setShowSignaturePad(true)}
+                        onClick={() => {
+                          setSigningExistingFailureId(null)
+                          setShowSignaturePad(true)
+                        }}
                         className="w-full py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-purple-400 hover:text-purple-600 transition-colors"
                       >
                         <div className="flex flex-col items-center">
@@ -843,8 +1031,57 @@ export default function RecurringFailureModal({
                               )}
                             </div>
 
+                            {/* ✅ Acciones rápidas: firmar + actualizar imagen */}
+                            <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                              <button
+                                onClick={() => handleOpenSignExisting(wo.id)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 transition-colors"
+                              >
+                                ✍️ {wo.report_signature ? 'Re-firmar' : 'Firmar reporte'}
+                              </button>
+                              <button
+                                onClick={() => setUpdatingImageForId(v => v === wo.id ? null : wo.id)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                              >
+                                📷 Actualizar imagen
+                              </button>
+                            </div>
+
+                            {/* Panel de actualizar imagen */}
+                            {updatingImageForId === wo.id && (
+                              <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                <p className="text-xs font-semibold text-blue-800 mb-2">Nueva imagen de evidencia:</p>
+                                <div className="flex items-start gap-3 flex-wrap">
+                                  {existingImagePreview ? (
+                                    <div className="relative">
+                                      <img src={existingImagePreview} alt="preview" className="w-24 h-24 object-cover rounded-lg border shadow" />
+                                      <button onClick={() => { setExistingImageFile(null); setExistingImagePreview(null); }}
+                                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">×</button>
+                                    </div>
+                                  ) : (
+                                    <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer bg-white hover:bg-blue-50">
+                                      <FontAwesomeIcon icon={faImage} className="text-blue-400 text-xl mb-1" />
+                                      <span className="text-xs text-blue-600">Subir</span>
+                                      <input type="file" className="hidden" accept="image/*" onChange={handleExistingImageFileChange} />
+                                    </label>
+                                  )}
+                                  <div className="flex flex-col gap-1">
+                                    <button onClick={handleUpdateExistingImage}
+                                      disabled={!existingImageFile || updatingExistingImage}
+                                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-xs font-semibold">
+                                      {updatingExistingImage ? 'Guardando...' : '💾 Guardar'}
+                                    </button>
+                                    <button onClick={() => { setUpdatingImageForId(null); setExistingImageFile(null); setExistingImagePreview(null); }}
+                                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs hover:bg-slate-50">
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Botón de Acción */}
-                            <div className="flex-shrink-0">
+                            <div className="flex-shrink-0 mt-4">
                               <button
                                 onClick={() => handleManageWorkOrder(wo)}
                                 className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition-all flex items-center gap-2 w-full lg:w-auto"
@@ -872,14 +1109,27 @@ export default function RecurringFailureModal({
             </button>
 
             {activeTab === 'maintain' && !isNewFailure && !isAdmin && (
-              <button
-                onClick={handleMaintainFailure}
-                disabled={loading}
-                className="px-8 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold shadow-lg flex items-center gap-2"
-              >
-                {loading ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faSync} />}
-                Confirmar y Mantener
-              </button>
+              <>
+                <button
+                  onClick={handleMaintainFailure}
+                  disabled={loading}
+                  className="px-8 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold shadow-lg flex items-center gap-2"
+                >
+                  {loading ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faSync} />}
+                  Confirmar y Mantener
+                </button>
+                {workOrders && workOrders.length > 1 && (
+                  <button
+                    onClick={handleMaintainAllFailures}
+                    disabled={loading}
+                    className="px-8 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold shadow-lg flex items-center gap-2"
+                    title={`Incrementa persistencia de las ${workOrders.length} fallas activas del ítem`}
+                  >
+                    {loading ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faSync} />}
+                    Mantener Todas ({workOrders.length})
+                  </button>
+                )}
+              </>
             )}
 
             {activeTab === 'new' && (
@@ -901,7 +1151,10 @@ export default function RecurringFailureModal({
       {showSignaturePad && (
         <SignaturePad
           onSave={handleSignatureSave}
-          onClose={() => setShowSignaturePad(false)}
+          onClose={() => {
+            setShowSignaturePad(false)
+            setSigningExistingFailureId(null)
+          }}
         />
       )}
 

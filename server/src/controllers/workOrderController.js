@@ -338,7 +338,8 @@ class WorkOrderController {
 
       const result = await WorkOrderService.cancelWorkOrder(
         workOrderId,
-        reason.trim()
+        reason.trim(),
+        req.user?.user_id || null
       );
 
       res.status(200).json({

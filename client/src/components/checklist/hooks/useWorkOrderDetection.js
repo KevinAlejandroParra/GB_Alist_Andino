@@ -179,7 +179,7 @@ export function useWorkOrderDetection(checklist, items, user) {
       const response = await axiosInstance.put(
         `${API_URL}/api/failures/${workOrderId}`,
         {
-          notes: reason || 'Falla mantenida como recurrente',
+          notes: reason || 'Falla mantenida como persistente',
           status: 'PENDIENTE'
         },
         { headers: { Authorization: `Bearer ${user.token}` } }

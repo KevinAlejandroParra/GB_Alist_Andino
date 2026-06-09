@@ -57,7 +57,7 @@ export default function WorkOrderStatusIndicator({
   }
 
   const recurrenceText = workOrder.recurrence_count > 1 
-    ? `${workOrder.recurrence_count} recurrencias`
+    ? `${workOrder.recurrence_count} persistencias`
     : 'Primera vez'
 
   const statusClass = getStatusColor(workOrder.status, workOrder.severity)

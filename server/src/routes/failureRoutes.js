@@ -77,6 +77,9 @@ router.get('/export/excel', (req, res) => FailureController.exportFailuresToExce
 // GET /api/failures/statistics - Obtener estadísticas de OF
 router.get('/statistics', (req, res) => FailureController.getFailureOrderStatistics(req, res));
 
+// GET /api/failures/inspectables-list - Listado de inspectables para selector
+router.get('/inspectables-list', (req, res) => FailureController.getInspectablesList(req, res));
+
 /**
  * RUTAS GENERALES
  */
@@ -100,16 +103,28 @@ router.post('/:id/link-work-order', (req, res) => FailureController.linkToWorkOr
 // DELETE /api/failures/:id/unlink-work-order - Desenlazar falla de OT enlazada
 router.delete('/:id/unlink-work-order', (req, res) => FailureController.unlinkFromWorkOrder(req, res));
 
-// GET /api/failures/:id - Obtener detalles de OF específica
-router.get('/:id', (req, res) => FailureController.getFailureOrderById(req, res));
-
 // PUT /api/failures/:id/increment-recurrence - Incrementar contador de recurrencia
 router.put('/:id/increment-recurrence', (req, res) => FailureController.incrementRecurrence(req, res));
+
+// PATCH /api/failures/:id/assign-inspectable - Asignar o corregir inspectable de una falla
+router.patch('/:id/assign-inspectable', (req, res) => FailureController.assignInspectable(req, res));
+
+// POST /api/failures/:id/update-image - Actualizar imagen de evidencia (con upload)
+router.post('/:id/update-image', upload.single('evidence'), (req, res) => FailureController.updateFailureImage(req, res));
+
+// GET /api/failures/:id - Obtener detalles de OF específica
+router.get('/:id', (req, res) => FailureController.getFailureOrderById(req, res));
 
 // PUT /api/failures/:id - Actualizar OF
 router.put('/:id', (req, res) => FailureController.updateFailureOrder(req, res));
 
-// DELETE /api/failures/:id - Eliminar OF permanentemente (Solo Admin/Soporte)
+// PUT /api/failures/:id/cancel - Cancelar falla (conserva historial)
+router.put('/:id/cancel', (req, res) => FailureController.cancelFailureOrder(req, res));
+
+// PUT /api/failures/:id/reactivate - Reactivar falla cancelada
+router.put('/:id/reactivate', (req, res) => FailureController.reactivateFailureOrder(req, res));
+
+// DELETE /api/failures/:id - Deshabilitado (usar cancel)
 router.delete('/:id', (req, res) => FailureController.deleteFailureOrder(req, res));
 
 /**

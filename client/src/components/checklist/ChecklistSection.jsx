@@ -358,7 +358,7 @@ const ChecklistSection = (props) => {
   const [selectedFailure, setSelectedFailure] = useState(null);
   const [showStandaloneFailureModal, setShowStandaloneFailureModal] = useState(false);
 
-  // Estados para manejo de fallas recurrentes
+  // Estados para manejo de fallas persistentes
   const [showRecurringFailureModal, setShowRecurringFailureModal] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState(null);
   const [currentChecklistItem, setCurrentChecklistItem] = useState(null);
@@ -594,7 +594,7 @@ const ChecklistSection = (props) => {
         />
       )}
 
-      {/* ✅ NUEVO: Modal de fallas recurrentes mejorado */}
+      {/* ✅ NUEVO: Modal de fallas persistentes mejorado */}
       {showRecurringFailureModal && selectedWorkOrder && (
         <RecurringFailureModal
           isOpen={showRecurringFailureModal}

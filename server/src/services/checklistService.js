@@ -2185,56 +2185,48 @@ const getWorkOrdersByChecklistType = async ({ checklist_type_id }) => {
       return [];
     }
 
-    // PASO 3: Obtener las WorkOrders asociadas a esas FailureOrders
+    // PASO 3: Cargar AR y OT de cada falla
     const failureOrderIds = failureOrders.map(fo => fo.id);
+    const { RepairExecution } = require('../models');
 
-    const workOrders = await WorkOrder.findAll({
-      where: {
-        failure_order_id: {
-          [Op.in]: failureOrderIds
-        }
-      },
+    const enrichedFailures = await FailureOrder.findAll({
+      where: { id: { [Op.in]: failureOrderIds } },
       include: [
-        {
-          model: FailureOrder,
-          as: 'failureOrder',
-          required: true,
-          include: [
-            {
-              model: User,
-              as: 'reporter',
-              attributes: ['user_id', 'user_name']
-            },
-            {
-              model: ChecklistItem,
-              as: 'checklistItem',
-              attributes: ['checklist_item_id', 'question_text', 'item_number']
-            }
-          ]
-        }
+        { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] },
+        { model: ChecklistItem, as: 'checklistItem', attributes: ['checklist_item_id', 'question_text', 'item_number'] },
+        { model: RepairExecution, as: 'repairExecution', required: false },
+        { model: WorkOrder, as: 'workOrder', required: false }
       ],
-      order: [['createdAt', 'DESC']]
+      order: [[{ model: RepairExecution, as: 'repairExecution' }, 'createdAt', 'DESC']]
     });
 
-    console.log(`🔍 [getWorkOrdersByChecklistType] Encontradas ${workOrders.length} work orders para el checklist_type_id ${checklist_type_id}`);
+    const repairExecutionService = require('./repairExecutionService');
+    const activeFailures = enrichedFailures.filter(fo =>
+      !repairExecutionService.isClosed(fo)
+    );
 
-    // PASO 4: Filtrar solo las fallas activas (no resueltas ni canceladas)
-    const activeWorkOrders = workOrders.filter(wo => {
-      return !['RESUELTA', 'CANCELADO'].includes(wo.status);
-    });
+    console.log(`🔍 [getWorkOrdersByChecklistType] ${activeFailures.length} fallas activas`);
 
-    console.log(`🔍 [getWorkOrdersByChecklistType] ${activeWorkOrders.length} work orders activas filtradas`);
+    return activeFailures.map(failureOrder => {
+      const ar = failureOrder.repairExecution;
+      const wo = failureOrder.workOrder;
 
-    // Transformar para que coincida con el formato esperado
-    return activeWorkOrders.map(workOrder => {
-      const failureOrder = workOrder.failureOrder;
       return {
-        ...workOrder.toJSON(),
+        id: wo?.id || ar?.id || failureOrder.id,
+        failureOrderId: failureOrder.id,
+        workOrder: wo || (ar ? {
+          id: ar.id,
+          work_order_id: ar.repair_execution_id,
+          status: ar.status,
+          activity_performed: ar.activity_performed,
+          start_time: ar.start_time,
+          end_time: ar.end_time,
+          isRepairAct: true
+        } : null),
+        repairExecution: ar,
         failure_order_id: failureOrder.failure_order_id,
         reported_at: failureOrder.createdAt,
-        closed_at: failureOrder.closed_at,
         recurrence_count: failureOrder.recurrence_count,
-        // Incluir información adicional de la failure order
         failure_description: failureOrder.description,
         failure_severity: failureOrder.severity,
         failure_assigned_to: failureOrder.assigned_to,
@@ -2252,7 +2244,7 @@ const getWorkOrdersByChecklistType = async ({ checklist_type_id }) => {
 // FUNCIONES DE ÓRDENES DE FALLA Y PDF
 // ============================================
 
-const getChecklistFailures = async (checklistId, isFamilyChecklist = false) => {
+const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode = 'full') => {
   try {
     const checklist = await Checklist.findByPk(checklistId, {
       include: [
@@ -2343,63 +2335,63 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false) => {
           attributes: ['item_number', 'question_text']
         },
         {
+          model: require('../models').RepairExecution,
+          as: 'repairExecution',
+          required: false
+        },
+        {
           model: WorkOrder,
           as: 'workOrder',
           required: false,
-          attributes: ['status', 'updatedAt', 'createdAt']
+          include: [
+            {
+              model: require('../models').WorkOrderPart,
+              as: 'parts',
+              required: false,
+              include: [{ model: require('../models').Inventory, as: 'inventory', attributes: ['id', 'name'] }]
+            },
+            {
+              model: require('../models').Requisition,
+              as: 'requisitions',
+              required: false,
+              attributes: ['id', 'part_reference', 'quantity_requested', 'status']
+            }
+          ]
         }
       ],
       order: [['createdAt', 'DESC']]
     });
 
-    // ============================================
-    // FILTRAR FALLAS SEGÚN ESTADO EN LA FECHA DE CORTE
-    // ============================================
-    // Una falla debe aparecer en el PDF SI:
-    // 1. Fue reportada antes o durante el período del checklist (ya filtrado arriba)
-    // 2. Y cumple UNA de estas condiciones:
-    //    a) No tiene WorkOrder asociada (aún no se ha trabajado en ella)
-    //    b) Tiene WorkOrder pero NO estaba resuelta/cancelada en la fecha de corte
-    //       (es decir, fue resuelta DESPUÉS de la fecha de corte del checklist)
-    
-    const activeFailureOrders = failureOrders.filter(fo => {
-      // Si no tiene WorkOrder, la falla estaba activa
-      if (!fo.workOrder) {
-        return true;
+    const {
+      computeTraceability,
+      shouldIncludeFailureInPdf,
+      CLOSED_STATUSES
+    } = require('../utils/traceabilityUtil');
+    const pdfGeneratedAt = new Date();
+
+    const visibleFailureOrders = failureOrders.filter(fo => {
+      const traceability = computeTraceability({
+        repairExecution: fo.repairExecution,
+        workOrder: fo.workOrder,
+        requisitions: fo.workOrder?.requisitions || [],
+        parts: fo.workOrder?.parts || [],
+        pdfGeneratedAt
+      });
+
+      // Modo 'active': solo fallas no cerradas (para pantalla)
+      if (mode === 'active') {
+        const status = traceability.status;
+        return !CLOSED_STATUSES.includes(status);
       }
 
-      const woStatus = fo.workOrder.status;
-      
-      // Si el estado actual NO es resuelto/cancelado, incluirla
-      if (!['RESUELTA', 'CANCELADO'].includes(woStatus)) {
-        return true;
-      }
-
-      // Si está RESUELTA o CANCELADO, verificar CUÁNDO se resolvió
-      // Si se resolvió DESPUÉS de la fecha de corte del checklist, debe aparecer
-      // porque en el momento del checklist aún estaba activa
-      const woUpdatedAt = new Date(fo.workOrder.updatedAt);
-      
-      // Si la WorkOrder se actualizó (resolvió) DESPUÉS de la fecha de corte,
-      // significa que durante el checklist estaba activa
-      if (woUpdatedAt > cutoffDate) {
-        console.log(`[getChecklistFailures] Falla ${fo.failure_order_id} incluida: resuelta DESPUÉS del checklist (WO actualizada: ${woUpdatedAt.toISOString()}, corte: ${cutoffDate.toISOString()})`);
-        return true;
-      }
-
-      // Si se resolvió ANTES de la fecha de corte, NO debe aparecer
-      console.log(`[getChecklistFailures] Falla ${fo.failure_order_id} excluida: resuelta ANTES del checklist (WO actualizada: ${woUpdatedAt.toISOString()}, corte: ${cutoffDate.toISOString()})`);
-      return false;
+      // Modo 'full': usar lógica de PDF (por defecto)
+      return shouldIncludeFailureInPdf(fo, traceability, cutoffDate, pdfGeneratedAt);
     });
 
-    // Organizar fallas por item_id
-    // Para checklists de familia: clave compuesta "{affected_id}-{checklist_item_id}"
-    // Para otros: clave simple "{checklist_item_id}"
     const failuresByItem = {};
-    activeFailureOrders.forEach(failureOrder => {
+    visibleFailureOrders.forEach(failureOrder => {
       let itemKey;
       if (isFamilyChecklist && failureOrder.affected_id) {
-        // Usar la misma clave compuesta que usa el frontend: "{device_ins_id}-{checklist_item_id}"
         itemKey = `${failureOrder.affected_id}-${failureOrder.checklist_item_id}`;
       } else {
         itemKey = failureOrder.checklist_item_id;
@@ -2408,6 +2400,14 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false) => {
       if (!failuresByItem[itemKey]) {
         failuresByItem[itemKey] = [];
       }
+
+      const traceability = computeTraceability({
+        repairExecution: failureOrder.repairExecution,
+        workOrder: failureOrder.workOrder,
+        requisitions: failureOrder.workOrder?.requisitions || [],
+        parts: failureOrder.workOrder?.parts || [],
+        pdfGeneratedAt
+      });
 
       failuresByItem[itemKey].push({
         id: failureOrder.id,
@@ -2422,6 +2422,7 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false) => {
         is_recurring: failureOrder.is_recurring || false,
         created_at: failureOrder.createdAt,
         updated_at: failureOrder.updatedAt,
+        traceability,
         checklist_item: {
           item_number: failureOrder.checklistItem?.item_number || 'N/A',
           question_text: failureOrder.checklistItem?.question_text || 'N/A'
@@ -2432,7 +2433,7 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false) => {
     return {
       checklist_id: checklistId,
       failures_by_item: failuresByItem,
-      total_failures: activeFailureOrders.length,
+      total_failures: visibleFailureOrders.length,
       checklist_type_id: checklist.checklist_type_id
     };
   } catch (error) {

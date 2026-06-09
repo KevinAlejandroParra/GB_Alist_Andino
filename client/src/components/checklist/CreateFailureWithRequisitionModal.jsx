@@ -27,13 +27,14 @@ const CreateFailureWithRequisitionModal = ({
   const { user: authUser } = useAuth();
   const user = propUser || authUser;
   const failureSystemHook = useFailureRequisitionSystem();
+  const isTechnicianUser = user?.role_id === 3 || user?.role_name?.toLowerCase()?.includes('tecnico');
 
   // Estado inicial del formulario
   const initialFormData = {
     description: initialDescription || '',
     severity: 'LEVE',
     evidence_file: null,
-    requires_replacement: requiresReplacement,
+    requires_replacement: requiresReplacement && isTechnicianUser,
     requestedPartInfo: {
       name: '',
       quantity: 1,
@@ -224,14 +225,17 @@ const CreateFailureWithRequisitionModal = ({
       return;
     }
 
+    const effectiveRequiresReplacement = isTechnicianUser ? formData.requires_replacement : false;
+    const effectiveRequestedPartInfo = isTechnicianUser ? formData.requestedPartInfo : null;
+
     // 📤 DEBUG: Log antes de enviar datos
     console.log('📤 [CreateFailureWithRequisitionModal] Enviando datos para crear falla:')
     console.log('  - description:', formData.description)
     console.log('  - severity:', formData.severity)
     console.log('  - evidence_file:', formData.evidence_file)
     console.log('  - checklistItemId:', checklistItemId)
-    console.log('  - requires_replacement:', formData.requires_replacement)
-    console.log('  - requestedPartInfo:', formData.requestedPartInfo)
+    console.log('  - requires_replacement:', effectiveRequiresReplacement)
+    console.log('  - requestedPartInfo:', effectiveRequestedPartInfo)
 
     setLoading(true);
     try {
@@ -241,8 +245,8 @@ const CreateFailureWithRequisitionModal = ({
         assignedTechnicianArea: 'TECNICO', // Valor por defecto
         evidenceUrl: null,
         checklistItemId,
-        requires_replacement: formData.requires_replacement,
-        requestedPartInfo: formData.requestedPartInfo
+        requires_replacement: effectiveRequiresReplacement,
+        requestedPartInfo: effectiveRequestedPartInfo
       });
 
       if (result.success) {
@@ -302,6 +306,33 @@ const CreateFailureWithRequisitionModal = ({
   ];
 
   if (!show) return null;
+
+  // Si el usuario no es técnico, mostrar aviso y permitir cerrar el modal
+  if (!isTechnicianUser) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6">
+          <h2 className="text-xl font-bold text-gray-900">Función disponible solo para técnicos</h2>
+          <div className="mt-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4">
+            <p className="text-sm text-yellow-900">
+              Esta ventana está diseñada para cuando un técnico necesita crear una falla con solicitud de repuesto.
+            </p>
+            <p className="mt-2 text-sm text-yellow-900">
+              Si la falla la registra un anfitrión, no es necesario preguntarle si necesita repuesto. Registra la falla normalmente desde el flujo de anfitrión.
+            </p>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-5 py-3 rounded-md bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Modal principal que contiene las diferentes vistas
   return (

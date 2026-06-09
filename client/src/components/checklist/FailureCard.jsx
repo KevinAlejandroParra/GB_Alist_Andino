@@ -16,7 +16,11 @@ const FailureCard = ({ failure, onViewDetail, onResolve, onLinkToWorkOrder, user
   const getDaysOpen = () => {
     if (!failure.createdAt) return 0;
     const startDate = new Date(failure.createdAt);
-    const endDate = failure.workOrder?.end_time ? new Date(failure.workOrder.end_time) : new Date();
+    const endDate = failure.repairExecution?.end_time
+      ? new Date(failure.repairExecution.end_time)
+      : failure.workOrder?.end_time
+        ? new Date(failure.workOrder.end_time)
+        : new Date();
     const diffTime = Math.abs(endDate - startDate);
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
@@ -40,14 +44,16 @@ const FailureCard = ({ failure, onViewDetail, onResolve, onLinkToWorkOrder, user
     return severityColors[failure.severity] || 'border-l-gray-300';
   };
 
-  // Verificar si tiene OT
+  // Verificar si tiene Acta de Reparación u Orden de Trabajo
   const hasWorkOrder = !!failure.workOrder;
+  const hasRepairExecution = !!failure.repairExecution;
 
   // Verificar si tiene repuestos
   const hasParts = hasWorkOrder && failure.workOrder.parts && failure.workOrder.parts.length > 0;
 
-  // Verificar si está resuelta
-  const isResolved = hasWorkOrder && ['RESUELTA', 'CANCELADO'].includes(failure.workOrder.status);
+  // Verificar si está resuelta o cancelada
+  const isResolved = (hasWorkOrder && ['RESUELTA', 'CANCELADO'].includes(failure.workOrder.status)) ||
+    (hasRepairExecution && ['RESUELTA', 'CANCELADO'].includes(failure.repairExecution.status));
 
   const daysAlert = getDaysAlertConfig();
   const daysOpen = getDaysOpen();
@@ -70,16 +76,25 @@ const FailureCard = ({ failure, onViewDetail, onResolve, onLinkToWorkOrder, user
             {failure.failure_order_id || `OF-${failure.id}`}
           </span>
           <div className="flex flex-wrap gap-1">
-            {/* Badge: Sin OT / Con OT */}
-            {!hasWorkOrder ? (
+            {/* Badge: Sin OT / Con OT / Con AR */}
+            {!hasWorkOrder && !hasRepairExecution ? (
               <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium border border-orange-200">
                 <i className="fas fa-exclamation-circle mr-1"></i>
-                Sin OT
+                Sin OT ni AR
               </span>
-            ) : (
+            ) : null}
+
+            {hasRepairExecution && (
+              <span className="px-2 py-1 bg-teal-100 text-teal-800 rounded-full text-xs font-medium border border-teal-200">
+                <i className="fas fa-file-signature mr-1"></i>
+                Acta de Reparación
+              </span>
+            )}
+
+            {hasWorkOrder && (
               <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium border border-blue-200">
                 <i className="fas fa-clipboard-check mr-1"></i>
-                Con OT
+                Orden de Trabajo
               </span>
             )}
 
@@ -91,11 +106,18 @@ const FailureCard = ({ failure, onViewDetail, onResolve, onLinkToWorkOrder, user
               </span>
             )}
 
-            {/* Badge: Recurrencia */}
+            {/* Badge: Persistencia */}
             {failure.recurrence_count > 1 && (
               <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium border border-red-200">
                 <i className="fas fa-redo mr-1"></i>
                 x{failure.recurrence_count}
+              </span>
+            )}
+
+            {/* ✅ P7: Badge sin firma de reporte */}
+            {!failure.report_signature && (
+              <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium border border-yellow-300">
+                ⚠️ Sin firma
               </span>
             )}
 

@@ -1,6 +1,6 @@
 'use strict';
 
-const { WorkOrder, FailureOrder, User, Inventory, WorkOrderPart, Sequelize } = require('../models');
+const { WorkOrder, FailureOrder, User, Inventory, WorkOrderPart, Requisition, Sequelize } = require('../models');
 const { Op } = Sequelize;
 const failureOrderService = require('./FailureOrderService');
 
@@ -29,12 +29,20 @@ class WorkOrderService {
         throw new Error(`FailureOrder con ID ${failure_order_id} no encontrada`);
       }
 
-      // Validar que NO existe ya una WorkOrder para esta FailureOrder (relación 1:1)
+      // Validar que NO existe ya una AR para esta FailureOrder
+      const { RepairExecution } = require('../models');
+      const existingRepair = await RepairExecution.findOne({
+        where: { failure_order_id }
+      });
+      if (existingRepair) {
+        throw new Error(`Ya existe una acta de reparación para la FailureOrder ${failure_order_id}`);
+      }
+
       const existingWorkOrder = await WorkOrder.findOne({
         where: { failure_order_id }
       });
       if (existingWorkOrder) {
-        throw new Error(`Ya existe una WorkOrder para la FailureOrder ${failure_order_id}`);
+        throw new Error(`Ya existe una orden de trabajo para la FailureOrder ${failure_order_id}`);
       }
 
       // Validar priority_level
@@ -43,19 +51,13 @@ class WorkOrderService {
         throw new Error('priority_level debe ser: BAJA, NORMAL, ALTA o URGENTE');
       }
 
-      // Generar work_order_id único
-      const work_order_id = this.generateWorkOrderId();
+      // Crear Acta de Reparación (AR)
+      const repairExecutionService = require('./repairExecutionService');
+      const repairExecution = await repairExecutionService.createForFailure(failure_order_id);
 
-      // Crear WorkOrder
-      const workOrder = await WorkOrder.create({
-        work_order_id,
-        failure_order_id,
-        status: 'EN_PROCESO',
-        linked_failure_ids: JSON.stringify([failure_order_id]) // ✅ Inicializar con su propia falla
-      });
+      console.log(`✅ AR creada: ${repairExecution.repair_execution_id} - Para OF: ${failureOrder.failure_order_id}`);
 
-      // Cargar con relaciones
-      const createdWorkOrder = await WorkOrder.findByPk(workOrder.id, {
+      const createdRepairExecution = await require('../models').RepairExecution.findByPk(repairExecution.id, {
         include: [
           {
             model: FailureOrder,
@@ -67,9 +69,7 @@ class WorkOrderService {
         ]
       });
 
-      console.log(`✅ OT creada: ${work_order_id} - Para OF: ${failureOrder.failure_order_id}`);
-
-      return createdWorkOrder;
+      return createdRepairExecution;
     } catch (error) {
       console.error('❌ Error creando WorkOrder:', error);
       throw new Error(`Error al crear orden de trabajo: ${error.message}`);
@@ -247,28 +247,95 @@ class WorkOrderService {
    * @param {string} reason - Razón de cancelación
    * @returns {Promise<WorkOrder>}
    */
-  async cancelWorkOrder(workOrderId, reason) {
+  async _returnPartsToInventory(workOrder, transaction) {
+    if (!workOrder?.parts?.length) return;
+
+    for (const part of workOrder.parts) {
+      if (!part.inventory_id || !part.quantity_used) continue;
+
+      const inventoryItem = await Inventory.findByPk(part.inventory_id, { transaction });
+      if (!inventoryItem) continue;
+
+      await inventoryItem.update({
+        quantity: inventoryItem.quantity + part.quantity_used
+      }, { transaction });
+    }
+
+    await WorkOrderPart.destroy({
+      where: { work_order_id: workOrder.id },
+      transaction
+    });
+  }
+
+  async _cancelOpenRequisitions(workOrder, transaction) {
+    if (!workOrder?.requisitions?.length) return;
+
+    await Requisition.update(
+      { status: 'CANCELADO' },
+      {
+        where: {
+          work_order_id: workOrder.id,
+          status: { [Op.in]: ['SOLICITADO', 'PENDIENTE'] }
+        },
+        transaction
+      }
+    );
+  }
+
+  async cancelWorkOrder(workOrderId, reason, cancelledById = null) {
+    const transaction = await WorkOrder.sequelize.transaction();
+
     try {
-      const workOrder = await WorkOrder.findByPk(workOrderId);
+      const workOrder = await WorkOrder.findByPk(workOrderId, {
+        include: [
+          { model: WorkOrderPart, as: 'parts', required: false },
+          { model: Requisition, as: 'requisitions', required: false }
+        ],
+        transaction
+      });
+
       if (!workOrder) {
         throw new Error(`WorkOrder con ID ${workOrderId} no encontrada`);
       }
 
-      // No se puede cancelar si ya está COMPLETADO
-      if (workOrder.status === 'COMPLETADO') {
-        throw new Error('No se puede cancelar una WorkOrder ya COMPLETADA');
+      if (!reason || !String(reason).trim()) {
+        throw new Error('Razón de cancelación es requerida');
       }
 
-      // Cancelar
-      await workOrder.update({
+      if (workOrder.status === 'RESUELTA') {
+        throw new Error('No se puede cancelar una WorkOrder ya RESUELTA');
+      }
+
+      if (workOrder.status === 'CANCELADO') {
+        throw new Error('Esta WorkOrder ya está cancelada');
+      }
+
+      await this._returnPartsToInventory(workOrder, transaction);
+      await this._cancelOpenRequisitions(workOrder, transaction);
+
+      const cancelPayload = {
         status: 'CANCELADO',
-        cancellation_reason: reason
-      });
+        cancellation_reason: String(reason).trim(),
+        cancelled_at: new Date(),
+        cancelled_by_id: cancelledById
+      };
+
+      await workOrder.update(cancelPayload, { transaction });
+
+      if (workOrder.repair_execution_id) {
+        const { RepairExecution } = require('../models');
+        const repairExecution = await RepairExecution.findByPk(workOrder.repair_execution_id, { transaction });
+        if (repairExecution) {
+          await repairExecution.update(cancelPayload, { transaction });
+        }
+      }
+
+      await transaction.commit();
 
       console.log(`✅ OT ${workOrder.work_order_id} cancelada`);
-
       return await this.getWorkOrderById(workOrderId);
     } catch (error) {
+      await transaction.rollback();
       console.error('❌ Error cancelando WorkOrder:', error);
       throw new Error(`Error al cancelar orden de trabajo: ${error.message}`);
     }
@@ -807,7 +874,18 @@ class WorkOrderService {
 
       await workOrder.update(updateData);
 
-      // ✅ SINCRONIZACIÓN: Sincronizar con WorkOrders enlazadas
+      // Sincronizar AR vinculada
+      if (workOrder.repair_execution_id) {
+        const { RepairExecution } = require('../models');
+        const arFields = {};
+        ['status', 'activity_performed', 'evidence_url', 'closure_signature', 'start_time', 'end_time', 'resolved_by_id']
+          .forEach(f => { if (updateData[f] !== undefined) arFields[f] = updateData[f]; });
+        if (Object.keys(arFields).length) {
+          await RepairExecution.update(arFields, { where: { id: workOrder.repair_execution_id } });
+        }
+      }
+
+      // Sincronizar OT espejo enlazadas (legacy)
       const WorkOrderSyncService = require('./WorkOrderSyncService');
       const syncResult = await WorkOrderSyncService.syncLinkedWorkOrders(workOrderId, updateData);
       
@@ -848,18 +926,11 @@ class WorkOrderService {
 
       const failureOrder = failureResult.data;
 
-      // 2. Crear la Orden de Trabajo (OT) vinculada
-      const workOrderId = await this.generateWorkOrderId();
-      
-      await WorkOrder.create({
-        work_order_id: workOrderId,
-        failure_order_id: failureOrder.id,
-        status: 'EN_PROCESO',
-        start_time: new Date(),
-        linked_failure_ids: JSON.stringify([failureOrder.id]) // ✅ Inicializar con su propia falla
-      }, { transaction });
+      // Crear Acta de Reparación (AR) — ya no se crea OT automática sin repuestos
+      const repairExecutionService = require('./repairExecutionService');
+      await repairExecutionService.createForFailure(failureOrder.id, { transaction });
 
-      console.log(`✅ Flujo automático completado: OF ${failureOrder.failure_order_id} -> OT ${workOrderId}`);
+      console.log(`✅ Flujo automático completado: OF ${failureOrder.failure_order_id} → AR creada`);
       
       return true;
     } catch (error) {

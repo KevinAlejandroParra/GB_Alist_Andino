@@ -1,13 +1,12 @@
 export const RESOLVED_STATUSES = ['RESUELTA', 'CANCELADO'];
 
 export const DEFAULT_FILTERS = {
-  severity: 'all',
-  assigned_to: 'all',
-  hasWorkOrder: 'all',
-  hasParts: 'all',
   checklistTypeId: 'all',
   year: 'all',
-  month: 'all'
+  month: 'all',
+  day: 'all',
+  week: 'all',
+  failureType: 'all'
 };
 
 export const MONTH_OPTIONS = [
@@ -26,6 +25,23 @@ export const MONTH_OPTIONS = [
   { value: '12', label: 'Diciembre' }
 ];
 
+export function isWeeklyFrequency(frequency) {
+  const f = (frequency || '').toLowerCase().trim();
+  return f === 'weekly' || f === 'semanal';
+}
+
+export function getSelectedChecklistType(checklistTypes, checklistTypeId) {
+  if (!checklistTypeId || checklistTypeId === 'all') return null;
+  return (
+    checklistTypes.find((t) => String(t.checklist_type_id) === String(checklistTypeId)) || null
+  );
+}
+
+export function usesWeekPeriod(checklistTypes, checklistTypeId) {
+  const type = getSelectedChecklistType(checklistTypes, checklistTypeId);
+  return type ? isWeeklyFrequency(type.frequency) : false;
+}
+
 export function getYearOptions(yearsBack = 6) {
   const current = new Date().getFullYear();
   const options = [{ value: 'all', label: 'Todos los años' }];
@@ -33,6 +49,107 @@ export function getYearOptions(yearsBack = 6) {
     options.push({ value: String(y), label: String(y) });
   }
   return options;
+}
+
+export function getDayOptions(year, month) {
+  const options = [{ value: 'all', label: 'Todos los días' }];
+  if (year === 'all' || month === 'all') return options;
+
+  const y = parseInt(year, 10);
+  const m = parseInt(month, 10);
+  if (Number.isNaN(y) || Number.isNaN(m) || m < 1 || m > 12) return options;
+
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    options.push({ value: String(d), label: String(d) });
+  }
+  return options;
+}
+
+function getMondayOfWeekUTC(date) {
+  const d = new Date(date);
+  d.setUTCHours(0, 0, 0, 0);
+  const day = d.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setUTCDate(d.getUTCDate() + diff);
+  return d;
+}
+
+function getWeekIdentifierUTC(date) {
+  const monday = getMondayOfWeekUTC(date);
+  const year = monday.getUTCFullYear();
+  const startOfYear = new Date(Date.UTC(year, 0, 1));
+  let firstMonday = getMondayOfWeekUTC(startOfYear);
+  if (firstMonday.getUTCFullYear() < year) {
+    firstMonday = new Date(firstMonday);
+    firstMonday.setUTCDate(firstMonday.getUTCDate() + 7);
+  }
+  const weekNumber =
+    Math.floor((monday - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
+  return `${year}-W${String(weekNumber).padStart(2, '0')}`;
+}
+
+function getSundayOfWeekUTC(monday) {
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  sunday.setUTCHours(23, 59, 59, 999);
+  return sunday;
+}
+
+function formatWeekRangeLabel(monday, sunday) {
+  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const fmt = (d) => `${days[d.getUTCDay()]} ${d.getUTCDate()} ${months[d.getUTCMonth()]}`;
+  return `${fmt(monday)} – ${fmt(sunday)}`;
+}
+
+export function getWeekOptionsForMonth(year, month) {
+  const options = [{ value: 'all', label: 'Todas las semanas' }];
+  if (year === 'all' || month === 'all') return options;
+
+  const y = parseInt(year, 10);
+  const m = parseInt(month, 10) - 1;
+  if (Number.isNaN(y) || Number.isNaN(m)) return options;
+
+  const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const seen = new Map();
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(Date.UTC(y, m, d));
+    const weekId = getWeekIdentifierUTC(date);
+    if (seen.has(weekId)) continue;
+    const monday = getMondayOfWeekUTC(date);
+    const sunday = getSundayOfWeekUTC(monday);
+    const weekNum = weekId.split('-W')[1];
+    seen.set(weekId, {
+      value: weekId,
+      label: `Semana ${weekNum} (${formatWeekRangeLabel(monday, sunday)})`
+    });
+  }
+
+  return [...options, ...Array.from(seen.values())];
+}
+
+export function isHistoricalPeriodComplete(filters, checklistTypes) {
+  const weekly = usesWeekPeriod(checklistTypes, filters.checklistTypeId);
+  if (filters.year === 'all' || filters.month === 'all') return false;
+  if (weekly) return filters.week !== 'all';
+  return filters.day !== 'all';
+}
+
+export function describeHistoricalPeriod(filters, checklistTypes) {
+  if (!isHistoricalPeriodComplete(filters, checklistTypes)) return null;
+  const weekly = usesWeekPeriod(checklistTypes, filters.checklistTypeId);
+  const monthName = MONTH_OPTIONS.find((o) => o.value === filters.month)?.label || filters.month;
+
+  if (weekly && filters.week !== 'all') {
+    const opt = getWeekOptionsForMonth(filters.year, filters.month).find((o) => o.value === filters.week);
+    return opt?.label || filters.week;
+  }
+  if (filters.day !== 'all') {
+    return `${filters.day} de ${monthName} ${filters.year}`;
+  }
+  return null;
 }
 
 export const PAGE_SIZE = 30;
@@ -100,27 +217,30 @@ export const buildGroupedSuggestions = (query, failuresList) => {
 
 export const hasActiveFilters = (searchQuery, filters, activeTab) =>
   Boolean(searchQuery) ||
-  filters.severity !== 'all' ||
-  filters.assigned_to !== 'all' ||
-  filters.hasWorkOrder !== 'all' ||
-  filters.hasParts !== 'all' ||
   filters.checklistTypeId !== 'all' ||
   filters.year !== 'all' ||
   filters.month !== 'all' ||
+  filters.day !== 'all' ||
+  filters.week !== 'all' ||
+  filters.failureType !== 'all' ||
   activeTab !== 'all';
 
 export function appendBookQueryParams(params, { activeTab, filters, searchQuery }) {
   const map = {
     status: activeTab === 'all' ? 'all' : activeTab,
-    severity: filters?.severity,
-    assigned_to: filters?.assigned_to,
-    hasWorkOrder: filters?.hasWorkOrder,
-    hasParts: filters?.hasParts,
     checklistTypeId: filters?.checklistTypeId,
     year: filters?.year,
     month: filters?.month,
+    day: filters?.day,
+    week: filters?.week,
     searchQuery: searchQuery?.trim()
   };
+
+  if (filters?.failureType === 'ar') {
+    map.hasRepairExecution = 'true';
+  } else if (filters?.failureType === 'ot') {
+    map.hasWorkOrder = 'true';
+  }
 
   Object.entries(map).forEach(([key, value]) => {
     if (value && value !== 'all' && value !== '') {

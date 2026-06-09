@@ -53,6 +53,7 @@ router.put("/failures/:id", verifyToken, updateWorkOrder)
 router.get("/:id/observations", verifyToken, listObservations)
 router.post("/:id/sign", verifyToken, signChecklist)
 router.get("/:id/download", verifyToken, downloadChecklistPDF)
+router.get("/:id/download-pdf", verifyToken, downloadChecklistPDF)
 
 
 // Rutas de diagnóstico (temporal para debugging)

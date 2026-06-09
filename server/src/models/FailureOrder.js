@@ -29,7 +29,13 @@ module.exports = (sequelize, DataTypes) => {
         onDelete: 'SET NULL'
       });
 
-      // Relación con la orden de trabajo (1:1 - si existe)
+      // Acta de reparación (AR) — toda falla atendida
+      FailureOrder.hasOne(models.RepairExecution, {
+        foreignKey: 'failure_order_id',
+        as: 'repairExecution'
+      });
+
+      // Orden de trabajo formal (OT) — solo si hay repuestos
       FailureOrder.hasOne(models.WorkOrder, {
         foreignKey: 'failure_order_id',
         as: 'workOrder'

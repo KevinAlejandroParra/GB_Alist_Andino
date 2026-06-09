@@ -55,9 +55,9 @@ const OptimizedResolvedFailuresHistory = ({ resolvedFailures }) => {
     if (count === 1) {
       return { color: 'bg-blue-100 text-blue-800', text: 'Primera vez', icon: 'fa-star' }
     } else if (count === 2) {
-      return { color: 'bg-orange-100 text-orange-800', text: 'Recurrente', icon: 'fa-repeat' }
+      return { color: 'bg-orange-100 text-orange-800', text: 'Persistente', icon: 'fa-repeat' }
     } else {
-      return { color: 'bg-red-100 text-red-800', text: `Múltiple (${count})`, icon: 'fa-history' }
+      return { color: 'bg-red-100 text-red-800', text: `Múltiple persistencias (${count})`, icon: 'fa-history' }
     }
   }
 
@@ -195,7 +195,7 @@ const OptimizedResolvedFailuresHistory = ({ resolvedFailures }) => {
                   <div className="flex items-center space-x-4 text-xs text-gray-500">
                     <div className="flex items-center">
                       <i className="fas fa-calendar-alt mr-1.5"></i>
-                      Recurrencia #{failure.recurrence_count || 1} - {formatDate(failure.createdAt)}
+                      Persistencia #{failure.recurrence_count || 1} - {formatDate(failure.createdAt)}
                     </div>
                     <div className="flex items-center">
                       <i className="fas fa-check-circle mr-1.5 text-green-600"></i>
@@ -244,7 +244,7 @@ const OptimizedResolvedFailuresHistory = ({ resolvedFailures }) => {
                         </div>
                       </div>
                       <div>
-                        <span className="text-xs font-medium text-gray-500">Recurrencias</span>
+                        <span className="text-xs font-medium text-gray-500">Persistencias</span>
                         <div className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium mt-1 ${getRecurrenceChip(failure.recurrence_count).color}`}>
                           <i className={`fas ${getRecurrenceChip(failure.recurrence_count).icon} mr-1`}></i>
                           {getRecurrenceChip(failure.recurrence_count).text}

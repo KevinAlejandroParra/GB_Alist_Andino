@@ -36,6 +36,7 @@ const FamilyModel = require("./family.js");
 const EntityModel = require("./entity.js");
 const AuditModel = require("./audit.js");
 const FailureOrderModel = require("./FailureOrder.js");
+const RepairExecutionModel = require("./repairExecution.js");
 const WorkOrderModel = require("./workOrder.js");
 const WorkOrderPartModel = require("./workOrderPart.js"); 
 const ChecklistQrCodeModel = require("./checklistQrCode.js");
@@ -61,6 +62,7 @@ const Family = FamilyModel(connection, DataTypes);
 const Entity = EntityModel(connection, DataTypes);
 const Audit = AuditModel(connection, DataTypes);
 const FailureOrder = FailureOrderModel(connection, DataTypes);
+const RepairExecution = RepairExecutionModel(connection, DataTypes);
 const WorkOrder = WorkOrderModel(connection, DataTypes);
 const WorkOrderPart = WorkOrderPartModel(connection, DataTypes); 
 const ChecklistQrCode = ChecklistQrCodeModel(connection, DataTypes);
@@ -71,7 +73,7 @@ const models = {
       User, Role, Premise, ChecklistType, Checklist, ChecklistItem, ChecklistResponse,
       ChecklistSignature, MaintenanceAction, Requisition, 
       Inventory, Inspectable, Device, Attraction, Family, Entity, Audit,
-      FailureOrder, WorkOrder, WorkOrderPart, 
+      FailureOrder, RepairExecution, WorkOrder, WorkOrderPart, 
       ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation
   };
 
@@ -86,7 +88,7 @@ module.exports = {
       User, Role, Premise, ChecklistType, Checklist, ChecklistItem, ChecklistResponse,
       ChecklistSignature, MaintenanceAction, Requisition, 
       Inventory, Inspectable, Device, Attraction, Family, Entity, Audit,
-      FailureOrder, WorkOrder, WorkOrderPart, 
+      FailureOrder, RepairExecution, WorkOrder, WorkOrderPart, 
       ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation,
       connection, Sequelize,
   };

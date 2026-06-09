@@ -11,7 +11,12 @@ const {
   Sequelize
 } = require('../models');
 const { Op } = Sequelize;
-const { appendDateFilters } = require('../utils/failureDateFilter');
+const {
+  appendDateFilters,
+  resolveCutoffDate,
+  appendCutoffWhere,
+  filterFailuresActiveAtCutoff
+} = require('../utils/failureDateFilter');
 
 const RESOLVED_STATUSES = ['RESUELTA', 'CANCELADO'];
 
@@ -31,7 +36,7 @@ function isActiveFailure(failure) {
   return !RESOLVED_STATUSES.includes(failure.workOrder.status);
 }
 
-function applyPostFilters(failures, { status, hasWorkOrder, hasParts }) {
+function applyPostFilters(failures, { status, hasWorkOrder, hasRepairExecution, hasParts }) {
   let result = failures;
 
   if (status === 'pending') {
@@ -46,6 +51,12 @@ function applyPostFilters(failures, { status, hasWorkOrder, hasParts }) {
     result = result.filter((f) => f.workOrder);
   } else if (hasWorkOrder === 'false') {
     result = result.filter((f) => !f.workOrder);
+  }
+
+  if (hasRepairExecution === 'true') {
+    result = result.filter((f) => f.repairExecution);
+  } else if (hasRepairExecution === 'false') {
+    result = result.filter((f) => !f.repairExecution);
   }
 
   if (hasParts === 'true') {
@@ -129,8 +140,9 @@ async function buildWhereConditions(userRole, query) {
   }
 
   if (checklistTypeId && checklistTypeId !== 'all') {
+    const typeId = parseInt(checklistTypeId, 10);
     const items = await ChecklistItem.findAll({
-      where: { checklist_type_id: parseInt(checklistTypeId, 10) },
+      where: { checklist_type_id: typeId },
       attributes: ['checklist_item_id']
     });
     const itemIds = items.map((item) => item.checklist_item_id);
@@ -138,13 +150,24 @@ async function buildWhereConditions(userRole, query) {
       itemIds.length > 0 ? { [Op.in]: itemIds } : -1;
   }
 
-  appendDateFilters(whereConditions, {
+  const cutoffDate = resolveCutoffDate({
     year: query.year,
     month: query.month,
-    tableName: 'FailureOrder'
+    day: query.day,
+    week: query.week
   });
 
-  return whereConditions;
+  if (cutoffDate) {
+    appendCutoffWhere(whereConditions, cutoffDate, 'FailureOrder');
+  } else {
+    appendDateFilters(whereConditions, {
+      year: query.year,
+      month: query.month,
+      tableName: 'FailureOrder'
+    });
+  }
+
+  return { whereConditions, cutoffDate };
 }
 
 function appendStatusWhere(whereConditions, status) {
@@ -206,7 +229,7 @@ function getListIncludes(status, needsSearchJoin) {
     {
       model: WorkOrder,
       as: 'workOrder',
-      attributes: ['id', 'status', 'resolved_by_id'],
+      attributes: ['id', 'status', 'updatedAt', 'resolved_by_id'],
       required: status === 'resolved',
       where:
         status === 'resolved'
@@ -231,18 +254,23 @@ function getListIncludes(status, needsSearchJoin) {
 
 async function fetchFailuresForBook(userRole, query) {
   const { status = 'all', searchQuery } = query;
-  let whereConditions = await buildWhereConditions(userRole, query);
+  const { whereConditions, cutoffDate } = await buildWhereConditions(userRole, query);
   const needsSearchJoin = !!(searchQuery && searchQuery.trim());
+  let where = whereConditions;
 
   if (status === 'pending' || status === 'resolved') {
-    whereConditions = appendStatusWhere(whereConditions, status);
+    where = appendStatusWhere(where, status);
   }
 
-  const failures = await FailureOrder.findAll({
-    where: whereConditions,
+  let failures = await FailureOrder.findAll({
+    where,
     include: getListIncludes(status, needsSearchJoin),
     order: [['createdAt', 'DESC']]
   });
+
+  if (cutoffDate) {
+    failures = filterFailuresActiveAtCutoff(failures, cutoffDate);
+  }
 
   return applyPostFilters(failures, {
     ...query,

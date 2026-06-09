@@ -402,11 +402,13 @@ export default function BaseChecklistPage({
             allowDownload={config.allowDownload}
             customActions={[
               ...(config.customActions || []),
-              {
-                label: '🔧 Nueva Falla con Repuesto',
-                onClick: () => setShowCreateFailureModal(true),
-                className: 'bg-blue-600 hover:bg-blue-700'
-              },
+              ...(user?.role_id === 3 || user?.role_name?.toLowerCase()?.includes('tecnico') ? [
+                {
+                  label: '🔧 Nueva Falla con Repuesto',
+                  onClick: () => setShowCreateFailureModal(true),
+                  className: 'bg-blue-600 hover:bg-blue-700'
+                }
+              ] : []),
               {
                 label: '📋 Ver Mis Fallas',
                 onClick: () => router.push('/fallas'),

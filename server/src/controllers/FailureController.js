@@ -685,7 +685,9 @@ class FailureController {
         checklistTypeId,
         assigned_to,
         year,
-        month
+        month,
+        day,
+        week
       } = req.query;
 
       const { FailureOrder, User, Inspectable, WorkOrder, WorkOrderPart, Inventory, ChecklistItem, ChecklistType } = require('../models');
@@ -738,8 +740,20 @@ class FailureController {
           itemIds.length > 0 ? { [Op.in]: itemIds } : -1;
       }
 
-      const { appendDateFilters } = require('../utils/failureDateFilter');
-      appendDateFilters(whereConditions, { year, month, tableName: 'FailureOrder' });
+      const {
+        appendDateFilters,
+        resolveCutoffDate,
+        appendCutoffWhere,
+        filterFailuresActiveAtCutoff
+      } = require('../utils/failureDateFilter');
+
+      const cutoffDate = resolveCutoffDate({ year, month, day, week });
+
+      if (cutoffDate) {
+        appendCutoffWhere(whereConditions, cutoffDate, 'FailureOrder');
+      } else {
+        appendDateFilters(whereConditions, { year, month, tableName: 'FailureOrder' });
+      }
 
       // Filtro de búsqueda
       if (searchQuery) {
@@ -822,7 +836,7 @@ class FailureController {
       const workOrderInclude = {
         model: WorkOrder,
         as: 'workOrder',
-        attributes: ['id', 'work_order_id', 'status', 'start_time', 'end_time', 'activity_performed', 'evidence_url', 'requiere_replacement', 'resolved_by_id'],
+        attributes: ['id', 'work_order_id', 'status', 'updatedAt', 'start_time', 'end_time', 'activity_performed', 'evidence_url', 'requiere_replacement', 'resolved_by_id'],
         required: status === 'resolved',
         where: status === 'resolved' ? { status: { [Op.in]: RESOLVED_STATUSES } } : undefined,
         include: [
@@ -878,21 +892,41 @@ class FailureController {
         workOrderInclude
       ];
 
-      const { count, rows: failures } = await FailureOrder.findAndCountAll({
-        where: whereConditions,
-        distinct: true,
-        col: 'id',
-        subQuery: false,
-        include: listIncludes,
-        order: [[sortBy, sortOrder]],
-        limit: parseInt(limit),
-        offset: (parseInt(page) - 1) * parseInt(limit)
-      });
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 100;
+
+      let failures;
+      let totalCount;
+
+      if (cutoffDate) {
+        const allRows = await FailureOrder.findAll({
+          where: whereConditions,
+          include: listIncludes,
+          order: [[sortBy, sortOrder]],
+          subQuery: false
+        });
+        const atCutoff = filterFailuresActiveAtCutoff(allRows, cutoffDate);
+        totalCount = atCutoff.length;
+        const offset = (pageNum - 1) * limitNum;
+        failures = atCutoff.slice(offset, offset + limitNum);
+      } else {
+        const { count, rows } = await FailureOrder.findAndCountAll({
+          where: whereConditions,
+          distinct: true,
+          col: 'id',
+          subQuery: false,
+          include: listIncludes,
+          order: [[sortBy, sortOrder]],
+          limit: limitNum,
+          offset: (pageNum - 1) * limitNum
+        });
+        failures = rows;
+        totalCount = count;
+      }
 
       console.log('✅ [GET FAILURE ORDERS] Fallas encontradas:', failures.length);
 
       let filteredFailures = failures;
-      let totalCount = count;
 
       // Filtro por tiene/no tiene OT
       if (hasWorkOrder === 'true') {
@@ -912,7 +946,9 @@ class FailureController {
         hasWorkOrder === 'true' || hasWorkOrder === 'false' ||
         hasParts === 'true' || hasParts === 'false';
 
-      totalCount = hasPostQueryFilters ? filteredFailures.length : count;
+      if (hasPostQueryFilters) {
+        totalCount = filteredFailures.length;
+      }
 
       console.log('✅ [GET FAILURE ORDERS] Fallas filtradas:', filteredFailures.length);
 
@@ -921,9 +957,10 @@ class FailureController {
         data: {
           failures: filteredFailures,
           pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total: totalCount
+            page: pageNum,
+            limit: limitNum,
+            total: totalCount,
+            historicalCutoff: cutoffDate ? cutoffDate.toISOString() : null
           },
           filters: {
             role: userRole,
@@ -956,7 +993,7 @@ class FailureController {
    */
   async getFailureComplete(req, res) {
     try {
-      const { FailureOrder, User, Inspectable, WorkOrder, WorkOrderPart, Inventory, ChecklistItem } = require('../models');
+      const { FailureOrder, User, Inspectable, WorkOrder, WorkOrderPart, Inventory, ChecklistItem, RepairExecution, Requisition } = require('../models');
 
       const { id } = req.params;
       const failureOrderId = parseInt(id);
@@ -991,6 +1028,22 @@ class FailureController {
             attributes: ['ins_id', 'name', 'description', 'type_code']
           },
           {
+            model: RepairExecution,
+            as: 'repairExecution',
+            include: [
+              {
+                model: User,
+                as: 'resolver',
+                attributes: ['user_id', 'user_name', 'role_id']
+              },
+              {
+                model: User,
+                as: 'cancelledBy',
+                attributes: ['user_id', 'user_name']
+              }
+            ]
+          },
+          {
             model: WorkOrder,
             as: 'workOrder',
             include: [
@@ -1008,6 +1061,10 @@ class FailureController {
                     as: 'inventory'
                   }
                 ]
+              },
+              {
+                model: Requisition,
+                as: 'requisitions'
               }
             ]
           }
@@ -1040,85 +1097,14 @@ class FailureController {
    * DELETE /api/work-orders/:id
    */
   async deleteWorkOrder(req, res) {
-    try {
-      const { id } = req.params;
-      const workOrderId = parseInt(id);
-
-      console.log('🗑️ [DELETE WORK ORDER] Iniciando eliminación');
-      console.log('🗑️ Work Order ID:', workOrderId);
-
-      if (isNaN(workOrderId)) {
-        return res.status(400).json({
-          success: false,
-          error: { code: 'INVALID_ID', message: 'ID de orden de trabajo inválido' }
-        });
+    res.status(403).json({
+      success: false,
+      error: {
+        code: 'WORK_ORDER_DELETION_FORBIDDEN',
+        message: 'La eliminación permanente de órdenes de trabajo está deshabilitada. Usa la opción de cancelación para conservar el historial.'
       }
-
-      const { WorkOrder, WorkOrderPart } = require('../models');
-
-      // Buscar la WorkOrder
-      const workOrder = await WorkOrder.findByPk(workOrderId);
-
-      if (!workOrder) {
-        return res.status(404).json({
-          success: false,
-          error: { code: 'WORK_ORDER_NOT_FOUND', message: 'Orden de trabajo no encontrada' }
-        });
-      }
-
-      // Validar que la OT esté vacía (sin actividad realizada)
-      if (workOrder.activity_performed && workOrder.activity_performed.trim() !== '') {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'WORK_ORDER_HAS_ACTIVITY',
-            message: 'No se puede eliminar una orden de trabajo que ya tiene actividad registrada'
-          }
-        });
-      }
-
-      // Validar que no esté resuelta
-      if (workOrder.status === 'RESUELTA') {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'WORK_ORDER_RESOLVED',
-            message: 'No se puede eliminar una orden de trabajo resuelta'
-          }
-        });
-      }
-
-      // Eliminar repuestos asociados (si los hay)
-      await WorkOrderPart.destroy({
-        where: { work_order_id: workOrderId }
-      });
-
-      console.log('✅ Repuestos eliminados');
-
-      // Eliminar la WorkOrder
-      await workOrder.destroy();
-
-      console.log('✅ WorkOrder eliminada:', workOrder.work_order_id);
-
-      res.status(200).json({
-        success: true,
-        message: 'Orden de trabajo eliminada exitosamente',
-        data: {
-          work_order_id: workOrder.work_order_id,
-          failure_order_id: workOrder.failure_order_id
-        }
-      });
-
-    } catch (error) {
-      console.error('❌ [DELETE WORK ORDER] Error:', error);
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'DELETE_WORK_ORDER_ERROR',
-          message: error.message
-        }
-      });
-    }
+    });
+  }
   }
 
   /**
@@ -1139,9 +1125,9 @@ class FailureController {
         });
       }
 
-      const { FailureOrder, WorkOrder } = require('../models');
+      const { FailureOrder, WorkOrder, RepairExecution } = require('../models');
+      const repairExecutionService = require('../services/repairExecutionService');
 
-      // Verificar que la falla existe
       const failureOrder = await FailureOrder.findByPk(failure_order_id);
 
       if (!failureOrder) {
@@ -1151,47 +1137,26 @@ class FailureController {
         });
       }
 
-      // Verificar que NO tiene ya una WorkOrder
-      const existingWorkOrder = await WorkOrder.findOne({
-        where: { failure_order_id }
-      });
-
-      if (existingWorkOrder) {
+      const existingRepair = await RepairExecution.findOne({ where: { failure_order_id } });
+      if (existingRepair) {
         return res.status(400).json({
           success: false,
-          error: { code: 'WORK_ORDER_EXISTS', message: 'Esta falla ya tiene una orden de trabajo' }
+          error: { code: 'REPAIR_EXECUTION_EXISTS', message: 'Esta falla ya tiene acta de reparación' }
         });
       }
 
-      // Generar ID único para la WorkOrder
-      const { v4: uuidv4 } = require('uuid');
-      const work_order_id = `OT-${new Date().getFullYear()}-${uuidv4().slice(0, 6).toUpperCase()}`;
+      const repairExecution = await repairExecutionService.createForFailure(failure_order_id);
 
-      // Crear la WorkOrder
-      const workOrder = await WorkOrder.create({
-        work_order_id,
-        failure_order_id,
-        status: 'EN_PROCESO',
-        start_time: new Date(),
-        linked_failure_ids: JSON.stringify([failure_order_id])
-      });
+      console.log('✅ [CREATE AR FOR FAILURE] Acta creada:', repairExecution.repair_execution_id);
 
-      console.log('✅ [CREATE WO FOR FAILURE] WorkOrder creada:', work_order_id);
-
-      // Recargar con relaciones
-      const createdWorkOrder = await WorkOrder.findByPk(workOrder.id, {
-        include: [
-          {
-            model: FailureOrder,
-            as: 'failureOrder'
-          }
-        ]
+      const created = await RepairExecution.findByPk(repairExecution.id, {
+        include: [{ model: FailureOrder, as: 'failureOrder' }]
       });
 
       res.status(201).json({
         success: true,
-        message: 'Orden de trabajo creada exitosamente',
-        data: createdWorkOrder
+        message: 'Acta de reparación creada exitosamente',
+        data: created
       });
 
     } catch (error) {
@@ -1581,7 +1546,10 @@ class FailureController {
    */
   async getFailureOrderById(req, res) {
     try {
-      const { FailureOrder } = require('../models');
+      const {
+        FailureOrder, User, ChecklistItem, Inspectable,
+        WorkOrder, WorkOrderPart, Inventory, Role, RepairExecution, Requisition
+      } = require('../models');
 
       const { id } = req.params;
       const failureOrderId = parseInt(id);
@@ -1589,44 +1557,83 @@ class FailureController {
       if (isNaN(failureOrderId)) {
         return res.status(400).json({
           success: false,
-          error: {
-            code: 'INVALID_ID',
-            message: 'ID de orden de falla inválido'
-          }
+          error: { code: 'INVALID_ID', message: 'ID de orden de falla inválido' }
         });
       }
 
-      // ✅ MEJORA: Consultar con todas las relaciones necesarias incluyendo ChecklistItem
       const failureOrder = await FailureOrder.findByPk(failureOrderId, {
         include: [
+          // Reporter con su rol
           {
-            model: require('../models').User,
+            model: User,
             as: 'reporter',
-            attributes: ['user_id', 'user_name']
-          },
-          {
-            model: require('../models').ChecklistItem,
-            as: 'checklistItem',
-            attributes: ['checklist_item_id', 'question_text', 'item_number', 'guidance_text']
-          },
-          {
-            model: require('../models').Inspectable,
-            as: 'affectedInspectable',
-            attributes: ['ins_id', 'name', 'description', 'type_code']
-          },
-          {
-            model: require('../models').WorkOrder,
-            as: 'workOrder',
+            attributes: ['user_id', 'user_name', 'role_id'],
             include: [
               {
-                model: require('../models').WorkOrderPart,
+                model: Role,
+                as: 'role',
+                attributes: ['role_name']
+              }
+            ]
+          },
+          // Admin que firmó el cierre de la falla
+          {
+            model: User,
+            as: 'adminSigner',
+            attributes: ['user_id', 'user_name'],
+            required: false
+          },
+          // Ítem del checklist
+          {
+            model: ChecklistItem,
+            as: 'checklistItem',
+            attributes: ['checklist_item_id', 'question_text', 'item_number', 'guidance_text'],
+            required: false
+          },
+          // Dispositivo afectado
+          {
+            model: Inspectable,
+            as: 'affectedInspectable',
+            attributes: ['ins_id', 'name', 'description', 'type_code'],
+            required: false
+          },
+          // Acta de reparación (AR)
+          {
+            model: RepairExecution,
+            as: 'repairExecution',
+            required: false,
+            include: [
+              { model: User, as: 'resolver', attributes: ['user_id', 'user_name'], required: false },
+              { model: User, as: 'cancelledBy', attributes: ['user_id', 'user_name'], required: false }
+            ]
+          },
+          // Orden de trabajo (OT) con repuestos
+          {
+            model: WorkOrder,
+            as: 'workOrder',
+            required: false,
+            include: [
+              {
+                model: User,
+                as: 'resolver',
+                attributes: ['user_id', 'user_name'],
+                required: false
+              },
+              {
+                model: WorkOrderPart,
                 as: 'parts',
+                required: false,
                 include: [
                   {
-                    model: require('../models').Inventory,
+                    model: Inventory,
                     as: 'inventory'
                   }
                 ]
+              },
+              {
+                model: Requisition,
+                as: 'requisitions',
+                required: false
               }
             ]
           }
@@ -1636,26 +1643,23 @@ class FailureController {
       if (!failureOrder) {
         return res.status(404).json({
           success: false,
-          error: {
-            code: 'FAILURE_ORDER_NOT_FOUND',
-            message: 'Orden de falla no encontrada'
-          }
+          error: { code: 'FAILURE_ORDER_NOT_FOUND', message: 'Orden de falla no encontrada' }
         });
       }
 
-      res.status(200).json({
-        success: true,
-        data: failureOrder
-      });
+      // Enriquecer reporter con nombre del rol
+      const data = failureOrder.toJSON();
+      if (data.reporter && !data.reporter.role_name && data.reporter.role) {
+        data.reporter.role_name = data.reporter.role.role_name;
+      }
+
+      res.status(200).json({ success: true, data });
 
     } catch (error) {
       console.error('❌ Error en getFailureOrderById:', error);
       res.status(400).json({
         success: false,
-        error: {
-          code: 'GET_FAILURE_ORDER_ERROR',
-          message: error.message
-        }
+        error: { code: 'GET_FAILURE_ORDER_ERROR', message: error.message }
       });
     }
   }
@@ -2210,6 +2214,7 @@ class FailureController {
   /**
    * Obtener fallas activas por tipo de checklist
    * GET /api/checklists/failures/by-type/:checklistTypeId
+   * ✅ CORREGIDO: Incluye fallas directas de items + fallas independientes del checklist
    */
   async getFailuresByChecklistType(req, res) {
     try {
@@ -2227,34 +2232,65 @@ class FailureController {
 
       console.log('🔍 [GET FAILURES BY CHECKLIST TYPE] checklistTypeId:', checklistTypeId);
 
-      // Primero, obtener todos los checklist_item_ids de este tipo
-      const { ChecklistItem } = require('../models');
+      const { ChecklistItem, FailureOrder, User, Inspectable, WorkOrder } = require('../models');
+      const { Op } = require('sequelize');
+
+      // Obtener todos los checklist_item_ids de este tipo
       const checklistItems = await ChecklistItem.findAll({
-        where: {
-          checklist_type_id: parseInt(checklistTypeId)
-        },
+        where: { checklist_type_id: parseInt(checklistTypeId) },
         attributes: ['checklist_item_id']
       });
 
       if (checklistItems.length === 0) {
-        console.log('🔍 [GET FAILURES BY CHECKLIST TYPE] No se encontraron items para el tipo:', checklistTypeId);
-        return res.status(200).json({
-          success: true,
-          data: [],
-          count: 0
-        });
+        return res.status(200).json({ success: true, data: [], count: 0 });
       }
 
-
       const itemIds = checklistItems.map(item => item.checklist_item_id);
-      console.log('🔍 [GET FAILURES BY CHECKLIST TYPE] Items encontrados:', itemIds);
+      console.log('🔍 [GET FAILURES BY CHECKLIST TYPE] Items encontrados:', itemIds.length);
 
-      // Usar el método existente getFailuresByItems
-      req.query.item_ids = itemIds.join(',');
-      req.query.status = 'active';
+      // ✅ CORRECCIÓN: Buscar fallas cuyo checklist_item_id esté en los items del tipo
+      // Esto incluye TODAS las fallas del checklist sin importar inspectable_id
+      const failureOrders = await FailureOrder.findAll({
+        where: {
+          checklist_item_id: { [Op.in]: itemIds }
+        },
+        include: [
+          { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] },
+          {
+            model: ChecklistItem,
+            as: 'checklistItem',
+            attributes: ['checklist_item_id', 'item_number', 'question_text']
+          },
+          {
+            model: Inspectable,
+            as: 'affectedInspectable',
+            attributes: ['ins_id', 'name', 'description', 'type_code']
+          },
+          {
+            model: WorkOrder,
+            as: 'workOrder',
+            attributes: ['work_order_id', 'status', 'start_time', 'activity_performed']
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
 
-      // Llamar al método getFailuresByItems internamente
-      await this.getFailuresByItems(req, res);
+      // Filtrar solo activas (sin OT resuelta)
+      const RESOLVED = ['RESUELTA', 'CERRADA', 'FINALIZADA', 'CANCELADO'];
+      const activeFailures = failureOrders.filter(fo => {
+        if (fo.workOrder && RESOLVED.includes(String(fo.workOrder.status).toUpperCase().trim())) {
+          return false;
+        }
+        return true;
+      });
+
+      console.log('✅ [GET FAILURES BY CHECKLIST TYPE] Activas:', activeFailures.length, '/ Total:', failureOrders.length);
+
+      res.status(200).json({
+        success: true,
+        data: activeFailures,
+        count: activeFailures.length
+      });
 
     } catch (error) {
       console.error('❌ [GET FAILURES BY CHECKLIST TYPE] Error:', error);
@@ -2410,68 +2446,77 @@ class FailureController {
   }
 
   /**
-   * Eliminar una Orden de Falla permanentemente
-   * DELETE /api/failures/:id
-   * ⚠️ ADVERTENCIA: Esta acción es IRREVERSIBLE
-   * Elimina la falla, su WorkOrder asociada, repuestos y la imagen de evidencia del servidor
+   * Cancelar una Orden de Falla (conserva historial)
+   * PUT /api/failures/:id/cancel
    */
-  async deleteFailureOrder(req, res) {
+  async cancelFailureOrder(req, res) {
     try {
-      const { id } = req.params;
-      const failureOrderId = parseInt(id);
+      const failureOrderId = parseInt(req.params.id, 10);
+      const { reason } = req.body;
+      const FailureLifecycleService = require('../services/FailureLifecycleService');
 
-      console.log('🗑️ [DELETE FAILURE ORDER] Iniciando eliminación');
-      console.log('🗑️ Failure Order ID:', failureOrderId);
-      console.log('🗑️ Usuario que solicita:', req.user?.user_id, '- Rol:', req.user?.role_id);
-
-      // Validar ID
-      if (isNaN(failureOrderId)) {
+      if (Number.isNaN(failureOrderId)) {
         return res.status(400).json({
           success: false,
-          error: {
-            code: 'INVALID_ID',
-            message: 'ID de orden de falla inválido'
-          }
+          error: { code: 'INVALID_ID', message: 'ID de orden de falla inválido' }
         });
       }
 
-      // Validar permisos: Admin (1), Soporte (2), Técnico (3) o Anfitrión (4) pueden eliminar fallas
-      if (![1, 2, 3, 4].includes(req.user.role_id)) {
-        console.log('❌ [DELETE FAILURE ORDER] Acceso denegado - Rol insuficiente');
-        return res.status(403).json({
-          success: false,
-          error: {
-            code: 'FORBIDDEN',
-            message: 'No tienes permisos para eliminar órdenes de falla'
-          }
-        });
-      }
-
-      // Llamar al servicio para eliminar
-      const result = await FailureOrderService.deleteFailureOrder(failureOrderId);
-
-      console.log('✅ [DELETE FAILURE ORDER] Eliminación exitosa:', result.deletedInfo);
-
-      res.status(200).json({
-        success: true,
-        message: 'Orden de falla eliminada permanentemente',
-        data: result.deletedInfo,
-        warning: 'Esta acción no se puede deshacer'
+      const result = await FailureLifecycleService.cancelFailureOrder(failureOrderId, {
+        reason,
+        cancelledById: req.user?.user_id
       });
 
+      res.status(200).json(result);
     } catch (error) {
-      console.error('❌ [DELETE FAILURE ORDER] Error:', error);
-      console.error('❌ [DELETE FAILURE ORDER] Stack:', error.stack);
-
       res.status(500).json({
         success: false,
-        error: {
-          code: 'DELETE_FAILURE_ORDER_ERROR',
-          message: error.message,
-          details: error.stack
-        }
+        error: { code: 'CANCEL_FAILURE_ERROR', message: error.message }
       });
     }
+  }
+
+  /**
+   * Reactivar una falla cancelada
+   * PUT /api/failures/:id/reactivate
+   */
+  async reactivateFailureOrder(req, res) {
+    try {
+      const failureOrderId = parseInt(req.params.id, 10);
+      const FailureLifecycleService = require('../services/FailureLifecycleService');
+
+      if (Number.isNaN(failureOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_ID', message: 'ID de orden de falla inválido' }
+        });
+      }
+
+      const result = await FailureLifecycleService.reactivateFailureOrder(failureOrderId, {
+        reactivatedById: req.user?.user_id
+      });
+
+      res.status(200).json(result);
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: { code: 'REACTIVATE_FAILURE_ERROR', message: error.message }
+      });
+    }
+  }
+
+  /**
+   * Eliminación permanente deshabilitada — usar cancelación
+   * DELETE /api/failures/:id
+   */
+  async deleteFailureOrder(req, res) {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'DELETE_DISABLED',
+        message: 'La eliminación permanente no está disponible. Use cancelación para archivar la falla.'
+      }
+    });
   }
 }
 

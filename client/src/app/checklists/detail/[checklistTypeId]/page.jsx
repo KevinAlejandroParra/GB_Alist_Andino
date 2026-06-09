@@ -5,9 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from '../../../../components/ProtectedRoute';
 import { useAuth } from '../../../../components/AuthContext';
 import ChecklistHeader from '../../../../components/checklist/components/ChecklistHeader';
-import OptimizedActiveFailuresList from '../../../../components/checklist/OptimizedActiveFailuresList';
 import HistorySection from '../../../../components/checklist/HistorySection';
-import OptimizedResolvedFailuresHistory from '../../../../components/checklist/OptimizedResolvedFailuresHistory';
 import axiosInstance from '../../../../utils/axiosConfig';
 import { formatLocalDate, formatLocalDateTime } from '../../../../utils/dateUtils';
 
@@ -20,8 +18,6 @@ export default function ChecklistDetailPage() {
   const [checklistType, setChecklistType] = useState(null);
   const [todayChecklist, setTodayChecklist] = useState(null);
   const [checklistHistory, setChecklistHistory] = useState([]);
-  const [failures, setFailures] = useState([]);
-  const [resolvedFailures, setResolvedFailures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedHistoricalChecklists, setExpandedHistoricalChecklists] = useState({});
@@ -31,21 +27,12 @@ export default function ChecklistDetailPage() {
     try {
       setLoading(true);
       
-      const [typeResponse, historyResponse, failuresResponse, resolvedFailuresResponse] = await Promise.all([
+      const [typeResponse, historyResponse] = await Promise.all([
         axiosInstance.get(`/api/checklists/type/${checklistTypeId}/details`),
         axiosInstance.get(`/api/checklists/type/${checklistTypeId}/history`),
-        axiosInstance.get(`/api/checklists/failures/by-type/${checklistTypeId}`),
-        axiosInstance.get(`/api/checklists/failures/resolved/by-type/${checklistTypeId}`)
       ]);
 
       setChecklistType(typeResponse.data);
-      
-      // Manejar estructura de datos de fallas
-      const failuresData = failuresResponse.data?.rows || failuresResponse.data || [];
-      const resolvedFailuresData = resolvedFailuresResponse.data?.rows || resolvedFailuresResponse.data || [];
-      
-      setFailures(failuresData);
-      setResolvedFailures(resolvedFailuresData);
       
       if (historyResponse.data && historyResponse.data.length > 0) {
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -311,32 +298,28 @@ export default function ChecklistDetailPage() {
             )}
           </div>
 
-          {/* Fallas Activas */}
+          {/* Libro de Fallas — Banner de acceso directo */}
           <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-bold text-gray-800">Fallas Activas ({failures.length})</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Vista resumida de este checklist. Para búsqueda, gráficas y gestión completa use el libro unificado.
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <i className="fas fa-book-medical text-purple-600" />
+                  Libro de Fallas
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Consulta, filtra y gestiona todas las fallas asociadas a este checklist desde el libro unificado.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => router.push(`/fallas?checklistTypeId=${checklistTypeId}`)}
-                className="px-4 py-2 text-sm font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors shrink-0"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 active:bg-purple-800 transition-colors shadow-sm shrink-0"
               >
-                <i className="fas fa-book-medical mr-2" />
-                Ver en Libro de Fallas
+                <i className="fas fa-book-open" />
+                Abrir Libro de Fallas
+                <i className="fas fa-arrow-right text-xs opacity-75" />
               </button>
             </div>
-            <OptimizedActiveFailuresList failures={failures} user={user} onUpdate={fetchChecklistData} />
-          </div>
-
-          {/* Historial de Fallas Resueltas */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Fallas Resueltas ({resolvedFailures.length})</h2>
-            <p className="text-sm text-gray-600 mb-4">Historial completo de fallas que han sido resueltas o cerradas.</p>
-            <OptimizedResolvedFailuresHistory resolvedFailures={resolvedFailures} />
           </div>
 
           {/* Historial de Checklists */}

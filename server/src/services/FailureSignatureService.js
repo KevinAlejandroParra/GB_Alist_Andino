@@ -37,12 +37,8 @@ class FailureSignatureService {
         throw new Error('Orden de falla no encontrada');
       }
 
-      // Verificar si ya tiene firma de reporte
-      if (failureOrder.report_signature) {
-        throw new Error('Esta orden de falla ya tiene una firma de reporte');
-      }
-
-      // Crear la firma en el campo report_signature
+      // Permitir sobrescribir firma existente (re-firma)
+      // Crear/actualizar la firma en el campo report_signature
       await failureOrder.update({
         report_signature: signatureData
       });
@@ -94,23 +90,35 @@ class FailureSignatureService {
 
       // Verificar si ya tiene firma de admin
       if (failureOrder.admin_signature) {
-        throw new Error('Esta orden de falla ya tiene una firma de administrador');
+        // Permitir re-firma: actualizar los datos
+        await failureOrder.update({
+          admin_signature: signatureData,
+          admin_signature_by_id: adminId,
+          admin_signature_at: new Date()
+        });
+        console.log(`✅ Firma de administrador actualizada para falla ${failureOrderId} por admin ${adminId}`);
+      } else {
+        // Primera firma
+        await failureOrder.update({
+          admin_signature: signatureData,
+          admin_signature_by_id: adminId,
+          admin_signature_at: new Date()
+        });
+        console.log(`✅ Firma de administrador creada para falla ${failureOrderId} por admin ${adminId}`);
       }
 
-      // Crear la firma en los campos de admin
-      await failureOrder.update({
-        admin_signature: signatureData,
-        admin_signature_by_id: adminId,
-        admin_signature_at: new Date()
-      });
-
       console.log(`✅ Firma de administrador creada para falla ${failureOrderId} por admin ${adminId}`);
+
+      // Cargar nombre del admin para retornarlo
+      const { User } = require('../models');
+      const adminUser = await User.findByPk(adminId, { attributes: ['user_id', 'user_name'] });
 
       return {
         success: true,
         data: {
           failureOrderId,
           adminId,
+          adminName: adminUser?.user_name || `Admin #${adminId}`,
           signatureData,
           signedAt: new Date()
         },

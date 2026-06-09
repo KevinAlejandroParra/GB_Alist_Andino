@@ -762,17 +762,33 @@ const generateChecklistHTML = async (data) => {
           failuresHtml = `
             <div style="margin-top: 6px; padding: 6px; background: #fefbeb; border-radius: 4px;">
               <strong style="font-size: 9px; color: #92400e;">📋 Órdenes de Falla (${itemFailures.length})</strong>
-              ${itemFailures.map((failure, idx) => `
-                <div style="background: #fff; margin-top: 6px; padding: 6px; border-radius: 3px; border-left: 3px solid ${failure.severity === 'CRITICA' ? '#dc2626' : failure.severity === 'MODERADA' ? '#f59e0b' : '#10b981'};">
-                  <div style="font-size: 8px; margin-bottom: 4px;">
-                    <strong style="color: #1f2937;">${idx + 1}. ${failure.severity || 'N/A'}</strong> - ${failure.description}
+              ${itemFailures.map((failure, idx) => {
+                const t = failure.traceability || { code: 'NONE', label: 'Sin seguimiento', color: '#9ca3af', bgColor: '#f3f4f6', shortLabel: '—' };
+                const partsHtml = (t.parts || []).map(p =>
+                  `<span style="display:block;font-size:7px;">• ${p.inventory?.name || 'Repuesto'} x${p.quantity_used}</span>`
+                ).join('');
+                const reqHtml = (t.requisitions || []).map(r =>
+                  `<span style="display:block;font-size:7px;">• ${r.part_reference} (${r.status}) x${r.quantity_requested}</span>`
+                ).join('');
+                return `
+                <div style="background: ${t.bgColor}; margin-top: 6px; padding: 6px; border-radius: 3px; border-left: 3px solid ${t.color};">
+                  <div style="font-size: 8px; margin-bottom: 4px; display:flex; justify-content:space-between; align-items:center;">
+                    <strong style="color: #1f2937;">${idx + 1}. ${failure.severity || 'N/A'}</strong>
+                    <span style="font-size:7px;font-weight:bold;color:${t.color};background:#fff;padding:2px 6px;border-radius:3px;border:1px solid ${t.color};">${t.shortLabel}</span>
                   </div>
+                  <div style="font-size: 8px; color: #374151; margin-bottom: 4px;">${failure.description}</div>
                   <div style="font-size: 7px; color: #6b7280; margin-bottom: 4px;">
-                    <strong>Asignado:</strong> ${failure.assigned_to_name} | 
+                    <strong>Trazabilidad:</strong> ${t.label}
+                    ${t.code === 'AR' && t.activity ? ` | <strong>Actividad:</strong> ${t.activity}` : ''}
+                    ${t.code === 'OT' ? (reqHtml || partsHtml ? `<div style="margin-top:2px;">${reqHtml}${partsHtml}</div>` : '') : ''}
+                    ${t.code === 'CANCELLED' && t.cancellation_reason ? ` | <strong>Motivo:</strong> ${t.cancellation_reason}` : ''}
+                  </div>
+                  <div style="font-size: 7px; color: #6b7280;">
+                    <strong>Asignado:</strong> ${failure.assigned_to_name} |
                     <strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez/veces` : 'Primera vez'}
                   </div>
-                </div>
-              `).join('')}
+                </div>`;
+              }).join('')}
             </div>
           `;
         }
