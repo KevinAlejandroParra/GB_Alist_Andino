@@ -603,16 +603,6 @@ const FailureDetailModal = ({
               ) : (
                 <p className="text-sm text-red-700">No se registró un motivo de cancelación.</p>
               )}
-              {failureDetail?.cancelledBy?.user_name && (
-                <p className="text-sm text-red-800 mt-1">
-                  <strong>Cancelado por:</strong> {failureDetail.cancelledBy.user_name}
-                </p>
-              )}
-              {failureDetail?.cancelled_at && (
-                <p className="text-sm text-red-800">
-                  <strong>Fecha de cancelación:</strong> {formatDate(failureDetail.cancelled_at)}
-                </p>
-              )}
             </div>
           )}
 
