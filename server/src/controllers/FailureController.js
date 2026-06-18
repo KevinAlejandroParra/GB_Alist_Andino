@@ -1105,7 +1105,6 @@ class FailureController {
       }
     });
   }
-  }
 
   /**
    * Crear WorkOrder para una FailureOrder existente

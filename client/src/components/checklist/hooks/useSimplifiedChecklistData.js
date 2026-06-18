@@ -106,7 +106,7 @@ export function useSimplifiedChecklistData(checklistTypeId, checklistType) {
 
       if (currentChecklistType === 'family' && currentDataConfig.generateDynamicTemplate) {
         endpoint = getFormattedEndpoint(currentChecklistType, 'generate', { checklistTypeId: currentChecklistTypeId });
-      } else if (currentChecklistType === 'attraction' && currentDataConfig.createInstance) {
+      } else if (currentDataConfig.createInstance) {
         endpoint = getFormattedEndpoint(currentChecklistType, 'create', { checklistTypeId: currentChecklistTypeId });
       } else {
         endpoint = getFormattedEndpoint(currentChecklistType, 'latest', { checklistTypeId: currentChecklistTypeId });
@@ -119,7 +119,7 @@ export function useSimplifiedChecklistData(checklistTypeId, checklistType) {
       console.log(`📋 [useSimplifiedChecklistData] Fetching:`, { currentChecklistType, currentChecklistTypeId, endpoint });
 
       let response;
-      if (currentChecklistType === 'attraction' && currentDataConfig.createInstance) {
+      if (currentDataConfig.createInstance) {
         await axiosInstance.get(endpoint, {
           headers: { Authorization: `Bearer ${currentUser.token}` },
           params
