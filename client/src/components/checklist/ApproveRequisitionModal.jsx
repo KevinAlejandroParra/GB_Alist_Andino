@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import useFailureRequisitionSystem from './hooks/useFailureRequisitionSystem';
 import { useAuth } from '../AuthContext';
 import Swal from 'sweetalert2';
+import { compressImage } from '../../utils/imageCompression';
 
 const ApproveRequisitionModal = ({ 
   show, 
@@ -44,7 +45,7 @@ const ApproveRequisitionModal = ({
     }));
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       // Validar tipo de archivo
@@ -53,22 +54,24 @@ const ApproveRequisitionModal = ({
         return;
       }
 
-      // Validar tamaño (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
-        Swal.fire('Error', 'La imagen no debe ser mayor a 5MB', 'error');
+      // Validar tamaño (10MB max antes de comprimir)
+      if (file.size > 10 * 1024 * 1024) {
+        Swal.fire('Error', 'La imagen no debe ser mayor a 10MB', 'error');
         return;
       }
+
+      // Comprimir imagen antes de preview
+      const compressedFile = await compressImage(file);
 
       const reader = new FileReader();
       reader.onload = (e) => {
         setPreviewImage(e.target.result);
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(compressedFile);
       
-      // Aquí se manejaría la subida real del archivo
       setFormData(prev => ({
         ...prev,
-        image_url: URL.createObjectURL(file) // Temporal para preview
+        image_url: URL.createObjectURL(compressedFile)
       }));
     }
   };

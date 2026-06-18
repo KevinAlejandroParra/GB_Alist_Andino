@@ -58,6 +58,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       comment: 'URL de la imagen del repuesto'
     },
+    image_public_id: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'ID público de la imagen en Cloudinary'
+    },
     
     // Notas adicionales
     notes: {

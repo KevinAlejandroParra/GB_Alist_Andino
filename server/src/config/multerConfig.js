@@ -1,22 +1,5 @@
-const multer = require('multer');
-const path = require('path');
+const { uploadCloudinary } = require('./cloudinary');
 
-// Configuración de Multer para la subida de imágenes
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../../public/media'));
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB
-  }
-});
-
-module.exports = upload;
+// Exportamos el middleware de subida configurado con Cloudinary
+// para reemplazar el uso anterior de multer local.
+module.exports = uploadCloudinary;

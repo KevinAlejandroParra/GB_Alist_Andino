@@ -51,6 +51,11 @@ module.exports = (sequelize, DataTypes) => {
     },
     activity_performed: DataTypes.TEXT,
     evidence_url: DataTypes.STRING,
+    evidence_public_id: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'ID público de la evidencia en Cloudinary'
+    },
     closure_signature: DataTypes.TEXT('long'),
     start_time: DataTypes.DATE,
     end_time: DataTypes.DATE,

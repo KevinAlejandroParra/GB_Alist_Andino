@@ -5,6 +5,7 @@ import axiosInstance from '../../../utils/axiosConfig';
 import { useAuth } from '../../AuthContext';
 import Swal from 'sweetalert2';
 import { getLatestWorkOrderByUser } from '../../../utils/inventoryApi';
+import { compressImage } from '../../../utils/imageCompression';
 
 /**
  * Modal para crear una nueva requisición de repuesto
@@ -133,17 +134,23 @@ const CreateRequisitionModal = ({
    return Object.keys(newErrors).length === 0;
   };
 
-  // Función para subir imagen
+  // Función para subir imagen (comprime a WebP 70% antes de subir)
   const uploadImageToServer = async (file) => {
     if (!file) return null;
 
     setUploadingImage(true);
     try {
       const API_URL = process.env.NEXT_PUBLIC_API;
-      const formData = new FormData();
-      formData.append("evidence", file);
 
-      console.log('📤 Subiendo imagen:', file.name, 'Tamaño:', file.size);
+      // Comprimir imagen antes de subir
+      console.log('🗜️ Comprimiendo imagen:', file.name, 'Tamaño original:', file.size);
+      const compressedFile = await compressImage(file);
+      console.log('✅ Imagen comprimida:', compressedFile.name, 'Tamaño:', compressedFile.size);
+
+      const formData = new FormData();
+      formData.append("evidence", compressedFile);
+
+      console.log('📤 Subiendo imagen comprimida...');
 
       const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData);
      

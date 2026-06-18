@@ -84,4 +84,18 @@ router.put('/:id/cancel', (req, res) => RequisitionController.cancelRequisition(
  */
 router.delete('/:id', (req, res) => RequisitionController.deleteRequisition(req, res));
 
+const upload = require('../config/multerConfig');
+
+/**
+ * PUT /api/requisitions/:id/imagen
+ * Actualizar imagen de requisición
+ */
+router.put('/:id/imagen', upload.single('image'), (req, res) => RequisitionController.updateRequisitionImage(req, res));
+
+/**
+ * DELETE /api/requisitions/:id/imagen
+ * Eliminar imagen de requisición
+ */
+router.delete('/:id/imagen', (req, res) => RequisitionController.deleteRequisitionImage(req, res));
+
 module.exports = router;

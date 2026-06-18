@@ -308,10 +308,21 @@ class UserController {
             console.log("BODY:", req.body);
             console.log("USER PARSED:", userJSON);
 
-            // Si hay imagen, actualizarla
+            // Si hay imagen, actualizarla en Cloudinary
             if (req.file) {
-                const imagePath = path.join("images/users", req.file.filename).replace(/\\/g, "/");
-                user.user_image = imagePath;
+                const { cloudinary } = require('../config/cloudinary');
+                
+                // Si el usuario ya tenía una imagen en Cloudinary, eliminarla
+                if (user.user_image_public_id) {
+                    try {
+                        await cloudinary.uploader.destroy(user.user_image_public_id);
+                    } catch (err) {
+                        console.error('❌ Error eliminando imagen antigua de Cloudinary:', err);
+                    }
+                }
+
+                user.user_image = req.file.path;
+                user.user_image_public_id = req.file.filename;
             }
 
             // Validación adicional para contraseña
@@ -801,9 +812,53 @@ class UserController {
             console.error('Error al obtener técnicos:', error);
             res.status(500).json({
                 success: false,
-                message: 'Error al obtener la lista de técnicos',
+                message: 'Error al obtener técnicos',
                 error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
+        }
+    }
+
+    /**
+     * Eliminar imagen de perfil de un usuario
+     * DELETE /api/users/:id/imagen
+     */
+    static async deleteUserImage(req, res) {
+        try {
+            const { user_id } = req.params;
+            const requestingUserId = req.user.user_id;
+
+            if (parseInt(user_id, 10) !== requestingUserId) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Solo es posible editar su propio perfil, no el de los demás."
+                });
+            }
+
+            const user = await User.findByPk(user_id);
+            if (!user) {
+                return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+            }
+
+            if (user.user_image_public_id) {
+                const { cloudinary } = require('../config/cloudinary');
+                try {
+                    await cloudinary.uploader.destroy(user.user_image_public_id);
+                } catch (err) {
+                    console.error('❌ Error eliminando imagen de Cloudinary:', err);
+                }
+            }
+
+            user.user_image = null;
+            user.user_image_public_id = null;
+            await user.save();
+
+            res.status(200).json({
+                success: true,
+                message: 'Imagen eliminada exitosamente'
+            });
+        } catch (error) {
+            console.error('❌ Error eliminando imagen de usuario:', error);
+            res.status(500).json({ success: false, message: error.message });
         }
     }
 }

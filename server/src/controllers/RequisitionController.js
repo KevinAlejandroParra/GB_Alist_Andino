@@ -802,6 +802,93 @@ class RequisitionController {
         }
       });
     }
+  /**
+   * Actualizar imagen de requisición
+   * PUT /api/requisitions/:id/imagen
+   */
+  async updateRequisitionImage(req, res) {
+    try {
+      const requisitionId = parseInt(req.params.id, 10);
+      if (Number.isNaN(requisitionId)) {
+        return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: { message: 'No se envió ninguna imagen' } });
+      }
+
+      const { Requisition } = require('../models');
+      const { cloudinary } = require('../config/cloudinary');
+
+      const requisition = await Requisition.findByPk(requisitionId);
+      if (!requisition) {
+        return res.status(404).json({ success: false, error: { message: 'Requisición no encontrada' } });
+      }
+
+      if (requisition.public_id) {
+        try {
+          await cloudinary.uploader.destroy(requisition.public_id);
+        } catch (err) {
+          console.error('❌ Error eliminando imagen antigua:', err);
+        }
+      }
+
+      await requisition.update({
+        image_url: req.file.path,
+        public_id: req.file.filename
+      });
+
+      res.status(200).json({
+        success: true,
+        data: requisition,
+        message: 'Imagen actualizada exitosamente'
+      });
+    } catch (error) {
+      console.error('❌ Error actualizando imagen:', error);
+      res.status(500).json({ success: false, error: { message: error.message } });
+    }
+  }
+
+  /**
+   * Eliminar imagen de requisición
+   * DELETE /api/requisitions/:id/imagen
+   */
+  async deleteRequisitionImage(req, res) {
+    try {
+      const requisitionId = parseInt(req.params.id, 10);
+      if (Number.isNaN(requisitionId)) {
+        return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
+      }
+
+      const { Requisition } = require('../models');
+      const { cloudinary } = require('../config/cloudinary');
+
+      const requisition = await Requisition.findByPk(requisitionId);
+      if (!requisition) {
+        return res.status(404).json({ success: false, error: { message: 'Requisición no encontrada' } });
+      }
+
+      if (requisition.public_id) {
+        try {
+          await cloudinary.uploader.destroy(requisition.public_id);
+        } catch (err) {
+          console.error('❌ Error eliminando imagen antigua:', err);
+        }
+      }
+
+      await requisition.update({
+        image_url: null,
+        public_id: null
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Imagen eliminada exitosamente'
+      });
+    } catch (error) {
+      console.error('❌ Error eliminando imagen:', error);
+      res.status(500).json({ success: false, error: { message: error.message } });
+    }
   }
 }
 

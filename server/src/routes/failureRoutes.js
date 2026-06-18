@@ -109,8 +109,11 @@ router.put('/:id/increment-recurrence', (req, res) => FailureController.incremen
 // PATCH /api/failures/:id/assign-inspectable - Asignar o corregir inspectable de una falla
 router.patch('/:id/assign-inspectable', (req, res) => FailureController.assignInspectable(req, res));
 
-// POST /api/failures/:id/update-image - Actualizar imagen de evidencia (con upload)
-router.post('/:id/update-image', upload.single('evidence'), (req, res) => FailureController.updateFailureImage(req, res));
+// PUT /api/failures/:id/imagen - Actualizar imagen de evidencia
+router.put('/:id/imagen', upload.single('evidence'), (req, res) => FailureController.updateEvidenceImage(req, res));
+
+// DELETE /api/failures/:id/imagen - Eliminar imagen de evidencia
+router.delete('/:id/imagen', (req, res) => FailureController.deleteEvidenceImage(req, res));
 
 // GET /api/failures/:id - Obtener detalles de OF específica
 router.get('/:id', (req, res) => FailureController.getFailureOrderById(req, res));

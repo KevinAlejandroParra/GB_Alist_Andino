@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../AuthContext';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../utils/axiosConfig';
+import { compressImage } from '../../utils/imageCompression';
 import SignaturePad from './SignaturePad';
 import { 
   getFailureSignaturesInfo, 
@@ -151,9 +152,10 @@ const StandaloneFailureModal = ({
         submitData.append('inspectableId', formData.inspectableId);
       }
       
-      // Agregar evidencia (obligatorio)
+      // Agregar evidencia comprimida (obligatorio)
       if (formData.evidenceFile) {
-        submitData.append('evidence', formData.evidenceFile);
+        const compressedFile = await compressImage(formData.evidenceFile);
+        submitData.append('evidence', compressedFile);
       }
 
       console.log('🚀 Enviando datos de falla independiente:', {

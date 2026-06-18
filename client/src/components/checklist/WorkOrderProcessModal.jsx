@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import axiosInstance from '../../utils/axiosConfig'
+import { compressImage } from '../../utils/imageCompression'
 import WorkOrderPartsManager from './WorkOrderPartsManager'
 import SignaturePad from './SignaturePad'
 import Swal from 'sweetalert2'
@@ -198,8 +199,11 @@ export default function WorkOrderProcessModal({
 
         setLoading(true)
         try {
+            // Comprimir imagen antes de subir
+            const compressedFile = await compressImage(formData.evidence)
+
             const formDataUpload = new FormData()
-            formDataUpload.append("evidence", formData.evidence)
+            formDataUpload.append("evidence", compressedFile)
 
             const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formDataUpload)
   

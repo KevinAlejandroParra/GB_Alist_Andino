@@ -11,6 +11,7 @@ router.get('/', verifyToken, checkRole([1, 2]), (req, res, next) => {
 }, UserController.getUsers); // Obtener todos los usuarios
 router.post('/', UserController.createUser); // Crear un usuario
 router.put('/:user_id', upload.single("imagen"), verifyToken, UserController.updateUser); // Actualizar un usuario
+router.delete('/:user_id/imagen', verifyToken, UserController.deleteUserImage); // Eliminar imagen de un usuario
 router.delete('/:user_id', UserController.deleteUser); // Eliminar un usuario definitivamente
 router.patch('/:user_id/state', UserController.changeUserState); // Cambiar el estado de un usuario temporalmente
 router.post('/login', UserController.loginUser); // Ruta para iniciar sesión

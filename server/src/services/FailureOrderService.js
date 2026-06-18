@@ -75,6 +75,7 @@ class FailureOrderService {
         description,
         severity: normalizedSeverity,
         evidence_url: evidenceUrl,
+        evidence_public_id: data.evidencePublicId, // ✅ NUEVO
         type_maintenance,
         reported_by_id: reportedBy,
         affected_id: inspectableId,
@@ -154,6 +155,7 @@ class FailureOrderService {
         description,
         severity,
         evidence_url: evidenceUrl,
+        evidence_public_id: data.evidencePublicId, // ✅ NUEVO
         type_maintenance,
         reported_by_id: reportedBy,
         affected_id: inspectableId,
@@ -237,6 +239,7 @@ class FailureOrderService {
         description,
         severity,
         evidence_url: evidenceUrl,
+        evidence_public_id: data.evidencePublicId, // ✅ NUEVO
         type_maintenance,
         reported_by_id: reportedBy,
         affected_id: null,
@@ -631,26 +634,27 @@ class FailureOrderService {
         parts_count: failureOrder.workOrder?.parts?.length || 0
       };
 
-      // 1. Eliminar imagen de evidencia del servidor si existe
+      // 1. Eliminar imagen de evidencia de Cloudinary o del servidor si es antigua
       if (failureOrder.evidence_url) {
         try {
-          // La URL viene como /media/filename.jpg
-          const filename = failureOrder.evidence_url.replace('/media/', '');
-          // ✅ CORRECCIÓN: Ruta correcta a public/media
-          const mediaPath = path.join(__dirname, '../../public/media', filename);
-          
-          console.log('🗑️ [DELETE FAILURE] Intentando eliminar imagen:', mediaPath);
-          
-          // Verificar si el archivo existe antes de intentar eliminarlo
-          try {
-            await fs.access(mediaPath);
-            await fs.unlink(mediaPath);
-            console.log('✅ [DELETE FAILURE] Imagen eliminada exitosamente:', filename);
-          } catch (accessError) {
-            if (accessError.code === 'ENOENT') {
-              console.log('⚠️ [DELETE FAILURE] Imagen no encontrada en el servidor:', filename);
-            } else {
-              throw accessError;
+          if (failureOrder.evidence_public_id) {
+            // Eliminar de Cloudinary
+            const { cloudinary } = require('../config/cloudinary');
+            await cloudinary.uploader.destroy(failureOrder.evidence_public_id);
+            console.log('✅ [DELETE FAILURE] Imagen eliminada de Cloudinary:', failureOrder.evidence_public_id);
+          } else {
+            // Retrocompatibilidad: Eliminar imagen local antigua
+            const filename = failureOrder.evidence_url.replace('/media/', '');
+            const mediaPath = path.join(__dirname, '../../public/media', filename);
+            
+            try {
+              await fs.access(mediaPath);
+              await fs.unlink(mediaPath);
+              console.log('✅ [DELETE FAILURE] Imagen eliminada exitosamente:', filename);
+            } catch (accessError) {
+              if (accessError.code === 'ENOENT') {
+                console.log('⚠️ [DELETE FAILURE] Imagen no encontrada en el servidor:', filename);
+              }
             }
           }
         } catch (fileError) {

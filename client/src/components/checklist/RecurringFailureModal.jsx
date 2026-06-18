@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import axiosInstance from '../../utils/axiosConfig'
+import { compressImage } from '../../utils/imageCompression'
 import WorkOrderProcessModal from './WorkOrderProcessModal'
 import SignaturePad from './SignaturePad'
 import Swal from 'sweetalert2'
@@ -174,8 +175,10 @@ export default function RecurringFailureModal({
   const uploadEvidenceToServer = async (file) => {
     if (!file) return null
     try {
+      // Comprimir imagen antes de subir
+      const compressedFile = await compressImage(file)
       const formData = new FormData()
-      formData.append("evidence", file)
+      formData.append("evidence", compressedFile)
       const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData)
       return response.data.filePath
     } catch (error) {
@@ -452,8 +455,10 @@ export default function RecurringFailureModal({
     if (!existingImageFile || !updatingImageForId) return
     setUpdatingExistingImage(true)
     try {
+      // Comprimir imagen antes de subir
+      const compressedFile = await compressImage(existingImageFile)
       const fd = new FormData()
-      fd.append('evidence', existingImageFile)
+      fd.append('evidence', compressedFile)
       await axiosInstance.post(`${API_URL}/api/failures/${updatingImageForId}/update-image`, fd, {
         headers: { Authorization: `Bearer ${user.token}` }
       })

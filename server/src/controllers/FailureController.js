@@ -1105,7 +1105,6 @@ class FailureController {
       }
     });
   }
-  }
 
   /**
    * Crear WorkOrder para una FailureOrder existente
@@ -1930,7 +1929,7 @@ class FailureController {
   }
 
   /**
-   * Actualizar imagen de evidencia de una falla (con upload de archivo)
+   * Actualizar imagen de evidencia de una falla (con upload de archivo vía Cloudinary)
    * POST /api/failures/:id/update-image
    */
   async updateFailureImage(req, res) {
@@ -1956,8 +1955,11 @@ class FailureController {
       }
 
       let evidenceUrl = null;
+      let evidencePublicId = null;
+
       if (req.file) {
-        evidenceUrl = `/media/${req.file.filename}`;
+        evidenceUrl = req.file.path; // URL de Cloudinary
+        evidencePublicId = req.file.filename; // public_id de Cloudinary
       } else if (req.body.evidenceUrl) {
         evidenceUrl = req.body.evidenceUrl;
       } else {
@@ -1967,18 +1969,21 @@ class FailureController {
         });
       }
 
-      // Eliminar imagen anterior si existe
-      if (failureOrder.evidence_url) {
+      // Eliminar imagen anterior de Cloudinary si existe
+      if (failureOrder.evidence_public_id) {
         try {
-          const fs = require('fs').promises;
-          const path = require('path');
-          const oldFilename = failureOrder.evidence_url.replace('/media/', '');
-          const oldPath = path.join(__dirname, '../../public/media', oldFilename);
-          await fs.access(oldPath).then(() => fs.unlink(oldPath)).catch(() => {});
-        } catch (e) { /* ignorar errores al eliminar imagen anterior */ }
+          const { cloudinary } = require('../config/cloudinary');
+          await cloudinary.uploader.destroy(failureOrder.evidence_public_id);
+        } catch (e) {
+          console.error('❌ Error eliminando imagen antigua de Cloudinary:', e);
+        }
       }
 
-      await failureOrder.update({ evidence_url: evidenceUrl });
+      const updateData = { evidence_url: evidenceUrl };
+      if (evidencePublicId) {
+        updateData.evidence_public_id = evidencePublicId;
+      }
+      await failureOrder.update(updateData);
 
       console.log(`✅ [UPDATE IMAGE] OF-${failureOrder.failure_order_id} imagen actualizada: ${evidenceUrl}`);
 
@@ -2516,7 +2521,99 @@ class FailureController {
         code: 'DELETE_DISABLED',
         message: 'La eliminación permanente no está disponible. Use cancelación para archivar la falla.'
       }
-    });
+  }
+
+  /**
+   * Actualizar imagen de evidencia en Cloudinary y DB
+   * PUT /api/failures/:id/imagen
+   */
+  async updateEvidenceImage(req, res) {
+    try {
+      const failureOrderId = parseInt(req.params.id, 10);
+      if (Number.isNaN(failureOrderId)) {
+        return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: { message: 'No se envió ninguna imagen' } });
+      }
+
+      const { FailureOrder } = require('../models');
+      const { cloudinary } = require('../config/cloudinary');
+
+      const failureOrder = await FailureOrder.findByPk(failureOrderId);
+      if (!failureOrder) {
+        return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
+      }
+
+      // Eliminar imagen anterior de Cloudinary si existe
+      if (failureOrder.evidence_public_id) {
+        try {
+          await cloudinary.uploader.destroy(failureOrder.evidence_public_id);
+        } catch (err) {
+          console.error('❌ Error eliminando imagen antigua:', err);
+        }
+      }
+
+      // Actualizar DB con nueva imagen
+      await failureOrder.update({
+        evidence_url: req.file.path,
+        evidence_public_id: req.file.filename
+      });
+
+      res.status(200).json({
+        success: true,
+        data: failureOrder,
+        message: 'Imagen actualizada exitosamente'
+      });
+    } catch (error) {
+      console.error('❌ Error actualizando imagen:', error);
+      res.status(500).json({ success: false, error: { message: error.message } });
+    }
+  }
+
+  /**
+   * Eliminar imagen de evidencia de Cloudinary y DB
+   * DELETE /api/failures/:id/imagen
+   */
+  async deleteEvidenceImage(req, res) {
+    try {
+      const failureOrderId = parseInt(req.params.id, 10);
+      if (Number.isNaN(failureOrderId)) {
+        return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
+      }
+
+      const { FailureOrder } = require('../models');
+      const { cloudinary } = require('../config/cloudinary');
+
+      const failureOrder = await FailureOrder.findByPk(failureOrderId);
+      if (!failureOrder) {
+        return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
+      }
+
+      // Eliminar de Cloudinary
+      if (failureOrder.evidence_public_id) {
+        try {
+          await cloudinary.uploader.destroy(failureOrder.evidence_public_id);
+        } catch (err) {
+          console.error('❌ Error eliminando imagen antigua:', err);
+        }
+      }
+
+      // Actualizar DB para quitar la imagen
+      await failureOrder.update({
+        evidence_url: null,
+        evidence_public_id: null
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Imagen eliminada exitosamente'
+      });
+    } catch (error) {
+      console.error('❌ Error eliminando imagen:', error);
+      res.status(500).json({ success: false, error: { message: error.message } });
+    }
   }
 }
 

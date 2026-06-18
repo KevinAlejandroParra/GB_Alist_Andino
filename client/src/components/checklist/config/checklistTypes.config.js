@@ -14,6 +14,7 @@ export const CHECKLIST_TYPES = {
     // Configuración de endpoints
     endpoints: {
       latest: '/api/checklists/type/{checklistTypeId}/latest',
+      create: '/api/checklists/type/{checklistTypeId}/create',
       history: '/api/checklists/type/{checklistTypeId}/history',
       responses: '/api/checklists/{checklistId}/responses',
       download: '/api/checklists/{checklistId}/download-pdf',
@@ -34,7 +35,7 @@ export const CHECKLIST_TYPES = {
     data: {
       requiresEntitySelection: false,
       generateDynamicTemplate: false,
-      createInstance: false,
+      createInstance: true,
       hasQrValidation: false,
       hideHistory: false,
       allowDownload: true,
@@ -127,6 +128,7 @@ export const CHECKLIST_TYPES = {
     // Configuración de endpoints
     endpoints: {
       latest: '/api/checklists/type/{checklistTypeId}/latest',
+      create: '/api/checklists/type/{checklistTypeId}/create',
       history: '/api/checklists/type/{checklistTypeId}/history',
       responses: '/api/checklists/{checklistId}/responses',
       download: '/api/checklists/{checklistId}/download-pdf'
@@ -147,7 +149,7 @@ export const CHECKLIST_TYPES = {
     data: {
       requiresEntitySelection: false,
       generateDynamicTemplate: false,
-      createInstance: false,
+      createInstance: true,
       hasQrValidation: false,
       hideHistory: true,
       allowDownload: true,

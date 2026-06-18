@@ -833,6 +833,115 @@ class WorkOrderController {
         }
       });
     }
+  /**
+   * Actualizar imagen de evidencia (RepairExecution/WorkOrder)
+   * PUT /api/work-orders/:id/imagen
+   */
+  async updateEvidenceImage(req, res) {
+    try {
+      const workOrderId = parseInt(req.params.id, 10);
+      if (Number.isNaN(workOrderId)) {
+        return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: { message: 'No se envió ninguna imagen' } });
+      }
+
+      const { WorkOrder, RepairExecution } = require('../models');
+      const { cloudinary } = require('../config/cloudinary');
+
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        return res.status(404).json({ success: false, error: { message: 'Orden de trabajo no encontrada' } });
+      }
+
+      const repairExecution = await RepairExecution.findOne({
+        where: { failure_order_id: workOrder.failure_order_id }
+      });
+
+      if (repairExecution && repairExecution.evidence_public_id) {
+        try {
+          await cloudinary.uploader.destroy(repairExecution.evidence_public_id);
+        } catch (err) {
+          console.error('❌ Error eliminando imagen antigua de Cloudinary:', err);
+        }
+      }
+
+      // Actualizar RepairExecution si existe
+      if (repairExecution) {
+        await repairExecution.update({
+          evidence_url: req.file.path,
+          evidence_public_id: req.file.filename
+        });
+      }
+
+      // Actualizar también WorkOrder para consistencia
+      await workOrder.update({
+        evidence_url: req.file.path
+      });
+
+      res.status(200).json({
+        success: true,
+        data: workOrder,
+        message: 'Imagen actualizada exitosamente'
+      });
+    } catch (error) {
+      console.error('❌ Error actualizando imagen:', error);
+      res.status(500).json({ success: false, error: { message: error.message } });
+    }
+  }
+
+  /**
+   * Eliminar imagen de evidencia (RepairExecution/WorkOrder)
+   * DELETE /api/work-orders/:id/imagen
+   */
+  async deleteEvidenceImage(req, res) {
+    try {
+      const workOrderId = parseInt(req.params.id, 10);
+      if (Number.isNaN(workOrderId)) {
+        return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
+      }
+
+      const { WorkOrder, RepairExecution } = require('../models');
+      const { cloudinary } = require('../config/cloudinary');
+
+      const workOrder = await WorkOrder.findByPk(workOrderId);
+      if (!workOrder) {
+        return res.status(404).json({ success: false, error: { message: 'Orden de trabajo no encontrada' } });
+      }
+
+      const repairExecution = await RepairExecution.findOne({
+        where: { failure_order_id: workOrder.failure_order_id }
+      });
+
+      if (repairExecution && repairExecution.evidence_public_id) {
+        try {
+          await cloudinary.uploader.destroy(repairExecution.evidence_public_id);
+        } catch (err) {
+          console.error('❌ Error eliminando imagen de Cloudinary:', err);
+        }
+      }
+
+      if (repairExecution) {
+        await repairExecution.update({
+          evidence_url: null,
+          evidence_public_id: null
+        });
+      }
+
+      await workOrder.update({
+        evidence_url: null
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Imagen eliminada exitosamente'
+      });
+    } catch (error) {
+      console.error('❌ Error eliminando imagen:', error);
+      res.status(500).json({ success: false, error: { message: error.message } });
+    }
   }
 }
 

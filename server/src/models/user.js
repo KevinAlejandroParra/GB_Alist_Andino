@@ -115,6 +115,11 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: false,
                 defaultValue: 'images/resources/nf.jpg'
             },
+            user_image_public_id: {
+                type: DataTypes.STRING,
+                allowNull: true,
+                comment: 'ID público de la imagen en Cloudinary'
+            },
             user_state: {
                 type: DataTypes.ENUM('activo', 'inactivo'),
                 allowNull: false,

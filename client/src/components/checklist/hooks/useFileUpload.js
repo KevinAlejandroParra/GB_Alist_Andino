@@ -1,9 +1,11 @@
 import { useCallback } from 'react'
 import Swal from 'sweetalert2'
 import axiosInstance from '../../../utils/axiosConfig'
+import { compressImage } from '../../../utils/imageCompression'
 
 /**
  * Hook para manejar subida de archivos de evidencia
+ * Comprime la imagen a WebP con 70% de calidad antes de subirla.
  * @param {Object} user - Usuario autenticado
  * @returns {Object} - Función para subir archivos
  */
@@ -12,7 +14,7 @@ export function useFileUpload(user) {
     if (!file) return
 
     const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
-    const maxSize = 5 * 1024 * 1024 // 5MB
+    const maxSize = 10 * 1024 * 1024 // 10MB antes de comprimir
 
     if (!allowedTypes.includes(file.type)) {
       await Swal.fire({
@@ -28,7 +30,7 @@ export function useFileUpload(user) {
     if (file.size > maxSize) {
       await Swal.fire({
         title: "Archivo muy grande",
-        text: "El archivo no debe superar los 5MB",
+        text: "El archivo no debe superar los 10MB",
         icon: "warning",
         confirmButtonColor: "#7c3aed",
         confirmButtonText: "Entendido",
@@ -38,8 +40,8 @@ export function useFileUpload(user) {
 
     try {
       Swal.fire({
-        title: "Subiendo archivo...",
-        text: "Por favor espera mientras se sube la imagen",
+        title: "Comprimiendo y subiendo...",
+        text: "Optimizando imagen antes de subirla",
         allowOutsideClick: false,
         showConfirmButton: false,
         didOpen: () => {
@@ -47,8 +49,11 @@ export function useFileUpload(user) {
         },
       })
 
+      // Comprimir imagen a WebP 70% antes de subir
+      const compressedFile = await compressImage(file)
+
       const formData = new FormData()
-      formData.append("evidence", file)
+      formData.append("evidence", compressedFile)
 
       const API_URL = process.env.NEXT_PUBLIC_API
       const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData)
