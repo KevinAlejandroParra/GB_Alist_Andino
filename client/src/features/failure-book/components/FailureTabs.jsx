@@ -4,7 +4,8 @@ export default function FailureTabs({ activeTab, onTabChange, totals }) {
   const tabs = [
     { id: 'all', icon: 'fa-border-all', label: 'Todas las Fallas', count: totals.all, badgeClass: 'bg-gray-100 text-gray-600' },
     { id: 'pending', icon: 'fa-clock', label: 'Fallas Pendientes', count: totals.pending, badgeClass: 'bg-amber-100 text-amber-700' },
-    { id: 'resolved', icon: 'fa-check-circle', label: 'Historial Resueltas', count: totals.resolved, badgeClass: 'bg-emerald-100 text-emerald-700' }
+    { id: 'resolved', icon: 'fa-check-circle', label: 'Historial Resueltas', count: totals.resolved, badgeClass: 'bg-emerald-100 text-emerald-700' },
+    { id: 'canceled', icon: 'fa-ban', label: 'Canceladas', count: totals.canceled, badgeClass: 'bg-red-100 text-red-700' }
   ];
 
   return (

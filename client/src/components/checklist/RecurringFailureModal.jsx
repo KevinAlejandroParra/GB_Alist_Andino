@@ -332,71 +332,37 @@ export default function RecurringFailureModal({
     }
   }
 
-  // Opción 3: Resolver (Gestionar OT)
-  const handleManageWorkOrder = async (failureOrder) => {
+  // Opción 3: Resolver falla (crear/actualizar AR)
+  const handleResolveFailure = async (failureOrder) => {
     setLoading(true)
     try {
-      let workOrderToProcess = null;
+      let repairExecution = failureOrder.repairExecution || null;
 
-      console.log('Gestionando falla:', failureOrder.id, failureOrder.failure_order_id);
-
-      // Caso A: El objeto ya tiene estructura de OT
-      if (failureOrder.work_order_id && failureOrder.work_order_id.startsWith('OT-')) {
-        workOrderToProcess = failureOrder;
-        console.log('Usando OT existente:', workOrderToProcess);
-      } else {
-        // Caso B: Es una FailureOrder - buscar si ya existe una OT específica para esta falla
-        const existingWos = await axiosInstance.get(`${API_URL}/api/work-orders`, {
-          headers: { Authorization: `Bearer ${user.token}` }
-        });
-
-        console.log('Respuesta de búsqueda:', existingWos.data);
-
-        if (existingWos.data.success && existingWos.data.data && existingWos.data.data.length > 0) {
-          // Filtrar específicamente las OTs que pertenezcan a esta falla
-          const matchingWorkOrders = existingWos.data.data.filter(wo =>
-            wo.failure_order_id === failureOrder.id ||
-            wo.failureOrder?.id === failureOrder.id
-          );
-
-          if (matchingWorkOrders.length > 0) {
-            // Tomar la OT más reciente (con mayor ID)
-            const mostRecentWorkOrder = matchingWorkOrders.sort((a, b) => b.id - a.id)[0];
-            workOrderToProcess = mostRecentWorkOrder;
-            console.log('OT encontrada para la falla específica:', workOrderToProcess);
-          } else {
-            console.log('No se encontró OT para esta falla específica');
-          }
-        }
-
-        // Si no existe OT específica, crear nueva
-        if (!workOrderToProcess) {
-          console.log('Creando nueva OT para falla:', failureOrder.id);
-          const createResponse = await axiosInstance.post(
-            `${API_URL}/api/work-orders`,
-            {
-              failure_order_id: failureOrder.id,
-              description: failureOrder.description,
-              priority_level: failureOrder.severity === 'CRITICA' ? 'URGENTE' : 'NORMAL',
-              created_by_id: user.user_id
-            },
-            { headers: { Authorization: `Bearer ${user.token}` } }
-          );
-          workOrderToProcess = createResponse.data.data;
-          console.log('Nueva OT creada:', workOrderToProcess);
-        }
+      if (!repairExecution) {
+        const createResponse = await axiosInstance.post(
+          `${API_URL}/api/work-orders/create-for-failure`,
+          { failure_order_id: failureOrder.id, created_by_id: user.user_id },
+          { headers: { Authorization: `Bearer ${user.token}` } }
+        );
+        repairExecution = createResponse.data.data;
       }
 
-      if (workOrderToProcess && workOrderToProcess.failure_order_id === failureOrder.id) {
-        setSelectedProcessWorkOrder(workOrderToProcess);
+      if (repairExecution) {
+        const processRecord = {
+          ...repairExecution,
+          isRepairAct: true,
+          failure_order_id: failureOrder.id,
+          description: failureOrder.description,
+          formalWorkOrderId: failureOrder.workOrder?.id || null
+        };
+        setSelectedProcessWorkOrder(processRecord);
         setShowProcessModal(true);
       } else {
-        throw new Error("No se pudo obtener ni crear la Orden de Trabajo correcta para esta falla");
+        throw new Error('No se pudo obtener la acta de reparación');
       }
-
     } catch (error) {
-      console.error("Error gestionando OT:", error);
-      Swal.fire('Error', 'No se pudo iniciar la gestión de la orden de trabajo', 'error');
+      console.error('Error resolviendo falla:', error);
+      Swal.fire('Error', error.response?.data?.error?.message || 'No se pudo iniciar la resolución de la falla', 'error');
     } finally {
       setLoading(false);
     }
@@ -1088,11 +1054,11 @@ export default function RecurringFailureModal({
                             {/* Botón de Acción */}
                             <div className="flex-shrink-0 mt-4">
                               <button
-                                onClick={() => handleManageWorkOrder(wo)}
+                                onClick={() => handleResolveFailure(wo)}
                                 className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition-all flex items-center gap-2 w-full lg:w-auto"
                               >
                                 <FontAwesomeIcon icon={faHardHat} />
-                                Gestionar OT
+                                Resolver falla
                                 <FontAwesomeIcon icon={faArrowRight} />
                               </button>
                             </div>
@@ -1168,35 +1134,14 @@ export default function RecurringFailureModal({
         <WorkOrderProcessModal
           isOpen={showProcessModal}
           onClose={async (updatedWorkOrder) => {
-            // Si se proporcionó una orden actualizada
-            if (updatedWorkOrder) {
-              // Si la orden fue RESUELTA, actualizar también la falla asociada
-              if (updatedWorkOrder.status === 'RESUELTA') {
-                try {
-                  console.log('✅ OT Resuelta, actualizando estado de falla...');
-                  await axiosInstance.put(
-                    `${API_URL}/api/failures/${selectedProcessWorkOrder.failure_order_id || selectedProcessWorkOrder.failureOrder?.id}`,
-                    { status: 'RESUELTO' },
-                    { headers: { Authorization: `Bearer ${user.token}` } }
-                  );
-
-                  // Notificar al padre que se resolvió
-                  if (onSuccess) {
-                    onSuccess('resolve', updatedWorkOrder);
-                  }
-
-                  // Cerrar este modal y el padre
-                  setShowProcessModal(false);
-                  setSelectedProcessWorkOrder(null);
-                  onClose(); // Cerrar el RecurringFailureModal
-                  return;
-                } catch (error) {
-                  console.error('Error actualizando estado de falla:', error);
-                }
-              }
+            if (updatedWorkOrder?.status === 'RESUELTA') {
+              if (onSuccess) onSuccess('resolve', updatedWorkOrder);
+              setShowProcessModal(false);
+              setSelectedProcessWorkOrder(null);
+              onClose();
+              return;
             }
 
-            // Flujo normal si no se resolvió o hubo error
             onWorkOrdersUpdate && onWorkOrdersUpdate();
             setShowProcessModal(false);
             setSelectedProcessWorkOrder(null);

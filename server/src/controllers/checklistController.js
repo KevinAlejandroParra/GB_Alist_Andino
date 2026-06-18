@@ -899,17 +899,22 @@ const generateChecklistHTML = async (data) => {
               failuresHtml = `
                 <div style="margin-top: 4px; padding: 4px; background: #fefbeb; border-radius: 4px;">
                   <strong style="font-size: 8px; color: #92400e;">📋 Fallas (${itemFailures.length})</strong>
-                  ${itemFailures.map((failure, idx) => `
-                    <div style="background: #fff; margin-top: 4px; padding: 4px; border-radius: 3px; border-left: 3px solid ${failure.severity === 'CRITICA' ? '#dc2626' : failure.severity === 'MODERADA' ? '#f59e0b' : '#10b981'};">
-                      <div style="font-size: 7px;">
-                        <strong>${idx + 1}. ${failure.severity || 'N/A'}</strong> - ${failure.description}
+                  ${itemFailures.map((failure, idx) => {
+                    const t = failure.traceability || { code: 'NONE', label: 'Sin seguimiento', color: '#9ca3af', bgColor: '#f3f4f6', shortLabel: '—' };
+                    return `
+                    <div style="background: ${t.bgColor}; margin-top: 4px; padding: 4px; border-radius: 3px; border-left: 3px solid ${t.color};">
+                      <div style="font-size: 7px; margin-bottom: 2px; display:flex; justify-content:space-between; align-items:center;">
+                        <strong>${idx + 1}. ${failure.severity || 'N/A'}</strong>
+                        <span style="font-size:7px;font-weight:bold;color:${t.color};background:#fff;padding:1px 4px;border-radius:3px;border:1px solid ${t.color};">${t.shortLabel}</span>
                       </div>
+                      <div style="font-size: 7px; color: #374151;">${failure.description}</div>
+                      ${t.code === 'CANCELLED' && t.cancellation_reason ? `<div style="font-size:7px;color:#dc2626;"><strong>Motivo:</strong> ${t.cancellation_reason}</div>` : ''}
                       <div style="font-size: 7px; color: #6b7280;">
                         <strong>Área:</strong> ${failure.assigned_to || 'No asignado'} |
                         <strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez` : 'Primera vez'}
                       </div>
-                    </div>
-                  `).join('')}
+                    </div>`;
+                  }).join('')}
                 </div>
               `;
             }
@@ -978,6 +983,36 @@ const generateChecklistHTML = async (data) => {
     `,
     )
     .join("")
+
+  const closedFailuresHtml = (data.failures?.closed_on_cutoff || []).length > 0 ? `
+                <div class="items-section" style="margin-top: 24px;">
+                    <h2>Fallas cerradas en la fecha del reporte</h2>
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th>ID Falla</th>
+                                <th>Descripción</th>
+                                <th>Tipo</th>
+                                <th>Cierre</th>
+                                <th>Técnico</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.failures.closed_on_cutoff.map((f) => `
+                            <tr>
+                                <td style="font-size:9px;">${f.failure_order_id || '—'}</td>
+                                <td style="font-size:9px;">${f.description || '—'}</td>
+                                <td style="font-size:9px;">
+                                    <span style="color:${f.traceability?.color || '#6b7280'};font-weight:bold;">${f.traceability?.shortLabel || '—'}</span>
+                                </td>
+                                <td style="font-size:9px;">${f.closed_at ? formatDate(f.closed_at) : '—'}</td>
+                                <td style="font-size:9px;">${f.resolver || '—'}</td>
+                            </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ` : '';
 
   return `
         <!DOCTYPE html>
@@ -1488,6 +1523,8 @@ const generateChecklistHTML = async (data) => {
                     </table>
                 </div>
                 
+                ${closedFailuresHtml}
+
                 <div class="page-break"></div>
 
                 <div class="signatures-section">

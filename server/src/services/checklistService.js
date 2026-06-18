@@ -2367,7 +2367,7 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode
       shouldIncludeFailureInPdf,
       CLOSED_STATUSES
     } = require('../utils/traceabilityUtil');
-    const pdfGeneratedAt = new Date();
+    const pdfGeneratedAt = cutoffDate;
 
     const visibleFailureOrders = failureOrders.filter(fo => {
       const traceability = computeTraceability({
@@ -2430,10 +2430,43 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode
       });
     });
 
+    const { sameCalendarDay } = require('../utils/traceabilityUtil');
+    const closedOnCutoff = failureOrders
+      .filter((fo) => {
+        const traceability = computeTraceability({
+          repairExecution: fo.repairExecution,
+          workOrder: fo.workOrder,
+          requisitions: fo.workOrder?.requisitions || [],
+          parts: fo.workOrder?.parts || [],
+          pdfGeneratedAt
+        });
+        if (traceability.status !== 'RESUELTA') return false;
+        const execution = fo.repairExecution || fo.workOrder;
+        const closedAt = execution?.end_time || execution?.updatedAt;
+        return closedAt && sameCalendarDay(closedAt, cutoffDate);
+      })
+      .map((fo) => {
+        const traceability = computeTraceability({
+          repairExecution: fo.repairExecution,
+          workOrder: fo.workOrder,
+          requisitions: fo.workOrder?.requisitions || [],
+          parts: fo.workOrder?.parts || [],
+          pdfGeneratedAt
+        });
+        return {
+          failure_order_id: fo.failure_order_id,
+          description: fo.description,
+          traceability,
+          closed_at: fo.repairExecution?.end_time || fo.workOrder?.end_time,
+          resolver: fo.repairExecution?.resolver?.user_name || fo.workOrder?.resolver?.user_name
+        };
+      });
+
     return {
       checklist_id: checklistId,
       failures_by_item: failuresByItem,
       total_failures: visibleFailureOrders.length,
+      closed_on_cutoff: closedOnCutoff,
       checklist_type_id: checklist.checklist_type_id
     };
   } catch (error) {

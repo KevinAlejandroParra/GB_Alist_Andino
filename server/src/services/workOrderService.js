@@ -35,7 +35,17 @@ class WorkOrderService {
         where: { failure_order_id }
       });
       if (existingRepair) {
-        throw new Error(`Ya existe una acta de reparación para la FailureOrder ${failure_order_id}`);
+        return await require('../models').RepairExecution.findByPk(existingRepair.id, {
+          include: [
+            {
+              model: FailureOrder,
+              as: 'failureOrder',
+              include: [
+                { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] }
+              ]
+            }
+          ]
+        });
       }
 
       const existingWorkOrder = await WorkOrder.findOne({

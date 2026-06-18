@@ -115,6 +115,16 @@ router.put('/:id/imagen', upload.single('evidence'), (req, res) => FailureContro
 // DELETE /api/failures/:id/imagen - Eliminar imagen de evidencia
 router.delete('/:id/imagen', (req, res) => FailureController.deleteEvidenceImage(req, res));
 
+// PUT /api/failures/repair-executions/:repairExecutionId/update - Actualizar AR
+router.put('/repair-executions/:repairExecutionId/update', (req, res) =>
+  FailureController.updateRepairExecution(req, res)
+);
+
+// POST /api/failures/repair-executions/:repairExecutionId/create-work-order - OT desde AR
+router.post('/repair-executions/:repairExecutionId/create-work-order', (req, res) =>
+  FailureController.createFormalWorkOrderFromRepair(req, res)
+);
+
 // GET /api/failures/:id - Obtener detalles de OF específica
 router.get('/:id', (req, res) => FailureController.getFailureOrderById(req, res));
 

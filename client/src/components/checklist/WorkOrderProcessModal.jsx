@@ -55,16 +55,22 @@ export default function WorkOrderProcessModal({
 
     const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
 
+    const isRepairExecutionRecord = (record) =>
+        Boolean(record?.isRepairAct || record?.repair_execution_id?.startsWith('AR-'))
+
+    const [formalWorkOrderId, setFormalWorkOrderId] = useState(null)
+
     // Función para cargar repuestos de la orden de trabajo
     const loadWorkOrderParts = async () => {
-        if (!workOrder?.id) {
+        const partsId = formalWorkOrderId || (!isRepairExecutionRecord(workOrder) ? workOrder?.id : null);
+        if (!partsId) {
             setWorkOrderParts([]);
             return;
         }
 
         setLoadingParts(true);
         try {
-            const response = await axiosInstance.get(`${API_URL}/api/work-orders/${workOrder.id}/parts`);
+            const response = await axiosInstance.get(`${API_URL}/api/work-orders/${partsId}/parts`);
 
             if (response.data.success) {
                 setWorkOrderParts(response.data.data || []);
@@ -97,6 +103,7 @@ export default function WorkOrderProcessModal({
 
     useEffect(() => {
         if (isOpen && workOrder) {
+            setFormalWorkOrderId(workOrder.formalWorkOrderId || workOrder.formalWorkOrder?.id || null)
             setFormData({
                 activityPerformed: workOrder.activity_performed || '',
                 requiresReplacement: workOrder.requiere_replacement || false,
@@ -146,15 +153,26 @@ export default function WorkOrderProcessModal({
 
     if (!isOpen || !workOrder) return null
 
+    const arMode = isRepairExecutionRecord(workOrder)
+    const updateEndpoint = arMode
+        ? `${API_URL}/api/failures/repair-executions/${workOrder.id}/update`
+        : `${API_URL}/api/work-orders/${workOrder.id}/update`
+    const displayId = arMode
+        ? (workOrder.repair_execution_id || `AR-${workOrder.id}`)
+        : (workOrder.work_order_id || workOrder.id)
+    const headerColor = arMode ? 'text-blue-700' : 'text-orange-700'
+    const partsTargetId = formalWorkOrderId || (!arMode ? workOrder.id : null)
+
+    const updateRecord = (payload) =>
+        axiosInstance.put(updateEndpoint, payload, { headers: { Authorization: `Bearer ${user.token}` } })
+
     const handleStartWork = async () => {
         setLoading(true)
         try {
             const startTime = formData.startTime ? new Date(formData.startTime) : new Date()
 
-            await axiosInstance.put(
-                `${API_URL}/api/work-orders/${workOrder.id}/update`,
-                { start_time: startTime },
-                { headers: { Authorization: `Bearer ${user.token}` } }
+            await updateRecord(
+                { start_time: startTime }
             )
 
             await Swal.fire({
@@ -220,11 +238,7 @@ export default function WorkOrderProcessModal({
             // Actualizar estado para indicar que hay evidencia
             setHasExistingEvidence(true)
 
-            await axiosInstance.put(
-                `${API_URL}/api/work-orders/${workOrder.id}/update`,
-                { evidence_url: newFilePath },
-                { headers: { Authorization: `Bearer ${user.token}` } }
-            )
+            await updateRecord({ evidence_url: newFilePath })
 
             await Swal.fire('Evidencia guardada', 'La imagen se ha subido exitosamente', 'success')
             onUpdate && onUpdate({ ...workOrder, evidence_url: newFilePath })
@@ -268,11 +282,7 @@ export default function WorkOrderProcessModal({
 
         setLoading(true)
         try {
-            await axiosInstance.put(
-                `${API_URL}/api/work-orders/${workOrder.id}/update`,
-                { activity_performed: formData.activityPerformed },
-                { headers: { Authorization: `Bearer ${user.token}` } }
-            )
+            await updateRecord({ activity_performed: formData.activityPerformed })
 
             await Swal.fire({
                 icon: 'success',
@@ -299,11 +309,7 @@ export default function WorkOrderProcessModal({
 
         setLoading(true)
         try {
-            await axiosInstance.put(
-                `${API_URL}/api/work-orders/${workOrder.id}/update`,
-                { resolved_by_id: formData.resolvedById },
-                { headers: { Authorization: `Bearer ${user.token}` } }
-            )
+            await updateRecord({ resolved_by_id: formData.resolvedById })
 
             const selectedTech = technicians.find(t => t.user_id === parseInt(formData.resolvedById))
 
@@ -333,13 +339,28 @@ export default function WorkOrderProcessModal({
 
         setLoading(true)
         try {
-            await axiosInstance.put(
-                `${API_URL}/api/work-orders/${workOrder.id}/update`,
-                { requiere_replacement: newValue },
-                { headers: { Authorization: `Bearer ${user.token}` } }
-            )
+            if (newValue && arMode && !formalWorkOrderId) {
+                const createResp = await axiosInstance.post(
+                    `${API_URL}/api/failures/repair-executions/${workOrder.id}/create-work-order`,
+                    {},
+                    { headers: { Authorization: `Bearer ${user.token}` } }
+                )
+                if (createResp.data.success) {
+                    setFormalWorkOrderId(createResp.data.data.id)
+                }
+            }
 
-            // Actualizar estado inmediatamente en el frontend
+            if (!arMode || formalWorkOrderId || newValue) {
+                const woId = formalWorkOrderId || workOrder.id
+                if (!arMode || formalWorkOrderId) {
+                    await axiosInstance.put(
+                        `${API_URL}/api/work-orders/${woId}/update`,
+                        { requiere_replacement: newValue },
+                        { headers: { Authorization: `Bearer ${user.token}` } }
+                    )
+                }
+            }
+
             setFormData(prev => ({ ...prev, requiresReplacement: newValue }))
 
             // Si se cambia a "No Requiere Repuestos", limpiar repuestos cargados
@@ -367,11 +388,7 @@ export default function WorkOrderProcessModal({
     const handleRecordEndTime = async () => {
         setLoading(true)
         try {
-            await axiosInstance.put(
-                `${API_URL}/api/work-orders/${workOrder.id}/update`,
-                { end_time: new Date() },
-                { headers: { Authorization: `Bearer ${user.token}` } }
-            )
+            await updateRecord({ end_time: new Date() })
 
             setFormData(prev => ({ ...prev, endTime: new Date() }))
             await Swal.fire({
@@ -399,11 +416,7 @@ export default function WorkOrderProcessModal({
     const handleChangeStatus = async (newStatus) => {
         setLoading(true)
         try {
-            await axiosInstance.put(
-                `${API_URL}/api/work-orders/${workOrder.id}/update`,
-                { status: newStatus },
-                { headers: { Authorization: `Bearer ${user.token}` } }
-            )
+            await updateRecord({ status: newStatus })
 
             await Swal.fire({
                 icon: 'success',
@@ -489,25 +502,9 @@ export default function WorkOrderProcessModal({
         setLoading(true)
         try {
             // Actualizar estado de la orden de trabajo a RESUELTA
-            await axiosInstance.put(
-                `${API_URL}/api/work-orders/${workOrder.id}/update`,
-                { status: 'RESUELTA' },
-                { headers: { Authorization: `Bearer ${user.token}` } }
-            )
+            await updateRecord({ status: 'RESUELTA' })
 
-            // Si tiene falla asociada, actualizar su estado a RESUELTO
-            if (workOrder.failure_order_id) {
-                try {
-                    await axiosInstance.put(
-                        `${API_URL}/api/failures/${workOrder.failure_order_id}`,
-                        { status: 'RESUELTO' },
-                        { headers: { Authorization: `Bearer ${user.token}` } }
-                    )
-                } catch (failureError) {
-                    console.error('Error actualizando estado de falla:', failureError)
-                    // No bloquear el proceso si falla la actualización de la falla
-                }
-            }
+            // La resolución queda registrada en la AR/OT; no se actualiza estado legacy en FailureOrder
 
             // Mostrar alerta educativa y esperar a que se cierre
             await Swal.fire({
@@ -598,14 +595,10 @@ export default function WorkOrderProcessModal({
         try {
             // ✅ CORRECCIÓN: La firma se guarda directamente en la orden de trabajo
             // Sin llamadas a endpoints inexistentes
-            await axiosInstance.put(
-                `${API_URL}/api/work-orders/${workOrder.id}/update`,
-                {
-                    closure_signature: signatureDataUrl,
-                    resolved_by_id: user.user_id
-                },
-                { headers: { Authorization: `Bearer ${user.token}` } }
-            )
+            await updateRecord({
+                closure_signature: signatureDataUrl,
+                resolved_by_id: user.user_id
+            })
 
             onUpdate && onUpdate({
                 ...workOrder,
@@ -676,8 +669,8 @@ export default function WorkOrderProcessModal({
                     <div className="flex items-center justify-between px-8 py-6 bg-slate-50 border-b border-slate-200">
                         <div className="flex-1">
                             <div className="flex items-center gap-4 mb-2">
-                                <h3 className="text-2xl font-bold text-slate-800">
-                                    Orden de Trabajo #{workOrder.work_order_id || workOrder.id}
+                                <h3 className={`text-2xl font-bold ${headerColor}`}>
+                                    {arMode ? 'Acta de Reparación' : 'Orden de Trabajo'} #{displayId}
                                 </h3>
                                 {getStatusBadge(workOrder.status)}
                             </div>
@@ -1182,7 +1175,7 @@ export default function WorkOrderProcessModal({
                 {/* Parts Manager Modal */}
                 {showPartsManager && (
                     <WorkOrderPartsManager
-                        workOrderId={workOrder.id}
+                        workOrderId={partsTargetId}
                         show={showPartsManager}
                         onClose={() => setShowPartsManager(false)}
                         onSuccess={(parts) => {

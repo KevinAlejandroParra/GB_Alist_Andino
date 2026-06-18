@@ -78,23 +78,29 @@ const FailureCard = ({ failure, onViewDetail, onResolve, onLinkToWorkOrder, user
           <div className="flex flex-wrap gap-1">
             {/* Badge: Sin OT / Con OT / Con AR */}
             {!hasWorkOrder && !hasRepairExecution ? (
-              <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium border border-orange-200">
-                <i className="fas fa-exclamation-circle mr-1"></i>
-                Sin OT ni AR
+              <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium border border-gray-300">
+                <i className="fas fa-minus-circle mr-1"></i>
+                Sin seguimiento
               </span>
             ) : null}
 
             {hasRepairExecution && (
-              <span className="px-2 py-1 bg-teal-100 text-teal-800 rounded-full text-xs font-medium border border-teal-200">
+              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium border border-blue-300">
                 <i className="fas fa-file-signature mr-1"></i>
-                Acta de Reparación
+                AR
               </span>
             )}
 
             {hasWorkOrder && (
-              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium border border-blue-200">
+              <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium border border-orange-300">
                 <i className="fas fa-clipboard-check mr-1"></i>
-                Orden de Trabajo
+                OT
+              </span>
+            )}
+
+            {(failure.repairExecution?.status === 'CANCELADO' || failure.workOrder?.status === 'CANCELADO') && (
+              <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium border border-red-300">
+                Cancelada
               </span>
             )}
 
@@ -122,10 +128,12 @@ const FailureCard = ({ failure, onViewDetail, onResolve, onLinkToWorkOrder, user
             )}
 
             {/* Badge: Falla Enlazada (Sincronizada) */}
-            {hasWorkOrder && failure.workOrder.linked_failure_ids && (
+            {((hasRepairExecution && failure.repairExecution.linked_failure_ids) || (hasWorkOrder && failure.workOrder.linked_failure_ids)) && (
               (() => {
                 try {
-                  const linkedIds = JSON.parse(failure.workOrder.linked_failure_ids);
+                  const linkedIds = JSON.parse(
+                    failure.repairExecution?.linked_failure_ids || failure.workOrder?.linked_failure_ids
+                  );
                   if (linkedIds && linkedIds.length > 1) {
                     return (
                       <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-300 flex items-center gap-1">
@@ -199,7 +207,39 @@ const FailureCard = ({ failure, onViewDetail, onResolve, onLinkToWorkOrder, user
           <span>{formatDate(failure.createdAt)}</span>
         </div>
 
-        {/* Estado de OT si existe */}
+        {(failure.repairExecution?.status === 'CANCELADO' || failure.workOrder?.status === 'CANCELADO') && (
+          <div className="mb-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2">
+            <strong>Motivo:</strong> {failure.repairExecution?.cancellation_reason || failure.workOrder?.cancellation_reason || '—'}
+            {(failure.repairExecution?.cancelledBy || failure.repairExecution?.cancelled_at) && (
+              <div className="mt-1 text-red-600">
+                {failure.repairExecution?.cancelledBy?.user_name && (
+                  <span>Por: {failure.repairExecution.cancelledBy.user_name} · </span>
+                )}
+                {failure.repairExecution?.cancelled_at && (
+                  <span>{formatDate(failure.repairExecution.cancelled_at)}</span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Estado AR si existe */}
+        {hasRepairExecution && (
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <i className="fas fa-file-signature w-4"></i>
+            <span className="font-medium">Estado AR:</span>
+            <span className={`px-2 py-0.5 rounded ${
+              failure.repairExecution.status === 'RESUELTA' ? 'bg-green-100 text-green-800' :
+              failure.repairExecution.status === 'EN_PROCESO' ? 'bg-blue-100 text-blue-800' :
+              failure.repairExecution.status === 'CANCELADO' ? 'bg-red-100 text-red-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
+              {failure.repairExecution.status}
+            </span>
+          </div>
+        )}
+
+        {/* Estado OT si existe */}
         {hasWorkOrder && (
           <div className="flex items-center gap-2 text-xs text-gray-600">
             <i className="fas fa-tasks w-4"></i>

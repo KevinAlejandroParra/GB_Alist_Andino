@@ -157,8 +157,9 @@ export const PAGE_SIZE = 30;
 export const DONUT_COLORS = ['#a78bfa', '#f472b6', '#60a5fa', '#34d399', '#fbbf24'];
 
 export const isFailureActive = (failure) => {
-  if (!failure?.workOrder) return true;
-  return !RESOLVED_STATUSES.includes(failure.workOrder.status);
+  const status = failure?.repairExecution?.status || failure?.workOrder?.status || null;
+  if (!status) return true;
+  return !RESOLVED_STATUSES.includes(status);
 };
 
 export const buildGroupedSuggestions = (query, failuresList) => {

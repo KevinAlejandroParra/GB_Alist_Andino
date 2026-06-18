@@ -13,6 +13,7 @@ const {
 } = require('../models');
 const { Op } = Sequelize;
 const RepairExecutionSyncService = require('./RepairExecutionSyncService');
+const repairExecutionService = require('./repairExecutionService');
 
 /**
  * Ciclo de vida de fallas: cancelar, reactivar, devolver inventario.
@@ -91,7 +92,7 @@ class FailureLifecycleService {
     const payload = {
       repair_execution_id: this.generateRepairExecutionId(),
       failure_order_id: failureOrder.id,
-      status: workOrder?.status || 'CANCELADO',
+      status: workOrder?.status || 'EN_PROCESO',
       activity_performed: workOrder?.activity_performed || null,
       evidence_url: workOrder?.evidence_url || null,
       closure_signature: workOrder?.closure_signature || null,
@@ -124,12 +125,17 @@ class FailureLifecycleService {
         throw new Error(`Orden de falla ${failureOrderId} no encontrada`);
       }
 
-      const repairExecution = await this._ensureRepairExecution(failureOrder, transaction);
-      const workOrder = failureOrder.workOrder;
-
-      if (repairExecution.status === 'CANCELADO') {
+      const effectiveStatus = repairExecutionService.getEffectiveStatus(failureOrder);
+      if (effectiveStatus === 'CANCELADO') {
         throw new Error('Esta falla ya está cancelada');
       }
+      if (effectiveStatus === 'RESUELTA') {
+        throw new Error('No se puede cancelar una falla ya resuelta');
+      }
+
+      const repairExecution = failureOrder.repairExecution
+        || await this._ensureRepairExecution(failureOrder, transaction);
+      const workOrder = failureOrder.workOrder;
 
       if (workOrder) {
         await this._returnPartsToInventory(workOrder, transaction);
@@ -178,12 +184,13 @@ class FailureLifecycleService {
         throw new Error(`Orden de falla ${failureOrderId} no encontrada`);
       }
 
-      const repairExecution = failureOrder.repairExecution
-        || await this._ensureRepairExecution(failureOrder, transaction);
-
-      if (repairExecution.status !== 'CANCELADO') {
+      const effectiveStatus = repairExecutionService.getEffectiveStatus(failureOrder);
+      if (effectiveStatus !== 'CANCELADO') {
         throw new Error('Solo se pueden reactivar fallas en estado cancelado');
       }
+
+      const repairExecution = failureOrder.repairExecution
+        || await this._ensureRepairExecution(failureOrder, transaction);
 
       const reactivatePayload = {
         status: 'EN_PROCESO',
