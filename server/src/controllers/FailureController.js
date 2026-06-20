@@ -3,18 +3,11 @@
 const FailureOrderService = require('../services/FailureOrderService');
 const FailureBookService = require('../services/FailureBookService');
 const FailureSignatureService = require('../services/FailureSignatureService');
-const { toRelativePath, deleteLocalEvidenceFile } = require('../config/multerConfig');
+const { toRelativePath, deleteLocalFile } = require('../config/multerConfig');
 
-async function removeStoredEvidence({ evidence_url, evidence_public_id }) {
-  if (evidence_public_id) {
-    try {
-      const { cloudinary } = require('../config/cloudinary');
-      await cloudinary.uploader.destroy(evidence_public_id);
-    } catch (err) {
-      console.error('❌ Error eliminando imagen de Cloudinary:', err);
-    }
-  } else if (evidence_url) {
-    await deleteLocalEvidenceFile(evidence_url);
+async function removeStoredEvidence({ evidence_url }) {
+  if (evidence_url) {
+    await deleteLocalFile(evidence_url);
   }
 }
 
@@ -2042,7 +2035,7 @@ class FailureController {
   }
 
   /**
-   * Actualizar imagen de evidencia de una falla (con upload de archivo vía Cloudinary)
+    * Actualizar imagen de evidencia de una falla
    * POST /api/failures/:id/update-image
    */
   async updateFailureImage(req, res) {
@@ -2068,12 +2061,9 @@ class FailureController {
       }
 
       let evidenceUrl = null;
-      let evidencePublicId = null;
 
       if (req.file) {
-        // Ruta relativa persistida en DB: uploads/fallas/evidencias/<nombre_original>
         evidenceUrl = toRelativePath(req.file.path);
-        evidencePublicId = null; // almacenamiento local: no hay public_id de Cloudinary
       } else if (req.body.evidenceUrl) {
         evidenceUrl = req.body.evidenceUrl;
       } else {
@@ -2085,8 +2075,7 @@ class FailureController {
 
       await removeStoredEvidence(failureOrder);
 
-      const updateData = { evidence_url: evidenceUrl, evidence_public_id: evidencePublicId };
-      await failureOrder.update(updateData);
+      await failureOrder.update({ evidence_url: evidenceUrl });
 
       console.log(`✅ [UPDATE IMAGE] OF-${failureOrder.failure_order_id} imagen actualizada: ${evidenceUrl}`);
 
@@ -2745,8 +2734,7 @@ class FailureController {
       await removeStoredEvidence(failureOrder);
 
       await failureOrder.update({
-        evidence_url: toRelativePath(req.file.path),
-        evidence_public_id: null
+        evidence_url: toRelativePath(req.file.path)
       });
 
       res.status(200).json({
@@ -2761,7 +2749,7 @@ class FailureController {
   }
 
   /**
-   * Eliminar imagen de evidencia del disco local/Cloudinary y DB
+    * Eliminar imagen de evidencia del disco local y DB
    * DELETE /api/failures/:id/imagen
    */
   async deleteEvidenceImage(req, res) {
@@ -2781,8 +2769,7 @@ class FailureController {
       await removeStoredEvidence(failureOrder);
 
       await failureOrder.update({
-        evidence_url: null,
-        evidence_public_id: null
+        evidence_url: null
       });
 
       res.status(200).json({

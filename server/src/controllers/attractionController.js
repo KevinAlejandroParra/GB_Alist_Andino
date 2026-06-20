@@ -1,4 +1,5 @@
 const { Attraction, Inspectable } = require("../models");
+const { toRelativePath } = require("../config/multerConfig");
 
 const attractionController = {
     // Obtener todas las atracciones
@@ -38,9 +39,9 @@ const attractionController = {
     async createAttraction(req, res) {
         try {
             const { name, description, premise_id, public_flag, capacity } = req.body;
-            const photo_url = req.file ? `/media/${req.file.filename}` : req.body.photo_url; // Obtener la URL de la foto
+            const photo_url = req.file ? toRelativePath(req.file.path) : req.body.photo_url;
 
-            // Crear primero el Inspectable
+
             const inspectable = await Inspectable.create({
                 name,
                 description,
@@ -70,7 +71,7 @@ const attractionController = {
             const { name, description, premise_id, public_flag, capacity } = req.body;
             let photo_url = req.body.photo_url; // photo_url puede venir del body si es una URL directa
             if (req.file) {
-                photo_url = `/media/${req.file.filename}`; // Si se sube un nuevo archivo, usar su ruta
+                photo_url = toRelativePath(req.file.path);
             }
 
             const attraction = await Attraction.findByPk(attractionId);

@@ -1,21 +1,23 @@
 'use strict';
 
-// multerConfig.js
-// Default: Cloudinary (dispositivos, atracciones, requisiciones — rutas existentes).
-// Evidencias de fallas/reparaciones: storage local vía exportaciones nombradas.
-const { uploadCloudinary } = require('./cloudinary');
 const {
   uploadFailureEvidence,
   uploadRepairEvidence,
+  uploadDevice,
+  uploadAttraction,
+  uploadRequisition,
   toRelativePath,
   resolveLocalEvidencePath,
-  deleteLocalEvidenceFile
+  deleteLocalFile
 } = require('./localStorageConfig');
 
-module.exports = uploadCloudinary;
+module.exports = uploadDevice;
 
 module.exports.uploadFailureEvidence = uploadFailureEvidence;
 module.exports.uploadRepairEvidence = uploadRepairEvidence;
+module.exports.uploadDevice = uploadDevice;
+module.exports.uploadAttraction = uploadAttraction;
+module.exports.uploadRequisition = uploadRequisition;
 module.exports.toRelativePath = toRelativePath;
 module.exports.resolveLocalEvidencePath = resolveLocalEvidencePath;
-module.exports.deleteLocalEvidenceFile = deleteLocalEvidenceFile;
+module.exports.deleteLocalFile = deleteLocalFile;

@@ -67,11 +67,6 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       comment: 'URL de la evidencia (imagen) de la falla'
     },
-    evidence_public_id: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      comment: 'ID público de la evidencia en Cloudinary'
-    },
 
     // ✅ NUEVO: Campos de recurrencia
     is_recurring: {

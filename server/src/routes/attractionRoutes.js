@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const attractionController = require("../controllers/attractionController");
-const upload = require("../config/multerConfig"); 
+const { uploadAttraction: upload } = require("../config/multerConfig"); 
 
 // Rutas para Attraction
 router.get("/", attractionController.getAllAttractions);

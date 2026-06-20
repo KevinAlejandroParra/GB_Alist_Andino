@@ -818,24 +818,19 @@ class RequisitionController {
       }
 
       const { Requisition } = require('../models');
-      const { cloudinary } = require('../config/cloudinary');
+      const { toRelativePath, deleteLocalFile } = require('../config/multerConfig');
 
       const requisition = await Requisition.findByPk(requisitionId);
       if (!requisition) {
         return res.status(404).json({ success: false, error: { message: 'Requisición no encontrada' } });
       }
 
-      if (requisition.public_id) {
-        try {
-          await cloudinary.uploader.destroy(requisition.public_id);
-        } catch (err) {
-          console.error('❌ Error eliminando imagen antigua:', err);
-        }
+      if (requisition.image_url) {
+        await deleteLocalFile(requisition.image_url);
       }
 
       await requisition.update({
-        image_url: req.file.path,
-        public_id: req.file.filename
+        image_url: toRelativePath(req.file.path)
       });
 
       res.status(200).json({
@@ -861,24 +856,19 @@ class RequisitionController {
       }
 
       const { Requisition } = require('../models');
-      const { cloudinary } = require('../config/cloudinary');
+      const { deleteLocalFile } = require('../config/multerConfig');
 
       const requisition = await Requisition.findByPk(requisitionId);
       if (!requisition) {
         return res.status(404).json({ success: false, error: { message: 'Requisición no encontrada' } });
       }
 
-      if (requisition.public_id) {
-        try {
-          await cloudinary.uploader.destroy(requisition.public_id);
-        } catch (err) {
-          console.error('❌ Error eliminando imagen antigua:', err);
-        }
+      if (requisition.image_url) {
+        await deleteLocalFile(requisition.image_url);
       }
 
       await requisition.update({
-        image_url: null,
-        public_id: null
+        image_url: null
       });
 
       res.status(200).json({

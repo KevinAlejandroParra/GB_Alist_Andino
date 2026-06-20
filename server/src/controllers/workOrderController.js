@@ -2,7 +2,7 @@
 
 const WorkOrderService = require('../services/workOrderService');
 const { WorkOrder, WorkOrderPart, Inventory } = require('../models');
-const { toRelativePath, deleteLocalEvidenceFile } = require('../config/multerConfig');
+const { toRelativePath, deleteLocalFile } = require('../config/multerConfig');
 
 class WorkOrderController {
   /**
@@ -870,24 +870,14 @@ class WorkOrderController {
       // Ruta relativa local: uploads/fallas/reparaciones/<nombre_original>
       const relativeUrl = toRelativePath(req.file.path);
 
-      // Eliminar archivos locales anteriores (retrocompat Cloudinary vía public_id)
-      if (repairExecution?.evidence_public_id) {
-        try {
-          const { cloudinary } = require('../config/cloudinary');
-          await cloudinary.uploader.destroy(repairExecution.evidence_public_id);
-        } catch (err) {
-          console.error('❌ Error eliminando imagen antigua de Cloudinary:', err);
-        }
-      }
       for (const url of previousUrls) {
-        await deleteLocalEvidenceFile(url);
+        await deleteLocalFile(url);
       }
 
       // Actualizar RepairExecution si existe
       if (repairExecution) {
         await repairExecution.update({
-          evidence_url: relativeUrl,
-          evidence_public_id: null // almacenamiento local: no aplica public_id
+          evidence_url: relativeUrl
         });
       }
 
@@ -929,24 +919,14 @@ class WorkOrderController {
         where: { failure_order_id: workOrder.failure_order_id }
       });
 
-      if (repairExecution?.evidence_public_id) {
-        try {
-          const { cloudinary } = require('../config/cloudinary');
-          await cloudinary.uploader.destroy(repairExecution.evidence_public_id);
-        } catch (err) {
-          console.error('❌ Error eliminando imagen de Cloudinary:', err);
-        }
-      }
-
       const urlsToDelete = [repairExecution?.evidence_url, workOrder.evidence_url].filter(Boolean);
       for (const url of urlsToDelete) {
-        await deleteLocalEvidenceFile(url);
+        await deleteLocalFile(url);
       }
 
       if (repairExecution) {
         await repairExecution.update({
-          evidence_url: null,
-          evidence_public_id: null
+          evidence_url: null
         });
       }
 
