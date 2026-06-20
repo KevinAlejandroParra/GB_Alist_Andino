@@ -16,68 +16,68 @@ const ManageFailureModal = ({
   onSuccess
 }) => {
   const [showProcessModal, setShowProcessModal] = useState(false);
-  const [creatingRepair, setCreatingRepair] = useState(false);
-  const [processRecord, setProcessRecord] = useState(null);
+  const [creatingWorkOrder, setCreatingWorkOrder] = useState(false);
+  const [createdWorkOrder, setCreatedWorkOrder] = useState(null);
 
   if (!show || !failure) return null;
 
-  const hasRepairExecution = !!failure.repairExecution;
-  const hasFormalWorkOrder = !!failure.workOrder;
-  const effectiveStatus = failure.repairExecution?.status || failure.workOrder?.status || null;
-  const isClosed = ['RESUELTA', 'CANCELADO'].includes(effectiveStatus);
+  const effectiveExecution = failure.repairExecution || failure.workOrder || null;
+  const hasExecution = !!effectiveExecution;
+  const isResolved = hasExecution && ['RESUELTA', 'CANCELADO'].includes(effectiveExecution.status);
+  const effectiveStatus = effectiveExecution?.status;
+  const hasFormalWorkOrder = !!failure.workOrder?.work_order_id;
+  const processRecord = failure.workOrder || failure.repairExecution || null;
 
-  const openProcessModal = async () => {
-    if (hasRepairExecution) {
-      setProcessRecord({
-        ...failure.repairExecution,
-        isRepairAct: true,
-        failure_order_id: failure.id,
-        description: failure.description,
-        formalWorkOrderId: failure.workOrder?.id || null
-      });
+  const handleCreateWorkOrder = async () => {
+    if (hasExecution) {
+      // Si ya tiene AR u OT, solo abrir el modal de proceso
       setShowProcessModal(true);
       return;
     }
 
-    setCreatingRepair(true);
+    setCreatingWorkOrder(true);
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API || 'http://localhost:5000';
+      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
+
       const response = await axiosInstance.post(`${API_URL}/api/work-orders/create-for-failure`, {
         failure_order_id: failure.id,
         created_by_id: user.user_id
       });
 
       if (response.data.success) {
-        const ar = response.data.data;
-        setProcessRecord({
-          ...ar,
-          isRepairAct: true,
-          failure_order_id: failure.id,
-          description: failure.description
+        setCreatedWorkOrder(response.data.data);
+
+        await Swal.fire({
+          title: '✅ Acta de Reparación Creada',
+          text: `AR ${response.data.data.repair_execution_id} creada exitosamente`,
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false
         });
+
         setShowProcessModal(true);
       } else {
-        throw new Error(response.data.error?.message || 'Error al crear acta de reparación');
+        throw new Error(response.data.error?.message || 'Error al crear el acta de reparación');
       }
     } catch (error) {
+      console.error('Error creando AR:', error);
       Swal.fire({
         title: 'Error',
-        text: error.response?.data?.error?.message || error.message || 'No se pudo iniciar la resolución',
+        text: error.response?.data?.error?.message || error.message || 'No se pudo crear el acta de reparación',
         icon: 'error'
       });
     } finally {
-      setCreatingRepair(false);
+      setCreatingWorkOrder(false);
     }
   };
 
   const openOtProcess = () => {
-    if (!failure.workOrder) return;
-    setProcessRecord({
-      ...failure.workOrder,
-      failure_order_id: failure.id,
-      description: failure.description
-    });
+    if (!failure.workOrder?.work_order_id) return;
     setShowProcessModal(true);
+  };
+
+  const handleProcessSuccess = (updated) => {
+    // Actualizar estado local si es necesario tras cada cambio parcial
   };
 
   return (
@@ -101,7 +101,42 @@ const ManageFailureModal = ({
             </div>
 
             <div className="space-y-4">
-              {isClosed ? (
+              {!hasExecution ? (
+                // Sin AR ni OT: Opción de crear
+                <div className="border-2 border-blue-200 rounded-lg p-6 bg-blue-50">
+                  <div className="flex items-start gap-4">
+                    <div className="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl flex-shrink-0">
+                      🔧
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-gray-900 mb-2">
+                        Crear Acta de Reparación
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Esta falla no tiene un acta de reparación. Crea una para poder gestionarla y resolverla.
+                      </p>
+                      <button
+                        onClick={handleCreateWorkOrder}
+                        disabled={creatingWorkOrder}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {creatingWorkOrder ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Creando...</span>
+                          </>
+                        ) : (
+                          'Crear Acta de Reparación'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : isResolved ? (
+                // Resuelta: Solo información
                 <div className="border-2 border-green-200 rounded-lg p-6 bg-green-50">
                   <h3 className="font-bold text-gray-900 mb-2">
                     {effectiveStatus === 'CANCELADO' ? 'Falla cancelada' : 'Falla resuelta'}
@@ -109,24 +144,28 @@ const ManageFailureModal = ({
                   <p className="text-sm text-gray-600">No requiere más acciones de resolución.</p>
                 </div>
               ) : (
-                <>
-                  <div className="border-2 border-blue-200 rounded-lg p-6 bg-blue-50">
-                    <h3 className="font-bold text-blue-900 mb-2">Acta de Reparación (AR)</h3>
-                    <p className="text-sm text-blue-800 mb-4">
-                      Registra actividad, evidencia, firma y horas trabajadas.
-                      {hasRepairExecution && (
-                        <span className="block mt-1 font-medium">
-                          AR: {failure.repairExecution.repair_execution_id}
-                        </span>
-                      )}
-                    </p>
-                    <button
-                      onClick={openProcessModal}
-                      disabled={creatingRepair}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
-                    >
-                      {creatingRepair ? 'Iniciando...' : hasRepairExecution ? 'Continuar resolución' : 'Iniciar resolución'}
-                    </button>
+                // Con OT activa: Opción de gestionar
+                <div className="space-y-4">
+                  <div className="border-2 border-orange-200 rounded-lg p-6 bg-orange-50">
+                    <div className="flex items-start gap-4">
+                      <div className="bg-orange-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl flex-shrink-0">
+                        ⚙️
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 mb-2">
+                          Gestionar
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Esta falla tiene un acta de reparación activa. Puedes actualizarla o resolverla.
+                        </p>
+                        <button
+                          onClick={handleCreateWorkOrder}
+                          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+                        >
+                          Gestionar
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   {hasFormalWorkOrder && (
@@ -142,9 +181,9 @@ const ManageFailureModal = ({
                         Gestionar OT
                       </button>
                     </div>
-                  )}
-                </>
-              )}
+                    )}
+                  </div>
+                )}
             </div>
 
             <div className="mt-6 flex justify-end">
@@ -156,7 +195,8 @@ const ManageFailureModal = ({
         </div>
       </div>
 
-      {showProcessModal && processRecord && (
+      {/* Modal de proceso de OT */}
+      {showProcessModal && (
         <WorkOrderProcessModal
           isOpen={showProcessModal}
           onClose={async (updated) => {
@@ -174,8 +214,9 @@ const ManageFailureModal = ({
             }
             onSuccess?.();
           }}
-          workOrder={processRecord}
-          onUpdate={() => {}}
+          workOrder={createdWorkOrder || effectiveExecution}
+          failureId={failure.id}
+          onUpdate={handleProcessSuccess}
           user={user}
         />
       )}

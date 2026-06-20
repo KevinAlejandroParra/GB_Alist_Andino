@@ -416,10 +416,10 @@ const downloadChecklistPDF = async (req, res) => {
     // ✅ OPTIMIZACIÓN: Usar navegador singleton para evitar lanzar uno nuevo cada vez
     const browser = await getBrowserInstance();
     const page = await browser.newPage()
-    
+
     // ✅ OPTIMIZACIÓN: Configurar página para renderizado más rápido
     await page.setViewport({ width: 1200, height: 1600 });
-    
+
     // ✅ OPTIMIZACIÓN: Deshabilitar recursos innecesarios
     await page.setRequestInterception(true);
     page.on('request', (request) => {
@@ -431,9 +431,9 @@ const downloadChecklistPDF = async (req, res) => {
         request.continue();
       }
     });
-    
+
     // ✅ Usar page.goto con el archivo local
-    await page.goto(`file:///${fileUrl}`, { 
+    await page.goto(`file:///${fileUrl}`, {
       waitUntil: "domcontentloaded",
       timeout: 30000 // Reducir timeout a 30 segundos
     })
@@ -477,7 +477,7 @@ const downloadChecklistPDF = async (req, res) => {
 
     await page.close() // ✅ Explicitly close page
     // ✅ NO cerrar el navegador, mantenerlo abierto para reutilizar
-    
+
     // Limpieza
     try {
       if (fs.existsSync(tempFilePath)) {
@@ -536,13 +536,13 @@ const getBrowserInstance = async () => {
   }).then(browser => {
     browserInstance = browser;
     browserLaunchPromise = null;
-    
+
     // Manejar cierre inesperado
     browser.on('disconnected', () => {
       console.log('⚠️ Navegador desconectado, se creará uno nuevo en la próxima solicitud');
       browserInstance = null;
     });
-    
+
     return browser;
   }).catch(error => {
     browserLaunchPromise = null;
@@ -576,10 +576,118 @@ const getChecklistTypes = async (req, res) => {
   }
 };
 
+const IMAGE_UNAVAILABLE_PLACEHOLDER = `
+  <div style="width:120px;height:80px;background:#e5e7eb;border:1px dashed #9ca3af;border-radius:4px;
+    display:flex;align-items:center;justify-content:center;font-size:7px;color:#6b7280;text-align:center;padding:4px;">
+    Imagen no disponible
+  </div>`;
+
+const formatPdfHours = (startTime, endTime) => {
+  if (!startTime || !endTime) return 'N/A';
+  const ms = new Date(endTime) - new Date(startTime);
+  if (Number.isNaN(ms) || ms < 0) return 'N/A';
+  return `${(ms / 3600000).toFixed(1)} h`;
+};
+
+const buildPdfEvidenceSection = (title, imagePath, imageCache) => {
+  if (!imagePath) return '';
+  const base64 = imageCache[imagePath] || null;
+  const imgHtml = base64
+    ? `<img src="${base64}" class="evidence-image" style="max-width:140px;max-height:100px;"/>`
+    : IMAGE_UNAVAILABLE_PLACEHOLDER;
+  return `
+    <div style="margin-top:6px;">
+      <div style="font-size:7px;font-weight:bold;color:#374151;margin-bottom:3px;">${title}</div>
+      ${imgHtml}
+    </div>`;
+};
+
+const buildFailurePdfBlock = (failure, idx, imageCache, formatDate) => {
+  const t = failure.traceability || {
+    code: 'NONE', label: 'Sin seguimiento', color: '#9ca3af', bgColor: '#f3f4f6', shortLabel: 'Sin seguimiento'
+  };
+  const ar = failure.repairExecution;
+  const wo = failure.workOrder;
+
+  const partsHtml = (wo?.parts || []).map(p =>
+    `<span style="display:block;font-size:7px;">• ${p.name} x${p.quantity}</span>`
+  ).join('');
+  const reqHtml = (wo?.requisitions || []).map(r =>
+    `<span style="display:block;font-size:7px;">• ${r.part_reference} (${r.status}) x${r.quantity_requested}</span>`
+  ).join('');
+
+  let arHtml = '';
+  if (ar) {
+    const signatureHtml = ar.closure_signature
+      ? `<img src="${ar.closure_signature}" alt="Firma" style="max-height:40px;max-width:120px;border:1px solid #e5e7eb;border-radius:2px;"/>`
+      : '<span style="font-size:7px;color:#6b7280;">Sin firma registrada</span>';
+    arHtml = `
+      <div style="margin-top:6px;padding:5px;background:#fff;border-radius:3px;border:1px solid #dbeafe;">
+        <div style="font-size:7px;font-weight:bold;color:#1d4ed8;margin-bottom:3px;">Acta de Reparación (${ar.repair_execution_id})</div>
+        <div style="font-size:7px;color:#374151;"><strong>Actividad:</strong> ${ar.activity_performed || 'N/A'}</div>
+        <div style="font-size:7px;color:#374151;"><strong>Técnico:</strong> ${ar.resolver_name || 'N/A'} |
+          <strong>Horas:</strong> ${formatPdfHours(ar.start_time, ar.end_time)} |
+          <strong>Estado:</strong> ${ar.status || 'N/A'}</div>
+        <div style="font-size:7px;color:#374151;margin-top:2px;"><strong>Firma de cierre:</strong></div>
+        ${signatureHtml}
+        ${ar.evidence_url
+        ? buildPdfEvidenceSection('Evidencia de la reparación', ar.evidence_url, imageCache)
+        : '<div style="font-size:7px;color:#6b7280;margin-top:4px;">Sin evidencia fotográfica de reparación</div>'}
+      </div>`;
+  }
+
+  let otHtml = '';
+  if (wo && t.code === 'OT') {
+    otHtml = `
+      <div style="margin-top:6px;padding:5px;background:#fff;border-radius:3px;border:1px solid #fde68a;">
+        <div style="font-size:7px;font-weight:bold;color:#b45309;margin-bottom:3px;">Orden de Trabajo (${wo.work_order_id})</div>
+        <div style="font-size:7px;color:#374151;"><strong>Estado:</strong> ${wo.status || 'N/A'}</div>
+        ${partsHtml ? `<div style="margin-top:2px;font-size:7px;"><strong>Repuestos:</strong>${partsHtml}</div>` : ''}
+        ${reqHtml ? `<div style="margin-top:2px;font-size:7px;"><strong>Requisiciones:</strong>${reqHtml}</div>` : ''}
+      </div>`;
+  }
+
+  let cancelHtml = '';
+  if (t.code === 'CANCELLED') {
+    const cancelledBy = ar?.cancelled_by_name || wo?.cancelled_by_name || 'No registrado';
+    const cancelledAt = t.cancelled_at ? formatDate(t.cancelled_at) : 'N/A';
+    cancelHtml = `
+      <div style="margin-top:6px;padding:5px;background:#fef2f2;border-radius:3px;border:1px solid #fecaca;">
+        <div style="font-size:7px;font-weight:bold;color:#dc2626;">Falla cancelada</div>
+        <div style="font-size:7px;color:#374151;"><strong>Motivo:</strong> ${t.cancellation_reason || 'N/A'}</div>
+        <div style="font-size:7px;color:#374151;"><strong>Cancelada por:</strong> ${cancelledBy} |
+          <strong>Fecha:</strong> ${cancelledAt}</div>
+      </div>`;
+  }
+
+  return `
+    <div style="background:${t.bgColor};margin-top:6px;padding:6px;border-radius:3px;border-left:3px solid ${t.color};">
+      <div style="font-size:8px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
+        <strong style="color:#1f2937;">${idx + 1}. OF-${failure.failure_order_id}</strong>
+        <span style="font-size:7px;font-weight:bold;color:${t.color};background:#fff;padding:2px 6px;border-radius:3px;border:1px solid ${t.color};white-space:nowrap;">${t.label}</span>
+      </div>
+      <div style="font-size:7px;color:#6b7280;margin-bottom:3px;">
+        <strong>Fecha reporte:</strong> ${formatDate(failure.created_at)} |
+        <strong>Severidad:</strong> ${failure.severity || 'N/A'} |
+        <strong>Máquina:</strong> ${failure.affected_machine || 'N/A'}
+      </div>
+      <div style="font-size:8px;color:#374151;margin-bottom:4px;">${failure.description}</div>
+      <div style="font-size:7px;color:#6b7280;margin-bottom:2px;">
+        <strong>Reportó:</strong> ${failure.reporter_name || 'N/A'} |
+        <strong>Asignado:</strong> ${failure.assigned_to_name || 'N/A'} |
+        <strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez/veces` : 'Primera vez'}
+      </div>
+      ${buildPdfEvidenceSection('Evidencia de la falla', failure.evidence_url, imageCache)}
+      ${arHtml}
+      ${otHtml}
+      ${cancelHtml}
+    </div>`;
+};
+
 const generateChecklistHTML = async (data) => {
   const fs = require('fs');
   const path = require('path');
-  
+
   // ✅ Intentar cargar Sharp, pero tener fallback si falla
   let sharp = null;
   let useSharp = false;
@@ -591,51 +699,49 @@ const generateChecklistHTML = async (data) => {
     console.warn('⚠️ Sharp no disponible, usando conversión directa (sin optimización):', error.message);
     useSharp = false;
   }
-  
+
   // ✅ Función para convertir imágenes a base64 (con o sin Sharp)
+  const { resolveLocalEvidencePath } = require('../config/multerConfig');
+
   const getImageAsBase64 = async (imagePath) => {
     if (!imagePath) return null;
-    
+
     try {
-      let cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
-      const absolutePath = path.join(__dirname, '../../public', cleanPath);
-      
-      if (!fs.existsSync(absolutePath)) {
+      if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
         return null;
       }
 
+      let absolutePath = resolveLocalEvidencePath(imagePath);
+      if (!absolutePath || !fs.existsSync(absolutePath)) {
+        const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+        absolutePath = path.join(__dirname, '../../public', cleanPath);
+        if (!fs.existsSync(absolutePath)) {
+          return null;
+        }
+      }
+
       const fileData = fs.readFileSync(absolutePath);
-      
-      // Si Sharp está disponible, optimizar
-      if (useSharp && sharp) {
+      const sizeKb = fileData.length / 1024;
+
+      if (useSharp && sharp && sizeKb >= 200) {
         try {
           const buffer = await sharp(fileData)
-            .resize(800, 600, {
-              fit: 'inside',
-              withoutEnlargement: true
-            })
-            .jpeg({ 
-              quality: 75,
-              progressive: true
-            })
+            .resize(800, 600, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 75, progressive: true })
             .toBuffer();
-          
           return `data:image/jpeg;base64,${buffer.toString('base64')}`;
         } catch (sharpError) {
           console.warn('⚠️ Error con Sharp, usando fallback:', sharpError.message);
-          // Continuar con fallback abajo
         }
       }
-      
-      // Fallback: conversión directa sin optimización
+
       const ext = path.extname(absolutePath).toLowerCase().replace('.', '');
       let mimeType = 'image/jpeg';
       if (ext === 'png') mimeType = 'image/png';
       else if (ext === 'gif') mimeType = 'image/gif';
       else if (ext === 'webp') mimeType = 'image/webp';
-      
+
       return `data:${mimeType};base64,${fileData.toString('base64')}`;
-      
     } catch (error) {
       console.error('❌ Error al procesar imagen para PDF:', imagePath, error.message);
       return null;
@@ -644,12 +750,12 @@ const generateChecklistHTML = async (data) => {
 
   // ✅ PRE-PROCESAR TODAS LAS IMÁGENES ANTES DE GENERAR HTML
   const imageCache = {};
-  
+
   // Procesar imagen del usuario
   if (data.creator?.user_image) {
     imageCache[data.creator.user_image] = await getImageAsBase64(data.creator.user_image);
   }
-  
+
   // Procesar imágenes de respuestas y fallas
   if (data.items) {
     for (const item of data.items) {
@@ -664,7 +770,7 @@ const generateChecklistHTML = async (data) => {
           }
         }
       }
-      
+
       // Para checklists normales, procesar respuestas directas
       if (item.responses && item.responses[0]?.evidence_url) {
         const url = item.responses[0].evidence_url;
@@ -674,18 +780,25 @@ const generateChecklistHTML = async (data) => {
       }
     }
   }
-  
-  // Procesar imágenes de fallas
+
+  // Procesar imágenes de fallas (evidencia de falla y de reparación)
   if (data.failures?.failures_by_item) {
     for (const itemFailures of Object.values(data.failures.failures_by_item)) {
       for (const failure of itemFailures) {
-        if (failure.evidence_url && !imageCache[failure.evidence_url]) {
-          imageCache[failure.evidence_url] = await getImageAsBase64(failure.evidence_url);
+        const urls = [
+          failure.evidence_url,
+          failure.repairExecution?.evidence_url
+        ].filter(Boolean);
+
+        for (const url of urls) {
+          if (!imageCache[url]) {
+            imageCache[url] = await getImageAsBase64(url);
+          }
         }
       }
     }
   }
-  
+
   console.log(`✅ Pre-procesadas ${Object.keys(imageCache).length} imágenes para PDF ${useSharp ? '(optimizadas con Sharp)' : '(sin optimización)'}`);
 
   const formatDate = (dateStr) => {
@@ -762,33 +875,7 @@ const generateChecklistHTML = async (data) => {
           failuresHtml = `
             <div style="margin-top: 6px; padding: 6px; background: #fefbeb; border-radius: 4px;">
               <strong style="font-size: 9px; color: #92400e;">📋 Órdenes de Falla (${itemFailures.length})</strong>
-              ${itemFailures.map((failure, idx) => {
-                const t = failure.traceability || { code: 'NONE', label: 'Sin seguimiento', color: '#9ca3af', bgColor: '#f3f4f6', shortLabel: '—' };
-                const partsHtml = (t.parts || []).map(p =>
-                  `<span style="display:block;font-size:7px;">• ${p.inventory?.name || 'Repuesto'} x${p.quantity_used}</span>`
-                ).join('');
-                const reqHtml = (t.requisitions || []).map(r =>
-                  `<span style="display:block;font-size:7px;">• ${r.part_reference} (${r.status}) x${r.quantity_requested}</span>`
-                ).join('');
-                return `
-                <div style="background: ${t.bgColor}; margin-top: 6px; padding: 6px; border-radius: 3px; border-left: 3px solid ${t.color};">
-                  <div style="font-size: 8px; margin-bottom: 4px; display:flex; justify-content:space-between; align-items:center;">
-                    <strong style="color: #1f2937;">${idx + 1}. ${failure.severity || 'N/A'}</strong>
-                    <span style="font-size:7px;font-weight:bold;color:${t.color};background:#fff;padding:2px 6px;border-radius:3px;border:1px solid ${t.color};">${t.shortLabel}</span>
-                  </div>
-                  <div style="font-size: 8px; color: #374151; margin-bottom: 4px;">${failure.description}</div>
-                  <div style="font-size: 7px; color: #6b7280; margin-bottom: 4px;">
-                    <strong>Trazabilidad:</strong> ${t.label}
-                    ${t.code === 'AR' && t.activity ? ` | <strong>Actividad:</strong> ${t.activity}` : ''}
-                    ${t.code === 'OT' ? (reqHtml || partsHtml ? `<div style="margin-top:2px;">${reqHtml}${partsHtml}</div>` : '') : ''}
-                    ${t.code === 'CANCELLED' && t.cancellation_reason ? ` | <strong>Motivo:</strong> ${t.cancellation_reason}` : ''}
-                  </div>
-                  <div style="font-size: 7px; color: #6b7280;">
-                    <strong>Asignado:</strong> ${failure.assigned_to_name} |
-                    <strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez/veces` : 'Primera vez'}
-                  </div>
-                </div>`;
-              }).join('')}
+              ${itemFailures.map((failure, idx) => buildFailurePdfBlock(failure, idx, imageCache, formatDate)).join('')}
             </div>
           `;
         }
@@ -804,17 +891,6 @@ const generateChecklistHTML = async (data) => {
         let evidenceBase64 = imageCache[response.evidence_url] || null;
         let evidence = evidenceBase64 ?
           `<a href="${evidenceBase64}" target="_blank"><img src="${evidenceBase64}" class="evidence-image"/></a>` : "";
-
-        if (itemFailures.length > 0) {
-          const failureImages = itemFailures
-            .filter(f => f.evidence_url)
-            .map(f => {
-               let fEvBase64 = imageCache[f.evidence_url] || null;
-               return fEvBase64 ? `<a href="${fEvBase64}" target="_blank"><img src="${fEvBase64}" class="evidence-image" style="margin-top: 4px; border-color: #ef4444;"/></a>` : '';
-            })
-            .join('');
-          evidence = evidence + failureImages;
-        }
 
         html += `
                     <tr class="sub-item-row">
@@ -900,8 +976,8 @@ const generateChecklistHTML = async (data) => {
                 <div style="margin-top: 4px; padding: 4px; background: #fefbeb; border-radius: 4px;">
                   <strong style="font-size: 8px; color: #92400e;">📋 Fallas (${itemFailures.length})</strong>
                   ${itemFailures.map((failure, idx) => {
-                    const t = failure.traceability || { code: 'NONE', label: 'Sin seguimiento', color: '#9ca3af', bgColor: '#f3f4f6', shortLabel: '—' };
-                    return `
+                const t = failure.traceability || { code: 'NONE', label: 'Sin seguimiento', color: '#9ca3af', bgColor: '#f3f4f6', shortLabel: '—' };
+                return `
                     <div style="background: ${t.bgColor}; margin-top: 4px; padding: 4px; border-radius: 3px; border-left: 3px solid ${t.color};">
                       <div style="font-size: 7px; margin-bottom: 2px; display:flex; justify-content:space-between; align-items:center;">
                         <strong>${idx + 1}. ${failure.severity || 'N/A'}</strong>
@@ -914,7 +990,7 @@ const generateChecklistHTML = async (data) => {
                         <strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez` : 'Primera vez'}
                       </div>
                     </div>`;
-                  }).join('')}
+              }).join('')}
                 </div>
               `;
             }
@@ -929,17 +1005,6 @@ const generateChecklistHTML = async (data) => {
             let evidenceBase64 = imageCache[response.evidence_url] || null;
             let evidence = evidenceBase64 ?
               `<a href="${evidenceBase64}" target="_blank"><img src="${evidenceBase64}" class="evidence-image"/></a>` : "";
-
-            if (itemFailures.length > 0) {
-              const failureImages = itemFailures
-                .filter(f => f.evidence_url)
-                .map(f => {
-                   let fEvBase64 = imageCache[f.evidence_url] || null;
-                   return fEvBase64 ? `<a href="${fEvBase64}" target="_blank"><img src="${fEvBase64}" class="evidence-image" style="margin-top: 4px; border-color: #ef4444;"/></a>` : '';
-                })
-                .join('');
-              evidence = evidence + failureImages;
-            }
 
             html += `
                         <tr class="sub-item-row">
@@ -1443,10 +1508,10 @@ const generateChecklistHTML = async (data) => {
                             <td colspan="3">
                                 <div class="user-info">
                                     ${(() => {
-                                        if (!data.creator.user_image) return '';
-                                        const imgB64 = imageCache[data.creator.user_image] || null;
-                                        return imgB64 ? `<img src="${imgB64}" alt="User Image" class="user-avatar" onerror="this.style.display='none';"/>` : '';
-                                    })()}
+      if (!data.creator.user_image) return '';
+      const imgB64 = imageCache[data.creator.user_image] || null;
+      return imgB64 ? `<img src="${imgB64}" alt="User Image" class="user-avatar" onerror="this.style.display='none';"/>` : '';
+    })()}
                                     <div>
                                         <strong>${data.creator.user_name}</strong><br/>
                                         <small style="color: var(--slate-600);">${data.creator.role.role_name}</small>
@@ -1478,14 +1543,14 @@ const generateChecklistHTML = async (data) => {
                             <td colspan="3">
                                 <div style="font-size: 10px;">
                                     <strong>Informe de Códigos QR Desbloqueados</strong><br/>
-                                    ${data.qr_scans && data.qr_scans.length > 0 ? 
-                                        data.qr_scans.map(scan => 
-                                            `<div style="margin-top: 4px; padding: 4px; background: var(--slate-50); border-radius: 4px;">
+                                    ${data.qr_scans && data.qr_scans.length > 0 ?
+        data.qr_scans.map(scan =>
+          `<div style="margin-top: 4px; padding: 4px; background: var(--slate-50); border-radius: 4px;">
                                                 <strong>${scan.qr_code}</strong> - Desbloqueado: ${new Date(scan.scanned_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
                                             </div>`
-                                        ).join('') 
-                                        : '<small style="color: var(--slate-500);">No hay registros de QR desbloqueados</small>'
-                                    }
+        ).join('')
+        : '<small style="color: var(--slate-500);">No hay registros de QR desbloqueados</small>'
+      }
                                     <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--slate-200);">
                                         <strong>Hora de Creación del Checklist:</strong> ${new Date(data.createdAt).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' })}
                                     </div>
@@ -1647,20 +1712,20 @@ const getLatestChecklistByType = async (req, res) => {
   try {
     const { checklistTypeId } = req.params
     const { user_id, role_id } = req.user
-    
+
     console.log(`📥 [getLatestChecklistByType] Request received:`, {
       checklistTypeId,
       user_id,
       role_id,
       query: req.query
     });
-    
+
     const checklist = await checklistService.getLatestChecklistByType({
       checklistTypeId: Number.parseInt(checklistTypeId),
       user_id,
       role_id,
     })
-    
+
     console.log(`📤 [getLatestChecklistByType] Response:`, {
       checklistId: checklist?.checklist_id,
       weekIdentifier: checklist?.week_identifier,
@@ -1668,7 +1733,7 @@ const getLatestChecklistByType = async (req, res) => {
       typeCategory: checklist?.type?.type_category,
       frequency: checklist?.type?.frequency
     });
-    
+
     res.status(200).json(checklist)
   } catch (error) {
     console.error(`❌ [getLatestChecklistByType] Error:`, error.message);

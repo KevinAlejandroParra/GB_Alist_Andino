@@ -1,7 +1,7 @@
 const express = require("express")
 const router = express.Router()
 const { verifyToken } = require("../middleware/authMiddleware")
-const upload = require("../config/multerConfig")
+const { uploadFailureEvidence, toRelativePath } = require("../config/multerConfig")
 
 
 
@@ -77,18 +77,18 @@ router.post("/fix-checklists", async (req, res) => {
   }
 })
 
-router.post("/upload-evidence", verifyToken, upload.single("evidence"), (req, res) => {
+router.post("/upload-evidence", verifyToken, uploadFailureEvidence.single("evidence"), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No se proporcionó ningún archivo" })
     }
 
-    // Construir la ruta relativa del archivo
-    const filePath = `/media/${req.file.filename}`
+    // Ruta relativa en DB: uploads/fallas/evidencias/<nombre_original>
+    const filePath = toRelativePath(req.file.path)
 
     res.json({
       message: "Archivo subido exitosamente",
-      filePath: filePath,
+      filePath,
       originalName: req.file.originalname,
     })
   } catch (error) {

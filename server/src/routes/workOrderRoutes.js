@@ -72,10 +72,10 @@ router.get('/:id/parts', (req, res) => workOrderController.getWorkOrderParts(req
 // DELETE /api/work-orders/:id/parts/:partId - Eliminar un repuesto de una OT
 router.delete('/:id/parts/:partId', (req, res) => workOrderController.removeWorkOrderPart(req, res));
 
-const upload = require('../config/multerConfig');
+const { uploadRepairEvidence } = require('../config/multerConfig');
 
-// PUT /api/work-orders/:id/imagen - Actualizar imagen de evidencia
-router.put('/:id/imagen', upload.single('evidence'), (req, res) => workOrderController.updateEvidenceImage(req, res));
+// PUT /api/work-orders/:id/imagen - Actualizar imagen de evidencia de la reparación (técnico)
+router.put('/:id/imagen', uploadRepairEvidence.single('evidence'), (req, res) => workOrderController.updateEvidenceImage(req, res));
 
 // DELETE /api/work-orders/:id/imagen - Eliminar imagen de evidencia
 router.delete('/:id/imagen', (req, res) => workOrderController.deleteEvidenceImage(req, res));

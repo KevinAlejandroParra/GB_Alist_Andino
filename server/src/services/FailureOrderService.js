@@ -634,32 +634,24 @@ class FailureOrderService {
         parts_count: failureOrder.workOrder?.parts?.length || 0
       };
 
-      // 1. Eliminar imagen de evidencia de Cloudinary o del servidor si es antigua
-      if (failureOrder.evidence_url) {
+      // 1. Eliminar imagen de evidencia (Cloudinary, disco local uploads/ o legacy /media/)
+      if (failureOrder.evidence_url || failureOrder.evidence_public_id) {
         try {
           if (failureOrder.evidence_public_id) {
-            // Eliminar de Cloudinary
             const { cloudinary } = require('../config/cloudinary');
             await cloudinary.uploader.destroy(failureOrder.evidence_public_id);
             console.log('✅ [DELETE FAILURE] Imagen eliminada de Cloudinary:', failureOrder.evidence_public_id);
-          } else {
-            // Retrocompatibilidad: Eliminar imagen local antigua
-            const filename = failureOrder.evidence_url.replace('/media/', '');
-            const mediaPath = path.join(__dirname, '../../public/media', filename);
-            
-            try {
-              await fs.access(mediaPath);
-              await fs.unlink(mediaPath);
-              console.log('✅ [DELETE FAILURE] Imagen eliminada exitosamente:', filename);
-            } catch (accessError) {
-              if (accessError.code === 'ENOENT') {
-                console.log('⚠️ [DELETE FAILURE] Imagen no encontrada en el servidor:', filename);
-              }
+          } else if (failureOrder.evidence_url) {
+            const { deleteLocalEvidenceFile } = require('../config/multerConfig');
+            const deleted = await deleteLocalEvidenceFile(failureOrder.evidence_url);
+            if (deleted) {
+              console.log('✅ [DELETE FAILURE] Imagen local eliminada:', failureOrder.evidence_url);
+            } else {
+              console.log('⚠️ [DELETE FAILURE] Imagen no encontrada en el servidor:', failureOrder.evidence_url);
             }
           }
         } catch (fileError) {
           console.error('❌ [DELETE FAILURE] Error eliminando imagen:', fileError.message);
-          // No lanzar error, continuar con la eliminación de la falla
         }
       }
 

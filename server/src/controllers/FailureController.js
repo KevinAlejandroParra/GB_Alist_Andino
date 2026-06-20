@@ -3,7 +3,20 @@
 const FailureOrderService = require('../services/FailureOrderService');
 const FailureBookService = require('../services/FailureBookService');
 const FailureSignatureService = require('../services/FailureSignatureService');
-const upload = require('../config/multerConfig');
+const { toRelativePath, deleteLocalEvidenceFile } = require('../config/multerConfig');
+
+async function removeStoredEvidence({ evidence_url, evidence_public_id }) {
+  if (evidence_public_id) {
+    try {
+      const { cloudinary } = require('../config/cloudinary');
+      await cloudinary.uploader.destroy(evidence_public_id);
+    } catch (err) {
+      console.error('❌ Error eliminando imagen de Cloudinary:', err);
+    }
+  } else if (evidence_url) {
+    await deleteLocalEvidenceFile(evidence_url);
+  }
+}
 
 class FailureController {
   /**
@@ -177,7 +190,8 @@ class FailureController {
       // Manejar archivo de evidencia si se subió
       let evidenceUrl = null;
       if (req.file) {
-        evidenceUrl = `/media/${req.file.filename}`;
+        // Ruta relativa persistida en DB: uploads/fallas/evidencias/<nombre_original>
+        evidenceUrl = toRelativePath(req.file.path);
       }
 
       const reportedBy = req.user.user_id;
@@ -273,7 +287,8 @@ class FailureController {
       // Manejar archivo de evidencia si se subió
       let evidenceUrl = null;
       if (req.file) {
-        evidenceUrl = `/media/${req.file.filename}`;
+        // Ruta relativa persistida en DB: uploads/fallas/evidencias/<nombre_original>
+        evidenceUrl = toRelativePath(req.file.path);
       }
 
       const reportedBy = req.user.user_id;
@@ -764,19 +779,19 @@ class FailureController {
             { failure_order_id: { [Op.like]: pattern } },
             // Para campos de relaciones que pueden ser null, necesitamos
             // una condición más compleja que maneje el caso de relación ausente
-            { 
+            {
               [Op.and]: [
                 { '$checklistItem.checklist_item_id$': { [Op.not]: null } },
                 { '$checklistItem.question_text$': { [Op.like]: pattern } }
               ]
             },
-            { 
+            {
               [Op.and]: [
                 { '$affectedInspectable.ins_id$': { [Op.not]: null } },
                 { '$affectedInspectable.name$': { [Op.like]: pattern } }
               ]
             },
-            { 
+            {
               [Op.and]: [
                 { '$reporter.user_id$': { [Op.not]: null } },
                 { '$reporter.user_name$': { [Op.like]: pattern } }
@@ -784,7 +799,7 @@ class FailureController {
             }
           ]
         };
-        
+
         // Si ya hay condiciones en whereConditions, combinar con AND
         // para no sobreescribir Op.or existente
         if (Object.keys(whereConditions).length > 0) {
@@ -818,7 +833,7 @@ class FailureController {
             { '$workOrder.status$': { [Op.notIn]: RESOLVED_STATUSES } }
           ]
         };
-        
+
         // Si ya hay condiciones en whereConditions, combinar con AND
         // para no sobreescribir estructura existente
         if (Object.keys(whereConditions).length > 0) {
@@ -2056,8 +2071,9 @@ class FailureController {
       let evidencePublicId = null;
 
       if (req.file) {
-        evidenceUrl = req.file.path; // URL de Cloudinary
-        evidencePublicId = req.file.filename; // public_id de Cloudinary
+        // Ruta relativa persistida en DB: uploads/fallas/evidencias/<nombre_original>
+        evidenceUrl = toRelativePath(req.file.path);
+        evidencePublicId = null; // almacenamiento local: no hay public_id de Cloudinary
       } else if (req.body.evidenceUrl) {
         evidenceUrl = req.body.evidenceUrl;
       } else {
@@ -2067,20 +2083,9 @@ class FailureController {
         });
       }
 
-      // Eliminar imagen anterior de Cloudinary si existe
-      if (failureOrder.evidence_public_id) {
-        try {
-          const { cloudinary } = require('../config/cloudinary');
-          await cloudinary.uploader.destroy(failureOrder.evidence_public_id);
-        } catch (e) {
-          console.error('❌ Error eliminando imagen antigua de Cloudinary:', e);
-        }
-      }
+      await removeStoredEvidence(failureOrder);
 
-      const updateData = { evidence_url: evidenceUrl };
-      if (evidencePublicId) {
-        updateData.evidence_public_id = evidencePublicId;
-      }
+      const updateData = { evidence_url: evidenceUrl, evidence_public_id: evidencePublicId };
       await failureOrder.update(updateData);
 
       console.log(`✅ [UPDATE IMAGE] OF-${failureOrder.failure_order_id} imagen actualizada: ${evidenceUrl}`);
@@ -2156,8 +2161,9 @@ class FailureController {
         });
       }
 
-      const { FailureOrder, User, Inspectable, WorkOrder, ChecklistItem } = require('../models');
+      const { FailureOrder, User, Inspectable, WorkOrder, ChecklistItem, RepairExecution } = require('../models');
       const { Op } = require('sequelize');
+      const repairExecutionService = require('../services/repairExecutionService');
 
       const itemIdsArray = item_ids.split(',').map(id => parseInt(id)).filter(id => !isNaN(id));
 
@@ -2256,6 +2262,11 @@ class FailureController {
             model: WorkOrder,
             as: 'workOrder',
             attributes: ['work_order_id', 'status', 'start_time', 'activity_performed']
+          },
+          {
+            model: RepairExecution,
+            as: 'repairExecution',
+            attributes: ['repair_execution_id', 'status', 'start_time', 'activity_performed']
           }
         ],
         order: [['createdAt', 'DESC']]
@@ -2264,28 +2275,24 @@ class FailureController {
       console.log('🔍 [GET FAILURES BY ITEMS] Total fallas encontradas:', failureOrders.length);
 
       // ✅ IMPLEMENTACIÓN: Ocultar fallas atendidas (con OT en status RESUELTA)
-      const activeFailures = failureOrders.filter(fo => {
+      const activeFailures = failureOrders
+        .filter((failureOrder) => {
+          const effectiveStatus = repairExecutionService.getEffectiveStatus(failureOrder);
 
-        // ✅ OCULTAR fallas que tengan OT con status RESUELTA (ya están atendidas)
-        // Usamos toUpperCase y trim para evitar problemas de formato
-        if (fo.workOrder && ['RESUELTA', 'CERRADA', 'FINALIZADA'].includes(String(fo.workOrder.status).toUpperCase().trim())) {
-          return false;
-        }
+          if (status === 'all') {
+            return true;
+          }
 
-        // Filtrar por status parámetro si se especifica
-        if (status === 'active' && fo.workOrder && ['EN_PROCESO', 'EN_PRUEBAS'].includes(String(fo.workOrder.status).toUpperCase().trim())) {
-          // Solo mostrar fallas con OT activa
-          return true;
-        }
+          if (status === 'active') {
+            return !repairExecutionService.isClosed(failureOrder);
+          }
 
-        // Si no tiene OT, mostrarla (fallas sin OT = pendientes)
-        if (!fo.workOrder) {
-          return true;
-        }
-
-        // Si tiene OT pero no está resuelta ni en los estados "active" específicos (casos raros), mostrarla por defecto
-        return true;
-      });
+          return effectiveStatus === status;
+        })
+        .map((failureOrder) => ({
+          ...failureOrder.toJSON(),
+          execution_status: repairExecutionService.getEffectiveStatus(failureOrder)
+        }));
 
       console.log('🔍 [GET FAILURES BY ITEMS] Fallas activas filtradas:', activeFailures.length);
 
@@ -2335,8 +2342,9 @@ class FailureController {
 
       console.log('🔍 [GET FAILURES BY CHECKLIST TYPE] checklistTypeId:', checklistTypeId);
 
-      const { ChecklistItem, FailureOrder, User, Inspectable, WorkOrder } = require('../models');
+      const { ChecklistItem, FailureOrder, User, Inspectable, WorkOrder, RepairExecution } = require('../models');
       const { Op } = require('sequelize');
+      const repairExecutionService = require('../services/repairExecutionService');
 
       // Obtener todos los checklist_item_ids de este tipo
       const checklistItems = await ChecklistItem.findAll({
@@ -2373,19 +2381,18 @@ class FailureController {
             model: WorkOrder,
             as: 'workOrder',
             attributes: ['work_order_id', 'status', 'start_time', 'activity_performed']
+          },
+          {
+            model: RepairExecution,
+            as: 'repairExecution',
+            attributes: ['repair_execution_id', 'status', 'start_time', 'activity_performed']
           }
         ],
         order: [['createdAt', 'DESC']]
       });
 
-      // Filtrar solo activas (sin OT resuelta)
-      const RESOLVED = ['RESUELTA', 'CERRADA', 'FINALIZADA', 'CANCELADO'];
-      const activeFailures = failureOrders.filter(fo => {
-        if (fo.workOrder && RESOLVED.includes(String(fo.workOrder.status).toUpperCase().trim())) {
-          return false;
-        }
-        return true;
-      });
+      // Filtrar solo activas usando RepairExecution como fuente de verdad
+      const activeFailures = failureOrders.filter(fo => !repairExecutionService.isClosed(fo));
 
       console.log('✅ [GET FAILURES BY CHECKLIST TYPE] Activas:', activeFailures.length, '/ Total:', failureOrders.length);
 
@@ -2490,11 +2497,12 @@ class FailureController {
       const itemIds = checklistItems.map(item => item.checklist_item_id);
       console.log('🔍 [GET RESOLVED FAILURES BY CHECKLIST TYPE] Items encontrados:', itemIds);
 
-      // Obtener fallas resueltas (con OT en status RESUELTA)
-      const { FailureOrder, User, Inspectable, WorkOrder } = require('../models');
+      // Obtener fallas resueltas (con AR/OT en status RESUELTA o CANCELADO)
+      const { FailureOrder, User, Inspectable, WorkOrder, RepairExecution } = require('../models');
       const { Op } = require('sequelize');
+      const repairExecutionService = require('../services/repairExecutionService');
 
-      const resolvedFailures = await FailureOrder.findAll({
+      const allFailures = await FailureOrder.findAll({
         where: {
           checklist_item_id: {
             [Op.in]: itemIds
@@ -2519,13 +2527,21 @@ class FailureController {
           {
             model: WorkOrder,
             as: 'workOrder',
-            required: true,
-            attributes: ['work_order_id', 'status', 'start_time', 'activity_performed'],
-            where: { status: { [Op.in]: ['RESUELTA', 'CANCELADO'] } }
+            required: false,
+            attributes: ['work_order_id', 'status', 'start_time', 'activity_performed']
+          },
+          {
+            model: RepairExecution,
+            as: 'repairExecution',
+            required: false,
+            attributes: ['repair_execution_id', 'status', 'start_time', 'activity_performed']
           }
         ],
         order: [['createdAt', 'DESC']]
       });
+
+      // Filtrar solo las resueltas usando getEffectiveStatus
+      const resolvedFailures = allFailures.filter(fo => repairExecutionService.isClosed(fo));
 
       console.log('🔍 [GET RESOLVED FAILURES BY CHECKLIST TYPE] Total fallas resueltas:', resolvedFailures.length);
 
@@ -2554,7 +2570,18 @@ class FailureController {
    */
   async updateRepairExecution(req, res) {
     try {
-      const repairExecutionId = parseInt(req.params.repairExecutionId, 10);
+      const { RepairExecution } = require('../models');
+      const repairExecutionService = require('../services/repairExecutionService');
+
+      let repairExecutionId = parseInt(req.params.repairExecutionId, 10);
+      if (Number.isNaN(repairExecutionId)) {
+        const failureOrderId = parseInt(req.params.id, 10);
+        if (!Number.isNaN(failureOrderId)) {
+          const re = await RepairExecution.findOne({ where: { failure_order_id: failureOrderId } });
+          if (re) repairExecutionId = re.id;
+        }
+      }
+
       if (Number.isNaN(repairExecutionId)) {
         return res.status(400).json({
           success: false,
@@ -2578,7 +2605,6 @@ class FailureController {
         });
       }
 
-      const repairExecutionService = require('../services/repairExecutionService');
       const result = await repairExecutionService.updateFields(repairExecutionId, updateData);
 
       res.status(200).json({ success: true, data: result });
@@ -2691,10 +2717,11 @@ class FailureController {
         code: 'DELETE_DISABLED',
         message: 'La eliminación permanente no está disponible. Use cancelación para archivar la falla.'
       }
+    });
   }
 
   /**
-   * Actualizar imagen de evidencia en Cloudinary y DB
+   * Actualizar imagen de evidencia en disco local y DB
    * PUT /api/failures/:id/imagen
    */
   async updateEvidenceImage(req, res) {
@@ -2709,26 +2736,17 @@ class FailureController {
       }
 
       const { FailureOrder } = require('../models');
-      const { cloudinary } = require('../config/cloudinary');
 
       const failureOrder = await FailureOrder.findByPk(failureOrderId);
       if (!failureOrder) {
         return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
       }
 
-      // Eliminar imagen anterior de Cloudinary si existe
-      if (failureOrder.evidence_public_id) {
-        try {
-          await cloudinary.uploader.destroy(failureOrder.evidence_public_id);
-        } catch (err) {
-          console.error('❌ Error eliminando imagen antigua:', err);
-        }
-      }
+      await removeStoredEvidence(failureOrder);
 
-      // Actualizar DB con nueva imagen
       await failureOrder.update({
-        evidence_url: req.file.path,
-        evidence_public_id: req.file.filename
+        evidence_url: toRelativePath(req.file.path),
+        evidence_public_id: null
       });
 
       res.status(200).json({
@@ -2743,7 +2761,7 @@ class FailureController {
   }
 
   /**
-   * Eliminar imagen de evidencia de Cloudinary y DB
+   * Eliminar imagen de evidencia del disco local/Cloudinary y DB
    * DELETE /api/failures/:id/imagen
    */
   async deleteEvidenceImage(req, res) {
@@ -2754,23 +2772,14 @@ class FailureController {
       }
 
       const { FailureOrder } = require('../models');
-      const { cloudinary } = require('../config/cloudinary');
 
       const failureOrder = await FailureOrder.findByPk(failureOrderId);
       if (!failureOrder) {
         return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
       }
 
-      // Eliminar de Cloudinary
-      if (failureOrder.evidence_public_id) {
-        try {
-          await cloudinary.uploader.destroy(failureOrder.evidence_public_id);
-        } catch (err) {
-          console.error('❌ Error eliminando imagen antigua:', err);
-        }
-      }
+      await removeStoredEvidence(failureOrder);
 
-      // Actualizar DB para quitar la imagen
       await failureOrder.update({
         evidence_url: null,
         evidence_public_id: null

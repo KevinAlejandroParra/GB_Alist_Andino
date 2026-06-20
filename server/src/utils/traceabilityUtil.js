@@ -34,7 +34,7 @@ function computeTraceability({ repairExecution, workOrder, requisitions = [], pa
     return {
       code: 'NONE',
       label: 'Sin seguimiento',
-      shortLabel: '—',
+      shortLabel: 'Sin seguimiento',
       color: '#9ca3af',
       bgColor: '#f3f4f6'
     };
@@ -47,7 +47,7 @@ function computeTraceability({ repairExecution, workOrder, requisitions = [], pa
     return {
       code: 'CANCELLED',
       label: 'Falla cancelada',
-      shortLabel: 'Cancelada',
+      shortLabel: 'Falla cancelada',
       color: '#dc2626',
       bgColor: '#fef2f2',
       showInPdf: showCancelled,
@@ -60,10 +60,10 @@ function computeTraceability({ repairExecution, workOrder, requisitions = [], pa
     const hasPendingReq = requisitions.some(r => ['SOLICITADO', 'PENDIENTE'].includes(r.status));
     return {
       code: 'OT',
-      label: hasPendingReq ? 'OT — repuestos solicitados' : 'OT — repuestos en reparación',
-      shortLabel: 'OT',
-      color: '#c2410c',
-      bgColor: '#fff7ed',
+      label: 'Orden de Trabajo',
+      shortLabel: 'Orden de Trabajo',
+      color: '#f59e0b',
+      bgColor: '#fffbeb',
       requisitions,
       parts,
       activity: repairExecution?.activity_performed || workOrder?.activity_performed,
@@ -74,8 +74,8 @@ function computeTraceability({ repairExecution, workOrder, requisitions = [], pa
   return {
     code: 'AR',
     label: 'Acta de Reparación',
-    shortLabel: 'AR',
-    color: '#1d4ed8',
+    shortLabel: 'Acta de Reparación',
+    color: '#3b82f6',
     bgColor: '#eff6ff',
     activity: repairExecution?.activity_performed || workOrder?.activity_performed,
     status,

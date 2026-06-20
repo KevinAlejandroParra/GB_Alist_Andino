@@ -26,6 +26,7 @@ export default function WorkOrderProcessModal({
     isOpen,
     onClose,
     workOrder,
+    failureId: propFailureId,
     onUpdate,
     user
 }) {
@@ -39,6 +40,9 @@ export default function WorkOrderProcessModal({
     const [loadingSignatures, setLoadingSignatures] = useState(false)
     const [technicians, setTechnicians] = useState([])
     const [loadingTechnicians, setLoadingTechnicians] = useState(false)
+
+    // ID de la orden de falla para usar en endpoints de repair-execution
+    const failureId = propFailureId || workOrder?.failure_order_id
 
     const [formData, setFormData] = useState({
         activityPerformed: '',
@@ -130,8 +134,14 @@ export default function WorkOrderProcessModal({
                 setHasExistingEvidence(false)
             }
 
-            // Cargar repuestos de la orden de trabajo
-            loadWorkOrderParts()
+            // Determinar si la entidad es OT formal o AR
+            const detectedWorkOrderId = workOrder?.work_order_id ? workOrder.id : null;
+            setFormalWorkOrderId(detectedWorkOrderId)
+
+            // Cargar repuestos solo si existe una OT formal
+            if (detectedWorkOrderId) {
+                loadWorkOrderParts(detectedWorkOrderId)
+            }
             // Cargar lista de técnicos
             loadTechnicians()
         }
@@ -224,7 +234,7 @@ export default function WorkOrderProcessModal({
             formDataUpload.append("evidence", compressedFile)
 
             const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formDataUpload)
-  
+
 
             const newFilePath = response.data.filePath
             setUploadedEvidenceUrl(newFilePath)
@@ -363,9 +373,26 @@ export default function WorkOrderProcessModal({
 
             setFormData(prev => ({ ...prev, requiresReplacement: newValue }))
 
-            // Si se cambia a "No Requiere Repuestos", limpiar repuestos cargados
-            if (!newValue) {
-                setWorkOrderParts([])
+            // Cargar o limpiar repuestos según el nuevo estado
+            if (newValue) {
+                if (createResp?.data?.data?.id) {
+                    // Se acaba de crear una OT formal desde la AR
+                    const newWoId = createResp.data.data.id;
+                    setFormalWorkOrderId(newWoId);
+                    loadWorkOrderParts(newWoId);
+                } else if (formalWorkOrderId) {
+                    // Ya existía una OT formal
+                    loadWorkOrderParts(formalWorkOrderId);
+                } else if (!arMode) {
+                    // Es OT real — usar su propio ID
+                    setFormalWorkOrderId(workOrder.id);
+                    loadWorkOrderParts(workOrder.id);
+                } else {
+                    setWorkOrderParts([]);
+                }
+            } else {
+                setFormalWorkOrderId(null);
+                setWorkOrderParts([]);
             }
 
             await Swal.fire({
@@ -447,7 +474,7 @@ export default function WorkOrderProcessModal({
         const missingFields = []
 
         // 1. Validar evidencia de la solución
-        if (!workOrder.evidence_url || workOrder.evidence_url.trim() === '') {
+        if (!hasExistingEvidence) {
             missingFields.push('Evidencia de la solución (imagen/foto)')
         }
 
@@ -457,12 +484,12 @@ export default function WorkOrderProcessModal({
         }
 
         // 3. Validar hora de inicio
-        if (!workOrder.start_time) {
+        if (!workOrder.start_time && !formData.startTime) {
             missingFields.push('Hora de inicio')
         }
 
         // 4. Validar hora de fin
-        if (!workOrder.end_time) {
+        if (!formData.endTime && !workOrder.end_time) {
             missingFields.push('Hora de finalización')
         }
 
@@ -914,7 +941,7 @@ export default function WorkOrderProcessModal({
                                         </label>
                                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
                                             <p className="text-xs text-blue-800">
-                                                💡 <strong>¿Para qué sirve este campo?</strong> Si otra persona realizó el trabajo pero no lo documentó 
+                                                💡 <strong>¿Para qué sirve este campo?</strong> Si otra persona realizó el trabajo pero no lo documentó
                                                 (por ejemplo, por incapacidad o ausencia), puedes seleccionar su nombre aquí para mantener el historial correcto.
                                             </p>
                                         </div>

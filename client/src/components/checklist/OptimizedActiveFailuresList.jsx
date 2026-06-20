@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { format } from 'date-fns'
+import { resolveEvidenceUrl } from '../../../utils/evidenceUrl'
 import { es } from 'date-fns/locale'
 
 const OptimizedActiveFailuresList = ({ failures, user, onUpdate }) => {
@@ -82,8 +83,7 @@ const OptimizedActiveFailuresList = ({ failures, user, onUpdate }) => {
       return null
     }
 
-    const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000"
-    const absoluteUrl = cleanUrl.startsWith('http') ? cleanUrl : `${API_URL}${cleanUrl}`
+    const absoluteUrl = resolveEvidenceUrl(cleanUrl)
     
     const isImageUrl = (url) => {
       return url.match(/\.(jpg|jpeg|png|gif|webp)$/i)

@@ -393,16 +393,15 @@ const ChecklistSection = (props) => {
     }
   }, [checklist?.signatures, user]);
 
-  const handleCloseFailureSubmit = async (failureId, solutionText, responsibleArea) => {
+  const handleCloseFailureSubmit = async (failureId, solutionText) => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
       await axiosInstance.put(
-        `${API_URL}/api/work-orders/${failureId}`,
+        `${API_URL}/api/failures/${failureId}/repair-execution`,
         {
-          solution_text: solutionText,
-          responsible_area: responsibleArea,
-          status: "resuelto",
-          closed_by: user.user_id,
+          activity_performed: solutionText,
+          status: 'RESUELTA',
+          resolved_by_id: user.user_id,
         },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
@@ -588,9 +587,7 @@ const ChecklistSection = (props) => {
             setShowCloseFailureModal(false);
             setSelectedFailure(null);
           }}
-          failure={selectedFailure}
-          onSubmit={handleCloseFailureSubmit}
-          userId={user?.user_id}
+          failureOrder={selectedFailure}
         />
       )}
 
