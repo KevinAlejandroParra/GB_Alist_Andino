@@ -41,7 +41,6 @@ export default function WorkOrderProcessModal({
     const [technicians, setTechnicians] = useState([])
     const [loadingTechnicians, setLoadingTechnicians] = useState(false)
 
-    const [formalWorkOrderId, setFormalWorkOrderId] = useState(null)
     // ID de la orden de falla para usar en endpoints de repair-execution
     const failureId = propFailureId || workOrder?.failure_order_id
 
@@ -374,16 +373,26 @@ export default function WorkOrderProcessModal({
 
             setFormData(prev => ({ ...prev, requiresReplacement: newValue }))
 
-            // Si requiere repuestos, extraer la OT formal creada
-            if (newValue && response.data?.data?.workOrder?.id) {
-                const newWorkOrderId = response.data.data.workOrder.id;
-                setFormalWorkOrderId(newWorkOrderId);
-                loadWorkOrderParts(newWorkOrderId);
-            } else if (!newValue) {
-                setFormalWorkOrderId(null);
-                setWorkOrderParts([])
+            // Cargar o limpiar repuestos según el nuevo estado
+            if (newValue) {
+                if (createResp?.data?.data?.id) {
+                    // Se acaba de crear una OT formal desde la AR
+                    const newWoId = createResp.data.data.id;
+                    setFormalWorkOrderId(newWoId);
+                    loadWorkOrderParts(newWoId);
+                } else if (formalWorkOrderId) {
+                    // Ya existía una OT formal
+                    loadWorkOrderParts(formalWorkOrderId);
+                } else if (!arMode) {
+                    // Es OT real — usar su propio ID
+                    setFormalWorkOrderId(workOrder.id);
+                    loadWorkOrderParts(workOrder.id);
+                } else {
+                    setWorkOrderParts([]);
+                }
             } else {
-                setWorkOrderParts([])
+                setFormalWorkOrderId(null);
+                setWorkOrderParts([]);
             }
 
             await Swal.fire({

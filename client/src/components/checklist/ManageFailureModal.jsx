@@ -21,21 +21,24 @@ const ManageFailureModal = ({
 
   if (!show || !failure) return null;
 
-  const hasWorkOrder = !!failure.workOrder;
-  const isResolved = hasWorkOrder && ['RESUELTA', 'CANCELADO'].includes(failure.workOrder?.status);
+  const effectiveExecution = failure.repairExecution || failure.workOrder || null;
+  const hasExecution = !!effectiveExecution;
+  const isResolved = hasExecution && ['RESUELTA', 'CANCELADO'].includes(effectiveExecution.status);
+  const effectiveStatus = effectiveExecution?.status;
+  const hasFormalWorkOrder = !!failure.workOrder?.work_order_id;
+  const processRecord = failure.workOrder || failure.repairExecution || null;
 
   const handleCreateWorkOrder = async () => {
-    if (hasWorkOrder) {
-      // Si ya tiene OT, solo abrir el modal de proceso
+    if (hasExecution) {
+      // Si ya tiene AR u OT, solo abrir el modal de proceso
       setShowProcessModal(true);
       return;
     }
 
-    setCreatingRepair(true);
+    setCreatingWorkOrder(true);
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
 
-      // Crear la WorkOrder usando axiosInstance (ya tiene el token configurado)
       const response = await axiosInstance.post(`${API_URL}/api/work-orders/create-for-failure`, {
         failure_order_id: failure.id,
         created_by_id: user.user_id
@@ -44,40 +47,37 @@ const ManageFailureModal = ({
       if (response.data.success) {
         setCreatedWorkOrder(response.data.data);
 
-        // Mostrar el SweetAlert primero
         await Swal.fire({
-          title: '✅ Orden de Trabajo Creada',
-          text: `OT ${response.data.data.work_order_id} creada exitosamente`,
+          title: '✅ Acta de Reparación Creada',
+          text: `AR ${response.data.data.repair_execution_id} creada exitosamente`,
           icon: 'success',
           timer: 2000,
           showConfirmButton: false
         });
 
-        // Luego abrir el modal de proceso
         setShowProcessModal(true);
       } else {
-        throw new Error(response.data.error?.message || 'Error al crear la orden de trabajo');
+        throw new Error(response.data.error?.message || 'Error al crear el acta de reparación');
       }
     } catch (error) {
-      console.error('Error creando OT:', error);
+      console.error('Error creando AR:', error);
       Swal.fire({
         title: 'Error',
-        text: error.response?.data?.error?.message || error.message || 'No se pudo crear la orden de trabajo',
+        text: error.response?.data?.error?.message || error.message || 'No se pudo crear el acta de reparación',
         icon: 'error'
       });
     } finally {
-      setCreatingRepair(false);
+      setCreatingWorkOrder(false);
     }
   };
 
   const openOtProcess = () => {
-    if (!failure.workOrder) return;
-    setProcessRecord({
-      ...failure.workOrder,
-      failure_order_id: failure.id,
-      description: failure.description
-    });
+    if (!failure.workOrder?.work_order_id) return;
     setShowProcessModal(true);
+  };
+
+  const handleProcessSuccess = (updated) => {
+    // Actualizar estado local si es necesario tras cada cambio parcial
   };
 
   return (
@@ -101,8 +101,8 @@ const ManageFailureModal = ({
             </div>
 
             <div className="space-y-4">
-              {!hasWorkOrder ? (
-                // Sin OT: Opción de crear
+              {!hasExecution ? (
+                // Sin AR ni OT: Opción de crear
                 <div className="border-2 border-blue-200 rounded-lg p-6 bg-blue-50">
                   <div className="flex items-start gap-4">
                     <div className="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl flex-shrink-0">
@@ -110,10 +110,10 @@ const ManageFailureModal = ({
                     </div>
                     <div className="flex-1">
                       <h3 className="font-bold text-gray-900 mb-2">
-                        Crear Orden de Trabajo
+                        Crear Acta de Reparación
                       </h3>
                       <p className="text-sm text-gray-600 mb-4">
-                        Esta falla no tiene una orden de trabajo. Crea una para poder gestionarla y resolverla.
+                        Esta falla no tiene un acta de reparación. Crea una para poder gestionarla y resolverla.
                       </p>
                       <button
                         onClick={handleCreateWorkOrder}
@@ -129,7 +129,7 @@ const ManageFailureModal = ({
                             <span>Creando...</span>
                           </>
                         ) : (
-                          'Crear Orden de Trabajo'
+                          'Crear Acta de Reparación'
                         )}
                       </button>
                     </div>
@@ -153,16 +153,16 @@ const ManageFailureModal = ({
                       </div>
                       <div className="flex-1">
                         <h3 className="font-bold text-gray-900 mb-2">
-                          Gestionar Orden de Trabajo
+                          Gestionar
                         </h3>
                         <p className="text-sm text-gray-600 mb-4">
-                          Esta falla tiene una orden de trabajo activa. Puedes actualizarla o resolverla.
+                          Esta falla tiene un acta de reparación activa. Puedes actualizarla o resolverla.
                         </p>
                         <button
                           onClick={handleCreateWorkOrder}
                           className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
                         >
-                          Gestionar Orden de Trabajo
+                          Gestionar
                         </button>
                       </div>
                     </div>
@@ -181,9 +181,9 @@ const ManageFailureModal = ({
                         Gestionar OT
                       </button>
                     </div>
-                  )}
-                </>
-              )}
+                    )}
+                  </div>
+                )}
             </div>
 
             <div className="mt-6 flex justify-end">
@@ -214,7 +214,8 @@ const ManageFailureModal = ({
             }
             onSuccess?.();
           }}
-          workOrder={createdWorkOrder || failure.workOrder}
+          workOrder={createdWorkOrder || effectiveExecution}
+          failureId={failure.id}
           onUpdate={handleProcessSuccess}
           user={user}
         />

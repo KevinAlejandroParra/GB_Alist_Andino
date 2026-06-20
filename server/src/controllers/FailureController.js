@@ -2570,7 +2570,18 @@ class FailureController {
    */
   async updateRepairExecution(req, res) {
     try {
-      const repairExecutionId = parseInt(req.params.repairExecutionId, 10);
+      const { RepairExecution } = require('../models');
+      const repairExecutionService = require('../services/repairExecutionService');
+
+      let repairExecutionId = parseInt(req.params.repairExecutionId, 10);
+      if (Number.isNaN(repairExecutionId)) {
+        const failureOrderId = parseInt(req.params.id, 10);
+        if (!Number.isNaN(failureOrderId)) {
+          const re = await RepairExecution.findOne({ where: { failure_order_id: failureOrderId } });
+          if (re) repairExecutionId = re.id;
+        }
+      }
+
       if (Number.isNaN(repairExecutionId)) {
         return res.status(400).json({
           success: false,
@@ -2594,7 +2605,6 @@ class FailureController {
         });
       }
 
-      const repairExecutionService = require('../services/repairExecutionService');
       const result = await repairExecutionService.updateFields(repairExecutionId, updateData);
 
       res.status(200).json({ success: true, data: result });
@@ -2707,82 +2717,83 @@ class FailureController {
         code: 'DELETE_DISABLED',
         message: 'La eliminación permanente no está disponible. Use cancelación para archivar la falla.'
       }
-    }
+    });
+  }
 
   /**
    * Actualizar imagen de evidencia en disco local y DB
    * PUT /api/failures/:id/imagen
    */
   async updateEvidenceImage(req, res) {
-      try {
-        const failureOrderId = parseInt(req.params.id, 10);
-        if(Number.isNaN(failureOrderId)) {
-      return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
+    try {
+      const failureOrderId = parseInt(req.params.id, 10);
+      if (Number.isNaN(failureOrderId)) {
+        return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: { message: 'No se envió ninguna imagen' } });
+      }
+
+      const { FailureOrder } = require('../models');
+
+      const failureOrder = await FailureOrder.findByPk(failureOrderId);
+      if (!failureOrder) {
+        return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
+      }
+
+      await removeStoredEvidence(failureOrder);
+
+      await failureOrder.update({
+        evidence_url: toRelativePath(req.file.path),
+        evidence_public_id: null
+      });
+
+      res.status(200).json({
+        success: true,
+        data: failureOrder,
+        message: 'Imagen actualizada exitosamente'
+      });
+    } catch (error) {
+      console.error('❌ Error actualizando imagen:', error);
+      res.status(500).json({ success: false, error: { message: error.message } });
     }
-
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: { message: 'No se envió ninguna imagen' } });
-    }
-
-    const { FailureOrder } = require('../models');
-
-    const failureOrder = await FailureOrder.findByPk(failureOrderId);
-    if (!failureOrder) {
-      return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
-    }
-
-    await removeStoredEvidence(failureOrder);
-
-    await failureOrder.update({
-      evidence_url: toRelativePath(req.file.path),
-      evidence_public_id: null
-    });
-
-    res.status(200).json({
-      success: true,
-      data: failureOrder,
-      message: 'Imagen actualizada exitosamente'
-    });
-  } catch(error) {
-    console.error('❌ Error actualizando imagen:', error);
-    res.status(500).json({ success: false, error: { message: error.message } });
   }
-}
 
   /**
    * Eliminar imagen de evidencia del disco local/Cloudinary y DB
    * DELETE /api/failures/:id/imagen
    */
   async deleteEvidenceImage(req, res) {
-  try {
-    const failureOrderId = parseInt(req.params.id, 10);
-    if (Number.isNaN(failureOrderId)) {
-      return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
+    try {
+      const failureOrderId = parseInt(req.params.id, 10);
+      if (Number.isNaN(failureOrderId)) {
+        return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
+      }
+
+      const { FailureOrder } = require('../models');
+
+      const failureOrder = await FailureOrder.findByPk(failureOrderId);
+      if (!failureOrder) {
+        return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
+      }
+
+      await removeStoredEvidence(failureOrder);
+
+      await failureOrder.update({
+        evidence_url: null,
+        evidence_public_id: null
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Imagen eliminada exitosamente'
+      });
+    } catch (error) {
+      console.error('❌ Error eliminando imagen:', error);
+      res.status(500).json({ success: false, error: { message: error.message } });
     }
-
-    const { FailureOrder } = require('../models');
-
-    const failureOrder = await FailureOrder.findByPk(failureOrderId);
-    if (!failureOrder) {
-      return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
-    }
-
-    await removeStoredEvidence(failureOrder);
-
-    await failureOrder.update({
-      evidence_url: null,
-      evidence_public_id: null
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Imagen eliminada exitosamente'
-    });
-  } catch (error) {
-    console.error('❌ Error eliminando imagen:', error);
-    res.status(500).json({ success: false, error: { message: error.message } });
   }
-}
 }
 
 module.exports = new FailureController();
