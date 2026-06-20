@@ -802,6 +802,8 @@ class RequisitionController {
         }
       });
     }
+  }
+
   /**
    * Actualizar imagen de requisición
    * PUT /api/requisitions/:id/imagen

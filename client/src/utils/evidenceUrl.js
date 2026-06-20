@@ -1,6 +1,6 @@
 /**
  * Convierte una ruta de evidencia almacenada en DB a URL absoluta del API.
- * Soporta rutas relativas (uploads/..., /media/...), URLs http(s) y Cloudinary.
+ * Soporta rutas relativas (uploads/..., /media/...) y URLs http(s).
  */
 export function resolveEvidenceUrl(
   evidenceUrl,
