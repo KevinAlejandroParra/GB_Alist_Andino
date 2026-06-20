@@ -2423,7 +2423,7 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode
           model: require('../models').Inspectable,
           as: 'affectedInspectable',
           required: false,
-          attributes: ['inspectable_id', 'name']
+          attributes: ['ins_id', 'name']
         },
         {
           model: require('../models').RepairExecution,
@@ -2539,6 +2539,7 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode
           status: failureOrder.workOrder.status,
           activity_performed: failureOrder.workOrder.activity_performed,
           evidence_url: failureOrder.workOrder.evidence_url,
+          closure_signature: failureOrder.workOrder.closure_signature,
           cancellation_reason: failureOrder.workOrder.cancellation_reason,
           cancelled_at: failureOrder.workOrder.cancelled_at,
           cancelled_by_name: failureOrder.workOrder.cancelledBy?.user_name || null,
@@ -2586,9 +2587,50 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode
         return {
           failure_order_id: fo.failure_order_id,
           description: fo.description,
+          evidence_url: fo.evidence_url,
+          severity: fo.severity,
+          assigned_to: fo.assigned_to,
+          assigned_to_name: fo.assigned_to || 'No asignado',
+          reporter_name: fo.reporter?.user_name || 'Desconocido',
+          affected_machine: fo.affectedInspectable?.name || 'No especificada',
+          recurrence_count: fo.recurrence_count || 0,
+          created_at: fo.createdAt,
           traceability,
           closed_at: fo.repairExecution?.end_time || fo.workOrder?.end_time,
-          resolver: fo.repairExecution?.resolver?.user_name || fo.workOrder?.resolver?.user_name
+          resolver: fo.repairExecution?.resolver?.user_name || fo.workOrder?.resolver?.user_name,
+          repairExecution: fo.repairExecution ? {
+            repair_execution_id: fo.repairExecution.repair_execution_id,
+            status: fo.repairExecution.status,
+            activity_performed: fo.repairExecution.activity_performed,
+            evidence_url: fo.repairExecution.evidence_url,
+            closure_signature: fo.repairExecution.closure_signature,
+            start_time: fo.repairExecution.start_time,
+            end_time: fo.repairExecution.end_time,
+            resolver_name: fo.repairExecution.resolver?.user_name || 'No registrado',
+            cancellation_reason: fo.repairExecution.cancellation_reason,
+            cancelled_at: fo.repairExecution.cancelled_at,
+            cancelled_by_name: fo.repairExecution.cancelledBy?.user_name || null
+          } : null,
+          workOrder: fo.workOrder ? {
+            work_order_id: fo.workOrder.work_order_id,
+            status: fo.workOrder.status,
+            activity_performed: fo.workOrder.activity_performed,
+            evidence_url: fo.workOrder.evidence_url,
+            closure_signature: fo.workOrder.closure_signature,
+            cancellation_reason: fo.workOrder.cancellation_reason,
+            cancelled_at: fo.workOrder.cancelled_at,
+            cancelled_by_name: fo.workOrder.cancelledBy?.user_name || null,
+            resolver_name: fo.workOrder.resolver?.user_name || null,
+            parts: (fo.workOrder.parts || []).map(p => ({
+              name: p.inventory?.part_name || 'Repuesto',
+              quantity: p.quantity_used
+            })),
+            requisitions: (fo.workOrder.requisitions || []).map(r => ({
+              part_reference: r.part_reference,
+              quantity_requested: r.quantity_requested,
+              status: r.status
+            }))
+          } : null
         };
       });
 

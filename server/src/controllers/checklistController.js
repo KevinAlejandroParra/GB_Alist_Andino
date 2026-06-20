@@ -591,14 +591,21 @@ const formatPdfHours = (startTime, endTime) => {
 
 const buildPdfEvidenceSection = (title, imagePath, imageCache) => {
   if (!imagePath) return '';
-  const base64 = imageCache[imagePath] || null;
-  const imgHtml = base64
-    ? `<img src="${base64}" class="evidence-image" style="max-width:140px;max-height:100px;"/>`
-    : IMAGE_UNAVAILABLE_PLACEHOLDER;
+  let imagesHtml = '';
+  const paths = Array.isArray(imagePath) ? imagePath : [imagePath];
+  paths.forEach(path => {
+    const base64 = imageCache[path] || null;
+    if (base64) {
+      imagesHtml += `<img src="${base64}" class="evidence-image" style="max-width:320px;max-height:280px;display:block;margin:8px auto;"/>`;
+    } else {
+      imagesHtml += `<div style="width:180px;height:100px;background:#e5e7eb;border:1px dashed #9ca3af;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#6b7280;text-align:center;padding:4px;margin:4px auto;">Imagen no disponible</div>`;
+    }
+  });
+  if (!imagesHtml) return '';
   return `
-    <div style="margin-top:6px;">
-      <div style="font-size:7px;font-weight:bold;color:#374151;margin-bottom:3px;">${title}</div>
-      ${imgHtml}
+    <div style="margin-top:8px;padding:8px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;">
+      <div style="font-size:8px;font-weight:bold;color:#374151;margin-bottom:6px;">${title}</div>
+      ${imagesHtml}
     </div>`;
 };
 
@@ -610,40 +617,59 @@ const buildFailurePdfBlock = (failure, idx, imageCache, formatDate) => {
   const wo = failure.workOrder;
 
   const partsHtml = (wo?.parts || []).map(p =>
-    `<span style="display:block;font-size:7px;">• ${p.name} x${p.quantity}</span>`
+    `<span style="display:block;font-size:8px;margin:2px 0;">• ${p.name} x${p.quantity}</span>`
   ).join('');
   const reqHtml = (wo?.requisitions || []).map(r =>
-    `<span style="display:block;font-size:7px;">• ${r.part_reference} (${r.status}) x${r.quantity_requested}</span>`
+    `<span style="display:block;font-size:8px;margin:2px 0;">• ${r.part_reference} (${r.status}) x${r.quantity_requested}</span>`
   ).join('');
 
   let arHtml = '';
   if (ar) {
     const signatureHtml = ar.closure_signature
-      ? `<img src="${ar.closure_signature}" alt="Firma" style="max-height:40px;max-width:120px;border:1px solid #e5e7eb;border-radius:2px;"/>`
-      : '<span style="font-size:7px;color:#6b7280;">Sin firma registrada</span>';
+      ? `<img src="${ar.closure_signature}" alt="Firma" style="max-height:60px;max-width:180px;border:1px solid #e5e7eb;border-radius:4px;margin:4px 0;"/>`
+      : '<span style="font-size:8px;color:#6b7280;">Sin firma registrada</span>';
+    const evidenceUrls = [];
+    if (ar.evidence_url) evidenceUrls.push(ar.evidence_url);
     arHtml = `
-      <div style="margin-top:6px;padding:5px;background:#fff;border-radius:3px;border:1px solid #dbeafe;">
-        <div style="font-size:7px;font-weight:bold;color:#1d4ed8;margin-bottom:3px;">Acta de Reparación (${ar.repair_execution_id})</div>
-        <div style="font-size:7px;color:#374151;"><strong>Actividad:</strong> ${ar.activity_performed || 'N/A'}</div>
-        <div style="font-size:7px;color:#374151;"><strong>Técnico:</strong> ${ar.resolver_name || 'N/A'} |
-          <strong>Horas:</strong> ${formatPdfHours(ar.start_time, ar.end_time)} |
-          <strong>Estado:</strong> ${ar.status || 'N/A'}</div>
-        <div style="font-size:7px;color:#374151;margin-top:2px;"><strong>Firma de cierre:</strong></div>
+      <div style="margin-top:8px;padding:10px;background:#fff;border-radius:6px;border:1px solid #dbeafe;">
+        <div style="font-size:9px;font-weight:bold;color:#1d4ed8;margin-bottom:6px;">📋 Acta de Reparación (${ar.repair_execution_id})</div>
+        <div style="font-size:8px;color:#374151;margin-bottom:4px;"><strong>Actividad realizada:</strong> ${ar.activity_performed || 'N/A'}</div>
+        <table style="width:100%;font-size:8px;border-collapse:collapse;margin:4px 0;">
+          <tr><td style="padding:2px 4px;border:1px solid #e2e8f0;width:50%;"><strong>Técnico:</strong> ${ar.resolver_name || 'N/A'}</td>
+              <td style="padding:2px 4px;border:1px solid #e2e8f0;width:50%;"><strong>Estado:</strong> ${ar.status || 'N/A'}</td></tr>
+          <tr><td style="padding:2px 4px;border:1px solid #e2e8f0;"><strong>Inicio:</strong> ${ar.start_time ? formatDate(ar.start_time) : 'N/A'}</td>
+              <td style="padding:2px 4px;border:1px solid #e2e8f0;"><strong>Fin:</strong> ${ar.end_time ? formatDate(ar.end_time) : 'N/A'}</td></tr>
+          <tr><td style="padding:2px 4px;border:1px solid #e2e8f0;" colspan="2"><strong>Horas trabajadas:</strong> ${formatPdfHours(ar.start_time, ar.end_time)}</td></tr>
+        </table>
+        <div style="font-size:8px;color:#374151;margin-top:4px;"><strong>Firma de cierre:</strong></div>
         ${signatureHtml}
-        ${ar.evidence_url
-        ? buildPdfEvidenceSection('Evidencia de la reparación', ar.evidence_url, imageCache)
-        : '<div style="font-size:7px;color:#6b7280;margin-top:4px;">Sin evidencia fotográfica de reparación</div>'}
+        ${evidenceUrls.length > 0
+        ? buildPdfEvidenceSection('Evidencia de la reparación', evidenceUrls, imageCache)
+        : '<div style="font-size:8px;color:#6b7280;margin-top:4px;font-style:italic;">Sin evidencia fotográfica de reparación</div>'}
       </div>`;
   }
 
   let otHtml = '';
   if (wo && t.code === 'OT') {
+    const otEvidenceUrls = [];
+    if (wo.evidence_url) otEvidenceUrls.push(wo.evidence_url);
+    const woSignatureHtml = wo.closure_signature
+      ? `<img src="${wo.closure_signature}" alt="Firma" style="max-height:60px;max-width:180px;border:1px solid #e5e7eb;border-radius:4px;margin:4px 0;"/>`
+      : '';
     otHtml = `
-      <div style="margin-top:6px;padding:5px;background:#fff;border-radius:3px;border:1px solid #fde68a;">
-        <div style="font-size:7px;font-weight:bold;color:#b45309;margin-bottom:3px;">Orden de Trabajo (${wo.work_order_id})</div>
-        <div style="font-size:7px;color:#374151;"><strong>Estado:</strong> ${wo.status || 'N/A'}</div>
-        ${partsHtml ? `<div style="margin-top:2px;font-size:7px;"><strong>Repuestos:</strong>${partsHtml}</div>` : ''}
-        ${reqHtml ? `<div style="margin-top:2px;font-size:7px;"><strong>Requisiciones:</strong>${reqHtml}</div>` : ''}
+      <div style="margin-top:8px;padding:10px;background:#fff;border-radius:6px;border:1px solid #fde68a;">
+        <div style="font-size:9px;font-weight:bold;color:#b45309;margin-bottom:6px;">🔧 Orden de Trabajo (${wo.work_order_id})</div>
+        <div style="font-size:8px;color:#374151;margin-bottom:4px;"><strong>Actividad:</strong> ${wo.activity_performed || 'N/A'}</div>
+        <table style="width:100%;font-size:8px;border-collapse:collapse;margin:4px 0;">
+          <tr><td style="padding:2px 4px;border:1px solid #e2e8f0;width:50%;"><strong>Estado:</strong> ${wo.status || 'N/A'}</td>
+              <td style="padding:2px 4px;border:1px solid #e2e8f0;width:50%;"><strong>Técnico:</strong> ${wo.resolver_name || 'N/A'}</td></tr>
+        </table>
+        ${partsHtml ? `<div style="margin-top:4px;font-size:8px;"><strong>Repuestos utilizados:</strong><div style="margin:2px 0 0 8px;">${partsHtml}</div></div>` : ''}
+        ${reqHtml ? `<div style="margin-top:4px;font-size:8px;"><strong>Requisiciones:</strong><div style="margin:2px 0 0 8px;">${reqHtml}</div></div>` : ''}
+        ${woSignatureHtml ? `<div style="margin-top:4px;"><strong style="font-size:8px;">Firma de cierre:</strong>${woSignatureHtml}</div>` : ''}
+        ${otEvidenceUrls.length > 0
+        ? buildPdfEvidenceSection('Evidencia de la orden de trabajo', otEvidenceUrls, imageCache)
+        : ''}
       </div>`;
   }
 
@@ -652,31 +678,28 @@ const buildFailurePdfBlock = (failure, idx, imageCache, formatDate) => {
     const cancelledBy = ar?.cancelled_by_name || wo?.cancelled_by_name || 'No registrado';
     const cancelledAt = t.cancelled_at ? formatDate(t.cancelled_at) : 'N/A';
     cancelHtml = `
-      <div style="margin-top:6px;padding:5px;background:#fef2f2;border-radius:3px;border:1px solid #fecaca;">
-        <div style="font-size:7px;font-weight:bold;color:#dc2626;">Falla cancelada</div>
-        <div style="font-size:7px;color:#374151;"><strong>Motivo:</strong> ${t.cancellation_reason || 'N/A'}</div>
-        <div style="font-size:7px;color:#374151;"><strong>Cancelada por:</strong> ${cancelledBy} |
-          <strong>Fecha:</strong> ${cancelledAt}</div>
+      <div style="margin-top:8px;padding:10px;background:#fef2f2;border-radius:6px;border:1px solid #fecaca;">
+        <div style="font-size:9px;font-weight:bold;color:#dc2626;">🚫 Falla cancelada</div>
+        <div style="font-size:8px;color:#374151;margin-top:4px;"><strong>Motivo:</strong> ${t.cancellation_reason || 'N/A'}</div>
+        <div style="font-size:8px;color:#374151;margin-top:2px;"><strong>Cancelada por:</strong> ${cancelledBy} | <strong>Fecha:</strong> ${cancelledAt}</div>
       </div>`;
   }
 
   return `
-    <div style="background:${t.bgColor};margin-top:6px;padding:6px;border-radius:3px;border-left:3px solid ${t.color};">
-      <div style="font-size:8px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
+    <div style="background:${t.bgColor};margin-top:8px;padding:10px;border-radius:6px;border-left:4px solid ${t.color};box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+      <div style="font-size:9px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
         <strong style="color:#1f2937;">${idx + 1}. OF-${failure.failure_order_id}</strong>
-        <span style="font-size:7px;font-weight:bold;color:${t.color};background:#fff;padding:2px 6px;border-radius:3px;border:1px solid ${t.color};white-space:nowrap;">${t.label}</span>
+        <span style="font-size:8px;font-weight:bold;color:${t.color};background:#fff;padding:2px 8px;border-radius:4px;border:1px solid ${t.color};white-space:nowrap;">${t.label}</span>
       </div>
-      <div style="font-size:7px;color:#6b7280;margin-bottom:3px;">
-        <strong>Fecha reporte:</strong> ${formatDate(failure.created_at)} |
-        <strong>Severidad:</strong> ${failure.severity || 'N/A'} |
-        <strong>Máquina:</strong> ${failure.affected_machine || 'N/A'}
-      </div>
-      <div style="font-size:8px;color:#374151;margin-bottom:4px;">${failure.description}</div>
-      <div style="font-size:7px;color:#6b7280;margin-bottom:2px;">
-        <strong>Reportó:</strong> ${failure.reporter_name || 'N/A'} |
-        <strong>Asignado:</strong> ${failure.assigned_to_name || 'N/A'} |
-        <strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez/veces` : 'Primera vez'}
-      </div>
+      <table style="width:100%;font-size:8px;border-collapse:collapse;margin-bottom:4px;">
+        <tr><td style="padding:2px 4px;color:#6b7280;width:33%;"><strong>Fecha reporte:</strong> ${formatDate(failure.created_at)}</td>
+            <td style="padding:2px 4px;color:#6b7280;width:33%;"><strong>Severidad:</strong> ${failure.severity || 'N/A'}</td>
+            <td style="padding:2px 4px;color:#6b7280;width:34%;"><strong>Máquina:</strong> ${failure.affected_machine || 'N/A'}</td></tr>
+        <tr><td style="padding:2px 4px;color:#6b7280;"><strong>Reportó:</strong> ${failure.reporter_name || 'N/A'}</td>
+            <td style="padding:2px 4px;color:#6b7280;"><strong>Asignado:</strong> ${failure.assigned_to_name || 'N/A'}</td>
+            <td style="padding:2px 4px;color:#6b7280;"><strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez/veces` : 'Primera vez'}</td></tr>
+      </table>
+      <div style="font-size:9px;color:#374151;margin:6px 0;padding:6px;background:#fff;border-radius:4px;border:1px solid #e5e7eb;"><strong>Descripción de la falla:</strong><br/>${failure.description}</div>
       ${buildPdfEvidenceSection('Evidencia de la falla', failure.evidence_url, imageCache)}
       ${arHtml}
       ${otHtml}
@@ -726,8 +749,8 @@ const generateChecklistHTML = async (data) => {
       if (useSharp && sharp && sizeKb >= 200) {
         try {
           const buffer = await sharp(fileData)
-            .resize(800, 600, { fit: 'inside', withoutEnlargement: true })
-            .jpeg({ quality: 75, progressive: true })
+            .resize(1200, 900, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 80, progressive: true })
             .toBuffer();
           return `data:image/jpeg;base64,${buffer.toString('base64')}`;
         } catch (sharpError) {
@@ -787,13 +810,31 @@ const generateChecklistHTML = async (data) => {
       for (const failure of itemFailures) {
         const urls = [
           failure.evidence_url,
-          failure.repairExecution?.evidence_url
+          failure.repairExecution?.evidence_url,
+          failure.workOrder?.evidence_url
         ].filter(Boolean);
 
         for (const url of urls) {
           if (!imageCache[url]) {
             imageCache[url] = await getImageAsBase64(url);
           }
+        }
+      }
+    }
+  }
+
+  // Procesar imágenes de fallas cerradas en la fecha del reporte
+  if (data.failures?.closed_on_cutoff) {
+    for (const failure of data.failures.closed_on_cutoff) {
+      const urls = [
+        failure.evidence_url,
+        failure.repairExecution?.evidence_url,
+        failure.workOrder?.evidence_url
+      ].filter(Boolean);
+
+      for (const url of urls) {
+        if (!imageCache[url]) {
+          imageCache[url] = await getImageAsBase64(url);
         }
       }
     }
@@ -846,7 +887,7 @@ const generateChecklistHTML = async (data) => {
         // Renderizar el ítem padre en negrilla
         html += `
                     <tr class="parent-item-row" style="background-color: #f8fafc;">
-                        <td colspan="5" style="font-size: 10px; font-weight: bold; padding: 6px; color: #374151;">
+                        <td colspan="4" style="font-size: 10px; font-weight: bold; padding: 6px; color: #374151;">
                             <strong>${item.item_number}. ${item.question_text}</strong>
                         </td>
                     </tr>
@@ -887,28 +928,22 @@ const generateChecklistHTML = async (data) => {
           comment = comment ? `${comment} <br/> ${failureDescriptions}` : failureDescriptions;
         }
 
-        // ✅ Usar cache de imágenes pre-procesadas
-        let evidenceBase64 = imageCache[response.evidence_url] || null;
-        let evidence = evidenceBase64 ?
-          `<a href="${evidenceBase64}" target="_blank"><img src="${evidenceBase64}" class="evidence-image"/></a>` : "";
-
         html += `
                     <tr class="sub-item-row">
                         <td style="font-size: 9px; font-weight: bold;">${item.item_number}</td>
                         <td style="font-size: 9px; line-height: 1.2; padding: 4px;">
-                            <div style="max-width: 180px; word-wrap: break-word;">${item.question_text}</div>
+                            <div style="word-wrap: break-word;">${item.question_text}</div>
                         </td>
                         <td style="text-align: center; font-size: 9px; font-weight: bold; padding: 4px;" class="${displayValue.replace(" ", "-")}">
                             ${displayValue}
                         </td>
-                        <td style="font-size: 9px; line-height: 1.0; padding: 2px 4px;">
-                            <div style="max-width: 120px; word-wrap: break-word;">${comment}</div>
+                        <td style="font-size: 9px; line-height: 1.3; padding: 4px 6px;">
+                            <div style="word-wrap: break-word;">${comment}</div>
                         </td>
-                        <td style="text-align: center; padding: 6px; vertical-align: middle;">${evidence}</td>
                     </tr>
                     ${failuresHtml ? `
                     <tr class="failures-row" style="background-color: #fefbeb;">
-                        <td colspan="5" style="padding: 4px 8px; border-top: 1px solid #e5e7eb;">
+                        <td colspan="4" style="padding: 6px 10px; border-top: 1px solid #e5e7eb;">
                             ${failuresHtml}
                         </td>
                     </tr>
@@ -926,7 +961,7 @@ const generateChecklistHTML = async (data) => {
       // Encabezado del dispositivo (sección de color morado)
       html += `
               <tr class="device-section-row" style="background-color: #7c3aed; color: white;">
-                  <td colspan="5" style="font-size: 10px; font-weight: bold; padding: 8px; color: white;">
+                  <td colspan="4" style="font-size: 10px; font-weight: bold; padding: 8px; color: white;">
                       <strong>📱 ${deviceSection.item_number}. ${deviceSection.question_text}</strong>
                   </td>
               </tr>
@@ -944,7 +979,7 @@ const generateChecklistHTML = async (data) => {
             // Renderizar item padre en negrilla (como separador de categoría)
             html += `
                 <tr class="parent-item-row" style="background-color: #f8fafc;">
-                    <td colspan="5" style="font-size: 10px; font-weight: bold; padding: 6px; color: #374151;">
+                    <td colspan="4" style="font-size: 10px; font-weight: bold; padding: 6px; color: #374151;">
                         <strong>${item.item_number}. ${item.question_text}</strong>
                     </td>
                 </tr>
@@ -1002,28 +1037,22 @@ const generateChecklistHTML = async (data) => {
               comment = comment ? `${comment} <br/> ${failureDescriptions}` : failureDescriptions;
             }
 
-            // ✅ Usar cache de imágenes pre-procesadas
-            let evidenceBase64 = imageCache[response.evidence_url] || null;
-            let evidence = evidenceBase64 ?
-              `<a href="${evidenceBase64}" target="_blank"><img src="${evidenceBase64}" class="evidence-image"/></a>` : "";
-
             html += `
                         <tr class="sub-item-row">
                             <td style="font-size: 9px; font-weight: bold;">${item.item_number}</td>
                             <td style="font-size: 9px; line-height: 1.2; padding: 4px;">
-                                <div style="max-width: 180px; word-wrap: break-word;">${item.question_text}</div>
+                                <div style="word-wrap: break-word;">${item.question_text}</div>
                             </td>
                             <td style="text-align: center; font-size: 9px; font-weight: bold; padding: 4px;" class="${displayValue.replace(" ", "-")}">
                                 ${displayValue}
                             </td>
-                            <td style="font-size: 9px; line-height: 1.0; padding: 2px 4px;">
-                                <div style="max-width: 120px; word-wrap: break-word;">${comment}</div>
+                            <td style="font-size: 9px; line-height: 1.3; padding: 4px 6px;">
+                                <div style="word-wrap: break-word;">${comment}</div>
                             </td>
-                            <td style="text-align: center; padding: 6px; vertical-align: middle;">${evidence}</td>
                         </tr>
                         ${failuresHtml ? `
                         <tr class="failures-row" style="background-color: #fefbeb;">
-                            <td colspan="5" style="padding: 4px 8px; border-top: 1px solid #e5e7eb;">
+                            <td colspan="4" style="padding: 6px 10px; border-top: 1px solid #e5e7eb;">
                                 ${failuresHtml}
                             </td>
                         </tr>
@@ -1053,30 +1082,25 @@ const generateChecklistHTML = async (data) => {
   const closedFailuresHtml = (data.failures?.closed_on_cutoff || []).length > 0 ? `
                 <div class="items-section" style="margin-top: 24px;">
                     <h2>Fallas cerradas en la fecha del reporte</h2>
-                    <table class="items-table">
-                        <thead>
-                            <tr>
-                                <th>ID Falla</th>
-                                <th>Descripción</th>
-                                <th>Tipo</th>
-                                <th>Cierre</th>
-                                <th>Técnico</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${data.failures.closed_on_cutoff.map((f) => `
-                            <tr>
-                                <td style="font-size:9px;">${f.failure_order_id || '—'}</td>
-                                <td style="font-size:9px;">${f.description || '—'}</td>
-                                <td style="font-size:9px;">
-                                    <span style="color:${f.traceability?.color || '#6b7280'};font-weight:bold;">${f.traceability?.shortLabel || '—'}</span>
-                                </td>
-                                <td style="font-size:9px;">${f.closed_at ? formatDate(f.closed_at) : '—'}</td>
-                                <td style="font-size:9px;">${f.resolver || '—'}</td>
-                            </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                    <div style="margin-top:12px;">
+                        ${data.failures.closed_on_cutoff.map((f, idx) =>
+        buildFailurePdfBlock({
+          failure_order_id: f.failure_order_id,
+          description: f.description,
+          traceability: f.traceability,
+          created_at: f.created_at,
+          severity: f.severity,
+          affected_machine: f.affected_machine,
+          reporter_name: f.reporter_name,
+          assigned_to_name: f.assigned_to_name,
+          assigned_to: f.assigned_to,
+          recurrence_count: f.recurrence_count,
+          evidence_url: f.evidence_url,
+          repairExecution: f.repairExecution,
+          workOrder: f.workOrder
+        }, idx, imageCache, formatDate)
+      ).join('<hr style="border:none;border-top:2px dashed #d1d5db;margin:12px 0;">')}
+                    </div>
                 </div>
                 ` : '';
 
@@ -1321,36 +1345,29 @@ const generateChecklistHTML = async (data) => {
                     font-weight: 600;
                 }
                 
-                /* Distribución mejorada de columnas */
+                /* Distribución mejorada de columnas (4 columnas, sin evidencia) */
                 .sub-item-row td:first-child { 
-                    width: 10%; 
+                    width: 8%; 
                     text-align: center; 
                     font-weight: 600;
                     color: var(--primary-purple-dark);
                 }
                 
                 .sub-item-row td:nth-child(2) { 
-                    width: 35%; 
+                    width: 42%; 
                     line-height: 1.4;
                 }
                 
                 .sub-item-row td:nth-child(3) { 
-                    width: 15%; 
+                    width: 18%; 
                     text-align: center; 
                     font-weight: 600;
                 }
                 
                 .sub-item-row td:nth-child(4) { 
-                    width: 15%; 
-                    line-height: 1.0; 
-                    padding: 2px 4px;
-                }
-                
-                .sub-item-row td:nth-child(5) { 
-                    width: 30%; 
-                    text-align: center;
-                    vertical-align: middle;
-                    padding: 8px;
+                    width: 32%; 
+                    line-height: 1.3; 
+                    padding: 4px 6px;
                 }
                 
                 /* Estados de respuesta con colores mejorados */
@@ -1379,14 +1396,14 @@ const generateChecklistHTML = async (data) => {
                 }
                 
                 .evidence-image {
-                    max-width: 180px;
-                    max-height: 140px;
-                    border-radius: 6px;
+                    max-width: 320px;
+                    max-height: 280px;
+                    border-radius: 8px;
                     border: 1px solid var(--slate-300);
                     object-fit: contain;
-                    margin: 4px;
+                    margin: 6px;
                     background: #f1f5f9;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
                 }
                 
                 .evidence-image:hover {
@@ -1577,10 +1594,9 @@ const generateChecklistHTML = async (data) => {
                         <thead>
                             <tr>
                                 <th style="width: 8%;">Item</th>
-                                <th style="width: 32%;">Descripción</th>
-                                <th style="width: 15%;">Respuesta</th>
-                                <th style="width: 15%;">Observaciones</th>
-                                <th style="width: 30%;">Evidencia</th>
+                                <th style="width: 42%;">Descripción</th>
+                                <th style="width: 18%;">Respuesta</th>
+                                <th style="width: 32%;">Observaciones</th>
                             </tr>
                         </thead>
                         <tbody>
