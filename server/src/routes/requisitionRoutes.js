@@ -84,7 +84,7 @@ router.put('/:id/cancel', (req, res) => RequisitionController.cancelRequisition(
  */
 router.delete('/:id', (req, res) => RequisitionController.deleteRequisition(req, res));
 
-const upload = require('../config/multerConfig');
+const { uploadRequisition: upload } = require('../config/multerConfig');
 
 /**
  * PUT /api/requisitions/:id/imagen

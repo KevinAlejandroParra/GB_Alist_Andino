@@ -308,21 +308,12 @@ class UserController {
             console.log("BODY:", req.body);
             console.log("USER PARSED:", userJSON);
 
-            // Si hay imagen, actualizarla en Cloudinary
             if (req.file) {
-                const { cloudinary } = require('../config/cloudinary');
-                
-                // Si el usuario ya tenía una imagen en Cloudinary, eliminarla
-                if (user.user_image_public_id) {
-                    try {
-                        await cloudinary.uploader.destroy(user.user_image_public_id);
-                    } catch (err) {
-                        console.error('❌ Error eliminando imagen antigua de Cloudinary:', err);
-                    }
+                const { toRelativePath, deleteLocalFile } = require('../config/multerConfig');
+                if (user.user_image && !user.user_image.startsWith('images/')) {
+                    await deleteLocalFile(user.user_image);
                 }
-
-                user.user_image = req.file.path;
-                user.user_image_public_id = req.file.filename;
+                user.user_image = toRelativePath(req.file.path);
             }
 
             // Validación adicional para contraseña
@@ -839,17 +830,12 @@ class UserController {
                 return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
             }
 
-            if (user.user_image_public_id) {
-                const { cloudinary } = require('../config/cloudinary');
-                try {
-                    await cloudinary.uploader.destroy(user.user_image_public_id);
-                } catch (err) {
-                    console.error('❌ Error eliminando imagen de Cloudinary:', err);
-                }
+            if (user.user_image && !user.user_image.startsWith('images/')) {
+                const { deleteLocalFile } = require('../config/multerConfig');
+                await deleteLocalFile(user.user_image);
             }
 
             user.user_image = null;
-            user.user_image_public_id = null;
             await user.save();
 
             res.status(200).json({

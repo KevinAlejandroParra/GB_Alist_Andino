@@ -75,13 +75,11 @@ class FailureOrderService {
         description,
         severity: normalizedSeverity,
         evidence_url: evidenceUrl,
-        evidence_public_id: data.evidencePublicId, // ✅ NUEVO
         type_maintenance,
         reported_by_id: reportedBy,
         affected_id: inspectableId,
         checklist_item_id: checklistItemId,
         assigned_to: normalizedAssignedArea,
-        // ✅ NUEVO: Campos de recurrencia
         is_recurring: isRecurring,
         recurrence_count: recurrenceCount,
         report_signature: reportSignature
@@ -155,7 +153,6 @@ class FailureOrderService {
         description,
         severity,
         evidence_url: evidenceUrl,
-        evidence_public_id: data.evidencePublicId, // ✅ NUEVO
         type_maintenance,
         reported_by_id: reportedBy,
         affected_id: inspectableId,
@@ -239,7 +236,6 @@ class FailureOrderService {
         description,
         severity,
         evidence_url: evidenceUrl,
-        evidence_public_id: data.evidencePublicId, // ✅ NUEVO
         type_maintenance,
         reported_by_id: reportedBy,
         affected_id: null,
@@ -634,24 +630,13 @@ class FailureOrderService {
         parts_count: failureOrder.workOrder?.parts?.length || 0
       };
 
-      // 1. Eliminar imagen de evidencia (Cloudinary, disco local uploads/ o legacy /media/)
-      if (failureOrder.evidence_url || failureOrder.evidence_public_id) {
-        try {
-          if (failureOrder.evidence_public_id) {
-            const { cloudinary } = require('../config/cloudinary');
-            await cloudinary.uploader.destroy(failureOrder.evidence_public_id);
-            console.log('✅ [DELETE FAILURE] Imagen eliminada de Cloudinary:', failureOrder.evidence_public_id);
-          } else if (failureOrder.evidence_url) {
-            const { deleteLocalEvidenceFile } = require('../config/multerConfig');
-            const deleted = await deleteLocalEvidenceFile(failureOrder.evidence_url);
-            if (deleted) {
-              console.log('✅ [DELETE FAILURE] Imagen local eliminada:', failureOrder.evidence_url);
-            } else {
-              console.log('⚠️ [DELETE FAILURE] Imagen no encontrada en el servidor:', failureOrder.evidence_url);
-            }
-          }
-        } catch (fileError) {
-          console.error('❌ [DELETE FAILURE] Error eliminando imagen:', fileError.message);
+      if (failureOrder.evidence_url) {
+        const { deleteLocalFile } = require('../config/multerConfig');
+        const deleted = await deleteLocalFile(failureOrder.evidence_url);
+        if (deleted) {
+          console.log('✅ [DELETE FAILURE] Imagen local eliminada:', failureOrder.evidence_url);
+        } else {
+          console.log('⚠️ [DELETE FAILURE] Imagen no encontrada en el servidor:', failureOrder.evidence_url);
         }
       }
 
