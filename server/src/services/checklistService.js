@@ -2423,7 +2423,8 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode
           model: require('../models').Inspectable,
           as: 'affectedInspectable',
           required: false,
-          attributes: ['inspectable_id', 'name']
+          attributes: ['ins_id', 'name']
+
         },
         {
           model: require('../models').RepairExecution,
