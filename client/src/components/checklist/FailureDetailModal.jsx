@@ -7,6 +7,7 @@ import ManageFailureModal from './ManageFailureModal';
 import CancelFailureModal from './CancelFailureModal';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../utils/axiosConfig';
+import { resolveEvidenceUrl } from '../../utils/evidenceUrl';
 import LinkedFailuresSection from './LinkedFailuresSection';
 import {
   createFailureReportSignature,
@@ -683,10 +684,10 @@ const FailureDetailModal = ({
             {failureDetail?.evidence_url ? (
               <div className="bg-gray-50 rounded-lg p-4">
                 <img
-                  src={`${process.env.NEXT_PUBLIC_API || "http://localhost:5000"}${failureDetail.evidence_url}`}
+                  src={resolveEvidenceUrl(failureDetail.evidence_url)}
                   alt="Evidencia de la falla"
                   className="max-w-full h-64 object-cover rounded-lg mx-auto cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => window.open(`${process.env.NEXT_PUBLIC_API || "http://localhost:5000"}${failureDetail.evidence_url}`, '_blank')}
+                  onClick={() => window.open(resolveEvidenceUrl(failureDetail.evidence_url), '_blank')}
                 />
                 <p className="text-center text-gray-500 text-xs mt-2">Clic para ver en tamaño completo</p>
               </div>
@@ -781,10 +782,10 @@ const FailureDetailModal = ({
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Evidencia</label>
                         <img
-                          src={`${process.env.NEXT_PUBLIC_API || 'http://localhost:5000'}${failureDetail.repairExecution.evidence_url}`}
+                          src={resolveEvidenceUrl(failureDetail.repairExecution.evidence_url)}
                           alt="Evidencia AR"
                           className="w-full h-32 object-cover rounded border cursor-pointer hover:opacity-90"
-                          onClick={() => window.open(`${process.env.NEXT_PUBLIC_API || 'http://localhost:5000'}${failureDetail.repairExecution.evidence_url}`, '_blank')}
+                          onClick={() => window.open(resolveEvidenceUrl(failureDetail.repairExecution.evidence_url), '_blank')}
                         />
                       </div>
                     ) : (
@@ -887,10 +888,10 @@ const FailureDetailModal = ({
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Evidencia</label>
                         <img
-                          src={`${process.env.NEXT_PUBLIC_API || "http://localhost:5000"}${failureDetail.workOrder.evidence_url}`}
+                          src={resolveEvidenceUrl(failureDetail.workOrder.evidence_url)}
                           alt="Evidencia OT"
                           className="w-full h-32 object-cover rounded border cursor-pointer hover:opacity-90"
-                          onClick={() => window.open(`${process.env.NEXT_PUBLIC_API || "http://localhost:5000"}${failureDetail.workOrder.evidence_url}`, '_blank')}
+                          onClick={() => window.open(resolveEvidenceUrl(failureDetail.workOrder.evidence_url), '_blank')}
                         />
                       </div>
                     )}

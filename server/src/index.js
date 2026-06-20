@@ -51,6 +51,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(express.static(path.join(__dirname, "../public")));
 app.use('/media', express.static(path.join(__dirname, '../public/media')));
+// Servir imágenes de fallas y reparaciones desde disco local
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use("/api/users", userRoutes);
 app.use("/api/premises", premiseRoutes);

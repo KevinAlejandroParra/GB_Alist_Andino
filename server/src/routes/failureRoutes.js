@@ -3,7 +3,8 @@
 const express = require('express');
 const FailureController = require('../controllers/FailureController');
 const FailureSignatureService = require('../services/FailureSignatureService');
-const upload = require('../config/multerConfig');
+const { uploadFailureEvidence } = require('../config/multerConfig');
+const upload = uploadFailureEvidence; // evidencias del operario al reportar
 
 const router = express.Router();
 
@@ -109,8 +110,8 @@ router.put('/:id/increment-recurrence', (req, res) => FailureController.incremen
 // PATCH /api/failures/:id/assign-inspectable - Asignar o corregir inspectable de una falla
 router.patch('/:id/assign-inspectable', (req, res) => FailureController.assignInspectable(req, res));
 
-// PUT /api/failures/:id/imagen - Actualizar imagen de evidencia
-router.put('/:id/imagen', upload.single('evidence'), (req, res) => FailureController.updateEvidenceImage(req, res));
+// PUT /api/failures/:id/imagen - Actualizar imagen de evidencia de la falla (operario)
+router.put('/:id/imagen', uploadFailureEvidence.single('evidence'), (req, res) => FailureController.updateEvidenceImage(req, res));
 
 // DELETE /api/failures/:id/imagen - Eliminar imagen de evidencia
 router.delete('/:id/imagen', (req, res) => FailureController.deleteEvidenceImage(req, res));
@@ -120,6 +121,9 @@ router.get('/:id', (req, res) => FailureController.getFailureOrderById(req, res)
 
 // PUT /api/failures/:id - Actualizar OF
 router.put('/:id', (req, res) => FailureController.updateFailureOrder(req, res));
+
+// PUT /api/failures/:id/repair-execution - Actualizar AR / escalar a OT formal
+router.put('/:id/repair-execution', (req, res) => FailureController.updateRepairExecution(req, res));
 
 // PUT /api/failures/:id/cancel - Cancelar falla (conserva historial)
 router.put('/:id/cancel', (req, res) => FailureController.cancelFailureOrder(req, res));

@@ -91,7 +91,7 @@ class FailureLifecycleService {
     const payload = {
       repair_execution_id: this.generateRepairExecutionId(),
       failure_order_id: failureOrder.id,
-      status: workOrder?.status || 'CANCELADO',
+      status: workOrder?.status || 'EN_PROCESO',
       activity_performed: workOrder?.activity_performed || null,
       evidence_url: workOrder?.evidence_url || null,
       closure_signature: workOrder?.closure_signature || null,

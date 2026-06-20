@@ -87,39 +87,24 @@ const CloseFailureModal = ({
     setLoading(true);
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
-      
-      // Actualizar la OT con la firma de cierre
-      if (failureOrder.workOrder && failureOrder.workOrder.id) {
-        const workOrderResponse = await axiosInstance.post(
-          `${API_URL}/api/work-orders/${failureOrder.workOrder.id}/close`, 
-          {
-            closureSignature: formData.signatureData,
-            closureDetails: formData.closureDetails,
-            userName: user.user_name,
-            roleName: user.role_name
-          }
-        );
 
-        if (!workOrderResponse.data.success) {
-          throw new Error(workOrderResponse.data.error || 'Error al cerrar la orden de trabajo');
-        }
-      }
-
-      // Actualizar el estado de la falla a CERRADO
-      const failureResponse = await axiosInstance.put(
-        `${API_URL}/api/failures/${failureOrder.id}`, 
+      const response = await axiosInstance.put(
+        `${API_URL}/api/failures/${failureOrder.id}/repair-execution`,
         {
-          status: 'CERRADO',
-          closureDetails: formData.closureDetails
-        }
+          activity_performed: formData.closureDetails,
+          closure_signature: formData.signatureData,
+          status: 'RESUELTA',
+          resolved_by_id: user.user_id,
+        },
+        { headers: { Authorization: `Bearer ${user.token}` } }
       );
 
-      if (failureResponse.data.success) {
-        Swal.fire('✅ Falla Cerrada', 'La falla y su orden de trabajo han sido cerradas exitosamente.', 'success');
-        if (onSuccess) onSuccess(failureResponse.data.data);
+      if (response.data.success) {
+        Swal.fire('✅ Falla Cerrada', 'La falla ha sido cerrada exitosamente.', 'success');
+        if (onSuccess) onSuccess(response.data.data);
         onClose();
       } else {
-        throw new Error(failureResponse.data.error || 'Error al cerrar la falla');
+        throw new Error(response.data.error || 'Error al cerrar la falla');
       }
     } catch (error) {
       console.error('Error cerrando falla:', error);

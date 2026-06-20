@@ -2335,15 +2335,27 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode
           attributes: ['item_number', 'question_text']
         },
         {
+          model: require('../models').Inspectable,
+          as: 'affectedInspectable',
+          required: false,
+          attributes: ['inspectable_id', 'name']
+        },
+        {
           model: require('../models').RepairExecution,
           as: 'repairExecution',
-          required: false
+          required: false,
+          include: [
+            { model: User, as: 'resolver', attributes: ['user_name'], required: false },
+            { model: User, as: 'cancelledBy', attributes: ['user_name'], required: false }
+          ]
         },
         {
           model: WorkOrder,
           as: 'workOrder',
           required: false,
           include: [
+            { model: User, as: 'resolver', attributes: ['user_name'], required: false },
+            { model: User, as: 'cancelledBy', attributes: ['user_name'], required: false },
             {
               model: require('../models').WorkOrderPart,
               as: 'parts',
@@ -2418,11 +2430,44 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode
         assigned_to: failureOrder.assigned_to,
         assigned_to_name: failureOrder.assigned_to || 'No asignado',
         reporter_name: failureOrder.reporter?.user_name || 'Desconocido',
+        affected_machine: failureOrder.affectedInspectable?.name || 'No especificada',
         recurrence_count: failureOrder.recurrence_count || 0,
         is_recurring: failureOrder.is_recurring || false,
         created_at: failureOrder.createdAt,
         updated_at: failureOrder.updatedAt,
         traceability,
+        repairExecution: failureOrder.repairExecution ? {
+          repair_execution_id: failureOrder.repairExecution.repair_execution_id,
+          status: failureOrder.repairExecution.status,
+          activity_performed: failureOrder.repairExecution.activity_performed,
+          evidence_url: failureOrder.repairExecution.evidence_url,
+          closure_signature: failureOrder.repairExecution.closure_signature,
+          start_time: failureOrder.repairExecution.start_time,
+          end_time: failureOrder.repairExecution.end_time,
+          resolver_name: failureOrder.repairExecution.resolver?.user_name || 'No registrado',
+          cancellation_reason: failureOrder.repairExecution.cancellation_reason,
+          cancelled_at: failureOrder.repairExecution.cancelled_at,
+          cancelled_by_name: failureOrder.repairExecution.cancelledBy?.user_name || null
+        } : null,
+        workOrder: failureOrder.workOrder ? {
+          work_order_id: failureOrder.workOrder.work_order_id,
+          status: failureOrder.workOrder.status,
+          activity_performed: failureOrder.workOrder.activity_performed,
+          evidence_url: failureOrder.workOrder.evidence_url,
+          cancellation_reason: failureOrder.workOrder.cancellation_reason,
+          cancelled_at: failureOrder.workOrder.cancelled_at,
+          cancelled_by_name: failureOrder.workOrder.cancelledBy?.user_name || null,
+          resolver_name: failureOrder.workOrder.resolver?.user_name || null,
+          parts: (failureOrder.workOrder.parts || []).map(p => ({
+            name: p.inventory?.name || 'Repuesto',
+            quantity: p.quantity_used
+          })),
+          requisitions: (failureOrder.workOrder.requisitions || []).map(r => ({
+            part_reference: r.part_reference,
+            quantity_requested: r.quantity_requested,
+            status: r.status
+          }))
+        } : null,
         checklist_item: {
           item_number: failureOrder.checklistItem?.item_number || 'N/A',
           question_text: failureOrder.checklistItem?.question_text || 'N/A'
