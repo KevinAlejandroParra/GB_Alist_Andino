@@ -1,6 +1,6 @@
 'use strict';
 
-const { RepairExecution, WorkOrder, FailureOrder, User, connection } = require('../models');
+const { RepairExecution, WorkOrder } = require('../models');
 const RepairExecutionSyncService = require('./RepairExecutionSyncService');
 
 /** Servicio de Actas de Reparación (AR) */
@@ -63,169 +63,102 @@ class RepairExecutionService {
     return `OT-${year}-${timestamp}`;
   }
 
-  async loadFailureWithRelations(failureOrderId, options = {}) {
+  /** Crea OT formal vinculada a una AR existente (repuestos/requisiciones) */
+  async createFormalWorkOrder(repairExecutionId, options = {}) {
     const { transaction } = options;
+    const repairExecution = await RepairExecution.findByPk(repairExecutionId, { transaction });
+    if (!repairExecution) {
+      throw new Error(`Acta de reparación ${repairExecutionId} no encontrada`);
+    }
 
-    return FailureOrder.findByPk(failureOrderId, {
-      include: [
-        {
-          model: RepairExecution,
-          as: 'repairExecution',
-          required: false,
-          include: [
-            { model: User, as: 'resolver', attributes: ['user_id', 'user_name'], required: false },
-            { model: User, as: 'cancelledBy', attributes: ['user_id', 'user_name'], required: false }
-          ]
-        },
-        {
-          model: WorkOrder,
-          as: 'workOrder',
-          required: false,
-          include: [
-            { model: User, as: 'resolver', attributes: ['user_id', 'user_name'], required: false },
-            { model: User, as: 'cancelledBy', attributes: ['user_id', 'user_name'], required: false }
-          ]
-        }
-      ],
+    const existing = await WorkOrder.findOne({
+      where: { repair_execution_id: repairExecutionId },
       transaction
     });
-  }
+    if (existing) return existing;
 
-  validateResolutionPayload(entity, updateData) {
-    const mergedData = {
-      activity_performed: updateData.activity_performed ?? entity.activity_performed,
-      evidence_url: updateData.evidence_url ?? entity.evidence_url,
-      closure_signature: updateData.closure_signature ?? entity.closure_signature,
-      start_time: updateData.start_time ?? entity.start_time,
-      end_time: updateData.end_time ?? entity.end_time
-    };
-
-    const validationErrors = [];
-
-    if (!mergedData.activity_performed || String(mergedData.activity_performed).trim() === '') {
-      validationErrors.push('La descripción de la actividad realizada es obligatoria');
-    }
-
-    if (!mergedData.evidence_url || String(mergedData.evidence_url).trim() === '') {
-      validationErrors.push('La evidencia de la solución (imagen/foto) es obligatoria');
-    }
-
-    if (!mergedData.closure_signature || String(mergedData.closure_signature).trim() === '') {
-      validationErrors.push('La firma digital es obligatoria');
-    }
-
-    if (!mergedData.start_time) {
-      validationErrors.push('La hora de inicio es obligatoria');
-    }
-
-    if (!mergedData.end_time) {
-      validationErrors.push('La hora de finalización es obligatoria');
-    }
-
-    if (validationErrors.length > 0) {
-      throw new Error(`Campos obligatorios faltantes: ${validationErrors.join(', ')}`);
-    }
-  }
-
-  async ensureFormalWorkOrder(failureOrder, repairExecution, transaction) {
-    if (failureOrder.workOrder) {
-      return failureOrder.workOrder;
+    const byFailure = await WorkOrder.findOne({
+      where: { failure_order_id: repairExecution.failure_order_id },
+      transaction
+    });
+    if (byFailure) {
+      if (!byFailure.repair_execution_id) {
+        await byFailure.update({ repair_execution_id: repairExecutionId }, { transaction });
+      }
+      return byFailure;
     }
 
     return WorkOrder.create({
       work_order_id: this.generateWorkOrderId(),
-      failure_order_id: failureOrder.id,
-      repair_execution_id: repairExecution.id,
-      requiere_replacement: true,
+      failure_order_id: repairExecution.failure_order_id,
+      repair_execution_id: repairExecutionId,
       status: repairExecution.status || 'EN_PROCESO',
-      activity_performed: repairExecution.activity_performed || null,
-      evidence_url: repairExecution.evidence_url || null,
-      closure_signature: repairExecution.closure_signature || null,
-      start_time: repairExecution.start_time || null,
-      end_time: repairExecution.end_time || null,
-      resolved_by_id: repairExecution.resolved_by_id || null,
-      linked_failure_ids: repairExecution.linked_failure_ids || JSON.stringify([failureOrder.id])
+      requiere_replacement: true,
+      activity_performed: repairExecution.activity_performed,
+      evidence_url: repairExecution.evidence_url,
+      closure_signature: repairExecution.closure_signature,
+      start_time: repairExecution.start_time,
+      end_time: repairExecution.end_time,
+      resolved_by_id: repairExecution.resolved_by_id,
+      linked_failure_ids: repairExecution.linked_failure_ids
     }, { transaction });
   }
 
-  async updateForFailure(failureOrderId, updateData = {}) {
-    const transaction = await connection.transaction();
-
-    try {
-      const failureOrder = await this.loadFailureWithRelations(failureOrderId, { transaction });
-
-      if (!failureOrder) {
-        throw new Error(`Orden de falla ${failureOrderId} no encontrada`);
-      }
-
-      const repairExecution = failureOrder.repairExecution
-        || await this.createForFailure(failureOrderId, { transaction });
-
-      let workOrder = failureOrder.workOrder || null;
-
-      if (updateData.requiere_replacement === true && !workOrder) {
-        workOrder = await this.ensureFormalWorkOrder(failureOrder, repairExecution, transaction);
-      }
-
-      if (updateData.status === 'RESUELTA') {
-        this.validateResolutionPayload(workOrder || repairExecution, updateData);
-      }
-
-      const syncableFields = [
-        'status',
-        'activity_performed',
-        'evidence_url',
-        'closure_signature',
-        'start_time',
-        'end_time',
-        'resolved_by_id'
-      ];
-
-      const repairExecutionPayload = {};
-      syncableFields.forEach((field) => {
-        if (updateData[field] !== undefined) {
-          repairExecutionPayload[field] = updateData[field];
-        }
-      });
-
-      if (Object.keys(repairExecutionPayload).length > 0) {
-        await repairExecution.update(repairExecutionPayload, { transaction });
-        await RepairExecutionSyncService.syncLinkedRepairExecutions(
-          repairExecution.id,
-          repairExecutionPayload,
-          transaction
-        );
-      }
-
-      if (workOrder) {
-        const workOrderPayload = {};
-        syncableFields.forEach((field) => {
-          if (updateData[field] !== undefined) {
-            workOrderPayload[field] = updateData[field];
-          }
-        });
-
-        if (updateData.requiere_replacement !== undefined) {
-          workOrderPayload.requiere_replacement = updateData.requiere_replacement;
-        }
-
-        if (Object.keys(workOrderPayload).length > 0) {
-          await workOrder.update(workOrderPayload, { transaction });
-        }
-      }
-
-      await transaction.commit();
-
-      const updatedFailure = await this.loadFailureWithRelations(failureOrderId);
-      return {
-        success: true,
-        data: updatedFailure,
-        effectiveExecution: updatedFailure.workOrder || updatedFailure.repairExecution
-      };
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
+  async updateFields(repairExecutionId, updateData) {
+    const repairExecution = await RepairExecution.findByPk(repairExecutionId);
+    if (!repairExecution) {
+      throw new Error(`Acta de reparación ${repairExecutionId} no encontrada`);
     }
+
+    if (updateData.status === 'RESUELTA') {
+      const validationErrors = [];
+      const activity = updateData.activity_performed ?? repairExecution.activity_performed;
+      const evidence = updateData.evidence_url ?? repairExecution.evidence_url;
+      const signature = updateData.closure_signature ?? repairExecution.closure_signature;
+      const startTime = updateData.start_time ?? repairExecution.start_time;
+      const endTime = updateData.end_time ?? repairExecution.end_time;
+
+      if (!activity || !String(activity).trim()) {
+        validationErrors.push('La descripción de la actividad realizada es obligatoria');
+      }
+      if (!evidence || !String(evidence).trim()) {
+        validationErrors.push('La evidencia de la solución es obligatoria');
+      }
+      if (!signature || !String(signature).trim()) {
+        validationErrors.push('La firma digital es obligatoria');
+      }
+      if (!startTime) validationErrors.push('La hora de inicio es obligatoria');
+      if (!endTime) validationErrors.push('La hora de finalización es obligatoria');
+
+      if (validationErrors.length) {
+        throw new Error(`Campos obligatorios faltantes: ${validationErrors.join(', ')}`);
+      }
+    }
+
+    await repairExecution.update(updateData);
+
+    await RepairExecutionSyncService.syncLinkedRepairExecutions(
+      repairExecutionId,
+      updateData
+    );
+
+    const formalWorkOrder = await WorkOrder.findOne({
+      where: { repair_execution_id: repairExecutionId }
+    });
+    if (formalWorkOrder) {
+      const woFields = {};
+      ['status', 'activity_performed', 'evidence_url', 'closure_signature', 'start_time', 'end_time', 'resolved_by_id', 'requiere_replacement']
+        .forEach((f) => { if (updateData[f] !== undefined) woFields[f] = updateData[f]; });
+      if (Object.keys(woFields).length) {
+        await formalWorkOrder.update(woFields);
+        const WorkOrderSyncService = require('./WorkOrderSyncService');
+        await WorkOrderSyncService.syncLinkedWorkOrders(formalWorkOrder.id, woFields);
+      }
+    }
+
+    return RepairExecution.findByPk(repairExecutionId, {
+      include: [{ model: WorkOrder, as: 'formalWorkOrder' }]
+    });
   }
 }
 

@@ -157,14 +157,14 @@ const LinkedFailuresSection = ({ failureId, currentFailureOrderId, onUnlink }) =
                 🔗
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  Orden de Trabajo Sincronizada
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  Acta / OT sincronizada
                   <span className="px-3 py-1 bg-blue-600 text-white text-xs rounded-full font-semibold">
                     {linkedFailures.length + 1} fallas enlazadas
                   </span>
                 </h3>
                 <p className="text-sm text-gray-600">
-                  Esta orden está conectada con otras fallas. Todas se actualizan juntas automáticamente.
+                  Esta acta u OT está conectada con otras fallas. Los cambios se propagan automáticamente (AR y OT vinculada).
                 </p>
               </div>
             </div>

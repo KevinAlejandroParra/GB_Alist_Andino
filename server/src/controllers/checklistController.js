@@ -416,10 +416,10 @@ const downloadChecklistPDF = async (req, res) => {
     // ✅ OPTIMIZACIÓN: Usar navegador singleton para evitar lanzar uno nuevo cada vez
     const browser = await getBrowserInstance();
     const page = await browser.newPage()
-    
+
     // ✅ OPTIMIZACIÓN: Configurar página para renderizado más rápido
     await page.setViewport({ width: 1200, height: 1600 });
-    
+
     // ✅ OPTIMIZACIÓN: Deshabilitar recursos innecesarios
     await page.setRequestInterception(true);
     page.on('request', (request) => {
@@ -431,9 +431,9 @@ const downloadChecklistPDF = async (req, res) => {
         request.continue();
       }
     });
-    
+
     // ✅ Usar page.goto con el archivo local
-    await page.goto(`file:///${fileUrl}`, { 
+    await page.goto(`file:///${fileUrl}`, {
       waitUntil: "domcontentloaded",
       timeout: 30000 // Reducir timeout a 30 segundos
     })
@@ -477,7 +477,7 @@ const downloadChecklistPDF = async (req, res) => {
 
     await page.close() // ✅ Explicitly close page
     // ✅ NO cerrar el navegador, mantenerlo abierto para reutilizar
-    
+
     // Limpieza
     try {
       if (fs.existsSync(tempFilePath)) {
@@ -536,13 +536,13 @@ const getBrowserInstance = async () => {
   }).then(browser => {
     browserInstance = browser;
     browserLaunchPromise = null;
-    
+
     // Manejar cierre inesperado
     browser.on('disconnected', () => {
       console.log('⚠️ Navegador desconectado, se creará uno nuevo en la próxima solicitud');
       browserInstance = null;
     });
-    
+
     return browser;
   }).catch(error => {
     browserLaunchPromise = null;
@@ -631,8 +631,8 @@ const buildFailurePdfBlock = (failure, idx, imageCache, formatDate) => {
         <div style="font-size:7px;color:#374151;margin-top:2px;"><strong>Firma de cierre:</strong></div>
         ${signatureHtml}
         ${ar.evidence_url
-          ? buildPdfEvidenceSection('Evidencia de la reparación', ar.evidence_url, imageCache)
-          : '<div style="font-size:7px;color:#6b7280;margin-top:4px;">Sin evidencia fotográfica de reparación</div>'}
+        ? buildPdfEvidenceSection('Evidencia de la reparación', ar.evidence_url, imageCache)
+        : '<div style="font-size:7px;color:#6b7280;margin-top:4px;">Sin evidencia fotográfica de reparación</div>'}
       </div>`;
   }
 
@@ -687,7 +687,7 @@ const buildFailurePdfBlock = (failure, idx, imageCache, formatDate) => {
 const generateChecklistHTML = async (data) => {
   const fs = require('fs');
   const path = require('path');
-  
+
   // ✅ Intentar cargar Sharp, pero tener fallback si falla
   let sharp = null;
   let useSharp = false;
@@ -699,7 +699,7 @@ const generateChecklistHTML = async (data) => {
     console.warn('⚠️ Sharp no disponible, usando conversión directa (sin optimización):', error.message);
     useSharp = false;
   }
-  
+
   // ✅ Función para convertir imágenes a base64 (con o sin Sharp)
   const { resolveLocalEvidencePath } = require('../config/multerConfig');
 
@@ -750,12 +750,12 @@ const generateChecklistHTML = async (data) => {
 
   // ✅ PRE-PROCESAR TODAS LAS IMÁGENES ANTES DE GENERAR HTML
   const imageCache = {};
-  
+
   // Procesar imagen del usuario
   if (data.creator?.user_image) {
     imageCache[data.creator.user_image] = await getImageAsBase64(data.creator.user_image);
   }
-  
+
   // Procesar imágenes de respuestas y fallas
   if (data.items) {
     for (const item of data.items) {
@@ -770,7 +770,7 @@ const generateChecklistHTML = async (data) => {
           }
         }
       }
-      
+
       // Para checklists normales, procesar respuestas directas
       if (item.responses && item.responses[0]?.evidence_url) {
         const url = item.responses[0].evidence_url;
@@ -780,7 +780,7 @@ const generateChecklistHTML = async (data) => {
       }
     }
   }
-  
+
   // Procesar imágenes de fallas (evidencia de falla y de reparación)
   if (data.failures?.failures_by_item) {
     for (const itemFailures of Object.values(data.failures.failures_by_item)) {
@@ -798,7 +798,7 @@ const generateChecklistHTML = async (data) => {
       }
     }
   }
-  
+
   console.log(`✅ Pre-procesadas ${Object.keys(imageCache).length} imágenes para PDF ${useSharp ? '(optimizadas con Sharp)' : '(sin optimización)'}`);
 
   const formatDate = (dateStr) => {
@@ -975,7 +975,22 @@ const generateChecklistHTML = async (data) => {
               failuresHtml = `
                 <div style="margin-top: 4px; padding: 4px; background: #fefbeb; border-radius: 4px;">
                   <strong style="font-size: 8px; color: #92400e;">📋 Fallas (${itemFailures.length})</strong>
-                  ${itemFailures.map((failure, idx) => buildFailurePdfBlock(failure, idx, imageCache, formatDate)).join('')}
+                  ${itemFailures.map((failure, idx) => {
+                const t = failure.traceability || { code: 'NONE', label: 'Sin seguimiento', color: '#9ca3af', bgColor: '#f3f4f6', shortLabel: '—' };
+                return `
+                    <div style="background: ${t.bgColor}; margin-top: 4px; padding: 4px; border-radius: 3px; border-left: 3px solid ${t.color};">
+                      <div style="font-size: 7px; margin-bottom: 2px; display:flex; justify-content:space-between; align-items:center;">
+                        <strong>${idx + 1}. ${failure.severity || 'N/A'}</strong>
+                        <span style="font-size:7px;font-weight:bold;color:${t.color};background:#fff;padding:1px 4px;border-radius:3px;border:1px solid ${t.color};">${t.shortLabel}</span>
+                      </div>
+                      <div style="font-size: 7px; color: #374151;">${failure.description}</div>
+                      ${t.code === 'CANCELLED' && t.cancellation_reason ? `<div style="font-size:7px;color:#dc2626;"><strong>Motivo:</strong> ${t.cancellation_reason}</div>` : ''}
+                      <div style="font-size: 7px; color: #6b7280;">
+                        <strong>Área:</strong> ${failure.assigned_to || 'No asignado'} |
+                        <strong>Recurrencia:</strong> ${failure.recurrence_count > 0 ? `${failure.recurrence_count} vez` : 'Primera vez'}
+                      </div>
+                    </div>`;
+              }).join('')}
                 </div>
               `;
             }
@@ -1033,6 +1048,36 @@ const generateChecklistHTML = async (data) => {
     `,
     )
     .join("")
+
+  const closedFailuresHtml = (data.failures?.closed_on_cutoff || []).length > 0 ? `
+                <div class="items-section" style="margin-top: 24px;">
+                    <h2>Fallas cerradas en la fecha del reporte</h2>
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th>ID Falla</th>
+                                <th>Descripción</th>
+                                <th>Tipo</th>
+                                <th>Cierre</th>
+                                <th>Técnico</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.failures.closed_on_cutoff.map((f) => `
+                            <tr>
+                                <td style="font-size:9px;">${f.failure_order_id || '—'}</td>
+                                <td style="font-size:9px;">${f.description || '—'}</td>
+                                <td style="font-size:9px;">
+                                    <span style="color:${f.traceability?.color || '#6b7280'};font-weight:bold;">${f.traceability?.shortLabel || '—'}</span>
+                                </td>
+                                <td style="font-size:9px;">${f.closed_at ? formatDate(f.closed_at) : '—'}</td>
+                                <td style="font-size:9px;">${f.resolver || '—'}</td>
+                            </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ` : '';
 
   return `
         <!DOCTYPE html>
@@ -1463,10 +1508,10 @@ const generateChecklistHTML = async (data) => {
                             <td colspan="3">
                                 <div class="user-info">
                                     ${(() => {
-                                        if (!data.creator.user_image) return '';
-                                        const imgB64 = imageCache[data.creator.user_image] || null;
-                                        return imgB64 ? `<img src="${imgB64}" alt="User Image" class="user-avatar" onerror="this.style.display='none';"/>` : '';
-                                    })()}
+      if (!data.creator.user_image) return '';
+      const imgB64 = imageCache[data.creator.user_image] || null;
+      return imgB64 ? `<img src="${imgB64}" alt="User Image" class="user-avatar" onerror="this.style.display='none';"/>` : '';
+    })()}
                                     <div>
                                         <strong>${data.creator.user_name}</strong><br/>
                                         <small style="color: var(--slate-600);">${data.creator.role.role_name}</small>
@@ -1498,14 +1543,14 @@ const generateChecklistHTML = async (data) => {
                             <td colspan="3">
                                 <div style="font-size: 10px;">
                                     <strong>Informe de Códigos QR Desbloqueados</strong><br/>
-                                    ${data.qr_scans && data.qr_scans.length > 0 ? 
-                                        data.qr_scans.map(scan => 
-                                            `<div style="margin-top: 4px; padding: 4px; background: var(--slate-50); border-radius: 4px;">
+                                    ${data.qr_scans && data.qr_scans.length > 0 ?
+        data.qr_scans.map(scan =>
+          `<div style="margin-top: 4px; padding: 4px; background: var(--slate-50); border-radius: 4px;">
                                                 <strong>${scan.qr_code}</strong> - Desbloqueado: ${new Date(scan.scanned_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
                                             </div>`
-                                        ).join('') 
-                                        : '<small style="color: var(--slate-500);">No hay registros de QR desbloqueados</small>'
-                                    }
+        ).join('')
+        : '<small style="color: var(--slate-500);">No hay registros de QR desbloqueados</small>'
+      }
                                     <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--slate-200);">
                                         <strong>Hora de Creación del Checklist:</strong> ${new Date(data.createdAt).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' })}
                                     </div>
@@ -1543,6 +1588,8 @@ const generateChecklistHTML = async (data) => {
                     </table>
                 </div>
                 
+                ${closedFailuresHtml}
+
                 <div class="page-break"></div>
 
                 <div class="signatures-section">
@@ -1665,20 +1712,20 @@ const getLatestChecklistByType = async (req, res) => {
   try {
     const { checklistTypeId } = req.params
     const { user_id, role_id } = req.user
-    
+
     console.log(`📥 [getLatestChecklistByType] Request received:`, {
       checklistTypeId,
       user_id,
       role_id,
       query: req.query
     });
-    
+
     const checklist = await checklistService.getLatestChecklistByType({
       checklistTypeId: Number.parseInt(checklistTypeId),
       user_id,
       role_id,
     })
-    
+
     console.log(`📤 [getLatestChecklistByType] Response:`, {
       checklistId: checklist?.checklist_id,
       weekIdentifier: checklist?.week_identifier,
@@ -1686,7 +1733,7 @@ const getLatestChecklistByType = async (req, res) => {
       typeCategory: checklist?.type?.type_category,
       frequency: checklist?.type?.frequency
     });
-    
+
     res.status(200).json(checklist)
   } catch (error) {
     console.error(`❌ [getLatestChecklistByType] Error:`, error.message);

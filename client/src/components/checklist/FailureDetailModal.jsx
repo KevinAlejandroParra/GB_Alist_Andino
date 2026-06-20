@@ -390,7 +390,7 @@ const FailureDetailModal = ({
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
                 >
                   <span>🔧</span>
-                  <span>Gestionar Falla</span>
+                  <span>Resolver falla</span>
                 </button>
               )}
 
@@ -603,16 +603,6 @@ const FailureDetailModal = ({
                 </p>
               ) : (
                 <p className="text-sm text-red-700">No se registró un motivo de cancelación.</p>
-              )}
-              {failureDetail?.cancelledBy?.user_name && (
-                <p className="text-sm text-red-800 mt-1">
-                  <strong>Cancelado por:</strong> {failureDetail.cancelledBy.user_name}
-                </p>
-              )}
-              {failureDetail?.cancelled_at && (
-                <p className="text-sm text-red-800">
-                  <strong>Fecha de cancelación:</strong> {formatDate(failureDetail.cancelled_at)}
-                </p>
               )}
             </div>
           )}

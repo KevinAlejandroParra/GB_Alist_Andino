@@ -779,19 +779,19 @@ class FailureController {
             { failure_order_id: { [Op.like]: pattern } },
             // Para campos de relaciones que pueden ser null, necesitamos
             // una condición más compleja que maneje el caso de relación ausente
-            { 
+            {
               [Op.and]: [
                 { '$checklistItem.checklist_item_id$': { [Op.not]: null } },
                 { '$checklistItem.question_text$': { [Op.like]: pattern } }
               ]
             },
-            { 
+            {
               [Op.and]: [
                 { '$affectedInspectable.ins_id$': { [Op.not]: null } },
                 { '$affectedInspectable.name$': { [Op.like]: pattern } }
               ]
             },
-            { 
+            {
               [Op.and]: [
                 { '$reporter.user_id$': { [Op.not]: null } },
                 { '$reporter.user_name$': { [Op.like]: pattern } }
@@ -799,7 +799,7 @@ class FailureController {
             }
           ]
         };
-        
+
         // Si ya hay condiciones en whereConditions, combinar con AND
         // para no sobreescribir Op.or existente
         if (Object.keys(whereConditions).length > 0) {
@@ -823,11 +823,17 @@ class FailureController {
       if (status === 'pending') {
         const statusClause = {
           [Op.or]: [
-            { '$workOrder.id$': { [Op.is]: null } },
+            {
+              [Op.and]: [
+                { '$repairExecution.id$': { [Op.is]: null } },
+                { '$workOrder.id$': { [Op.is]: null } }
+              ]
+            },
+            { '$repairExecution.status$': { [Op.notIn]: RESOLVED_STATUSES } },
             { '$workOrder.status$': { [Op.notIn]: RESOLVED_STATUSES } }
           ]
         };
-        
+
         // Si ya hay condiciones en whereConditions, combinar con AND
         // para no sobreescribir estructura existente
         if (Object.keys(whereConditions).length > 0) {
@@ -844,16 +850,83 @@ class FailureController {
         } else {
           whereConditions = statusClause;
         }
+      } else if (status === 'canceled') {
+        const statusClause = {
+          [Op.or]: [
+            { '$repairExecution.status$': 'CANCELADO' },
+            { '$workOrder.status$': 'CANCELADO' }
+          ]
+        };
+        if (Object.keys(whereConditions).length > 0) {
+          if (whereConditions[Op.and] && Array.isArray(whereConditions[Op.and])) {
+            whereConditions[Op.and].push(statusClause);
+          } else {
+            whereConditions = { [Op.and]: [whereConditions, statusClause] };
+          }
+        } else {
+          whereConditions = statusClause;
+        }
+      } else if (status === 'resolved') {
+        const statusClause = {
+          [Op.or]: [
+            { '$repairExecution.status$': 'RESUELTA' },
+            { '$workOrder.status$': 'RESUELTA' }
+          ]
+        };
+        if (Object.keys(whereConditions).length > 0) {
+          if (whereConditions[Op.and] && Array.isArray(whereConditions[Op.and])) {
+            whereConditions[Op.and].push(statusClause);
+          } else {
+            whereConditions = { [Op.and]: [whereConditions, statusClause] };
+          }
+        } else {
+          whereConditions = statusClause;
+        }
       }
 
       console.log('🔍 [GET FAILURE ORDERS] Where conditions:', whereConditions);
 
+      const repairExecutionInclude = {
+        model: require('../models').RepairExecution,
+        as: 'repairExecution',
+        attributes: [
+          'id', 'repair_execution_id', 'status', 'activity_performed', 'evidence_url',
+          'start_time', 'end_time', 'resolved_by_id', 'cancellation_reason',
+          'cancelled_at', 'cancelled_by_id', 'linked_failure_ids', 'updatedAt'
+        ],
+        required: false,
+        where:
+          status === 'resolved'
+            ? { status: { [Op.in]: RESOLVED_STATUSES } }
+            : status === 'canceled'
+              ? { status: 'CANCELADO' }
+              : undefined,
+        include: [
+          {
+            model: User,
+            as: 'resolver',
+            attributes: ['user_id', 'user_name']
+          },
+          {
+            model: User,
+            as: 'cancelledBy',
+            attributes: ['user_id', 'user_name'],
+            required: false
+          }
+        ]
+      };
+
       const workOrderInclude = {
         model: WorkOrder,
         as: 'workOrder',
-        attributes: ['id', 'work_order_id', 'status', 'updatedAt', 'start_time', 'end_time', 'activity_performed', 'evidence_url', 'requiere_replacement', 'resolved_by_id'],
-        required: status === 'resolved',
-        where: status === 'resolved' ? { status: { [Op.in]: RESOLVED_STATUSES } } : undefined,
+        attributes: ['id', 'work_order_id', 'status', 'updatedAt', 'start_time', 'end_time', 'activity_performed', 'evidence_url', 'requiere_replacement', 'resolved_by_id', 'linked_failure_ids'],
+        required: false,
+        where:
+          status === 'resolved'
+            ? { status: { [Op.in]: RESOLVED_STATUSES } }
+            : status === 'canceled'
+              ? { status: 'CANCELADO' }
+              : undefined,
         include: [
           {
             model: User,
@@ -904,6 +977,7 @@ class FailureController {
           as: 'adminSigner',
           attributes: ['user_id', 'user_name']
         },
+        repairExecutionInclude,
         workOrderInclude
       ];
 
@@ -1153,9 +1227,13 @@ class FailureController {
 
       const existingRepair = await RepairExecution.findOne({ where: { failure_order_id } });
       if (existingRepair) {
-        return res.status(400).json({
-          success: false,
-          error: { code: 'REPAIR_EXECUTION_EXISTS', message: 'Esta falla ya tiene acta de reparación' }
+        const existing = await RepairExecution.findByPk(existingRepair.id, {
+          include: [{ model: FailureOrder, as: 'failureOrder' }]
+        });
+        return res.status(200).json({
+          success: true,
+          message: 'Acta de reparación existente',
+          data: existing
         });
       }
 
@@ -1514,11 +1592,13 @@ class FailureController {
         });
       }
 
-      const { FailureOrder, WorkOrder } = require('../models');
+      const { FailureOrder, WorkOrder, RepairExecution, Inspectable, User } = require('../models');
 
-      // Obtener la falla con su WorkOrder
       const failureOrder = await FailureOrder.findByPk(failureOrderId, {
-        include: [{ model: WorkOrder, as: 'workOrder' }]
+        include: [
+          { model: WorkOrder, as: 'workOrder' },
+          { model: RepairExecution, as: 'repairExecution' }
+        ]
       });
 
       if (!failureOrder) {
@@ -1526,6 +1606,24 @@ class FailureController {
           success: false,
           error: { code: 'FAILURE_NOT_FOUND', message: 'Falla no encontrada' }
         });
+      }
+
+      if (failureOrder.repairExecution?.linked_failure_ids) {
+        let linkedIds = [];
+        try {
+          linkedIds = JSON.parse(failureOrder.repairExecution.linked_failure_ids);
+        } catch (_) { /* ignore */ }
+        const otherIds = linkedIds.filter((fid) => fid !== failureOrderId);
+        if (otherIds.length) {
+          const linkedFailures = await FailureOrder.findAll({
+            where: { id: otherIds },
+            include: [
+              { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] },
+              { model: Inspectable, as: 'affectedInspectable', attributes: ['ins_id', 'name'] }
+            ]
+          });
+          return res.status(200).json({ success: true, data: linkedFailures, syncType: 'AR' });
+        }
       }
 
       if (!failureOrder.workOrder) {
@@ -2467,40 +2565,73 @@ class FailureController {
   }
 
   /**
-   * Actualizar AR de una falla y escalar a OT formal cuando requiera repuestos
-   * PUT /api/failures/:id/repair-execution
+   * Actualizar campos de una Acta de Reparación (AR)
+   * PUT /api/failures/repair-executions/:repairExecutionId/update
    */
   async updateRepairExecution(req, res) {
     try {
-      const failureOrderId = parseInt(req.params.id, 10);
-      const repairExecutionService = require('../services/repairExecutionService');
-
-      if (Number.isNaN(failureOrderId)) {
+      const repairExecutionId = parseInt(req.params.repairExecutionId, 10);
+      if (Number.isNaN(repairExecutionId)) {
         return res.status(400).json({
           success: false,
-          error: { code: 'INVALID_ID', message: 'ID de orden de falla inválido' }
+          error: { code: 'INVALID_ID', message: 'ID de acta de reparación inválido' }
         });
       }
 
-      const payload = { ...req.body };
-      const shouldAssignResolver = payload.closure_signature !== undefined
-        || payload.status === 'RESUELTA';
-
-      if (shouldAssignResolver && payload.resolved_by_id === undefined && req.user?.user_id) {
-        payload.resolved_by_id = req.user.user_id;
+      const allowedFields = [
+        'start_time', 'end_time', 'activity_performed', 'evidence_url',
+        'closure_signature', 'resolved_by_id', 'status'
+      ];
+      const updateData = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) updateData[field] = req.body[field];
       }
 
-      const result = await repairExecutionService.updateForFailure(failureOrderId, payload);
+      if (!Object.keys(updateData).length) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'NO_FIELDS', message: 'No se proporcionaron campos válidos' }
+        });
+      }
 
-      return res.status(200).json({
-        success: true,
-        data: result.data,
-        effectiveExecution: result.effectiveExecution
-      });
+      const repairExecutionService = require('../services/repairExecutionService');
+      const result = await repairExecutionService.updateFields(repairExecutionId, updateData);
+
+      res.status(200).json({ success: true, data: result });
     } catch (error) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: { code: 'UPDATE_REPAIR_EXECUTION_ERROR', message: error.message }
+      });
+    }
+  }
+
+  /**
+   * Crear OT formal desde una AR (repuestos/requisiciones)
+   * POST /api/failures/repair-executions/:repairExecutionId/create-work-order
+   */
+  async createFormalWorkOrderFromRepair(req, res) {
+    try {
+      const repairExecutionId = parseInt(req.params.repairExecutionId, 10);
+      if (Number.isNaN(repairExecutionId)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_ID', message: 'ID de acta de reparación inválido' }
+        });
+      }
+
+      const repairExecutionService = require('../services/repairExecutionService');
+      const workOrder = await repairExecutionService.createFormalWorkOrder(repairExecutionId);
+
+      res.status(201).json({
+        success: true,
+        message: 'Orden de trabajo creada desde acta de reparación',
+        data: workOrder
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'CREATE_FORMAL_WO_ERROR', message: error.message }
       });
     }
   }
@@ -2576,82 +2707,82 @@ class FailureController {
         code: 'DELETE_DISABLED',
         message: 'La eliminación permanente no está disponible. Use cancelación para archivar la falla.'
       }
-  }
+    }
 
   /**
    * Actualizar imagen de evidencia en disco local y DB
    * PUT /api/failures/:id/imagen
    */
   async updateEvidenceImage(req, res) {
-    try {
-      const failureOrderId = parseInt(req.params.id, 10);
-      if (Number.isNaN(failureOrderId)) {
-        return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({ success: false, error: { message: 'No se envió ninguna imagen' } });
-      }
-
-      const { FailureOrder } = require('../models');
-
-      const failureOrder = await FailureOrder.findByPk(failureOrderId);
-      if (!failureOrder) {
-        return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
-      }
-
-      await removeStoredEvidence(failureOrder);
-
-      await failureOrder.update({
-        evidence_url: toRelativePath(req.file.path),
-        evidence_public_id: null
-      });
-
-      res.status(200).json({
-        success: true,
-        data: failureOrder,
-        message: 'Imagen actualizada exitosamente'
-      });
-    } catch (error) {
-      console.error('❌ Error actualizando imagen:', error);
-      res.status(500).json({ success: false, error: { message: error.message } });
+      try {
+        const failureOrderId = parseInt(req.params.id, 10);
+        if(Number.isNaN(failureOrderId)) {
+      return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
     }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: { message: 'No se envió ninguna imagen' } });
+    }
+
+    const { FailureOrder } = require('../models');
+
+    const failureOrder = await FailureOrder.findByPk(failureOrderId);
+    if (!failureOrder) {
+      return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
+    }
+
+    await removeStoredEvidence(failureOrder);
+
+    await failureOrder.update({
+      evidence_url: toRelativePath(req.file.path),
+      evidence_public_id: null
+    });
+
+    res.status(200).json({
+      success: true,
+      data: failureOrder,
+      message: 'Imagen actualizada exitosamente'
+    });
+  } catch(error) {
+    console.error('❌ Error actualizando imagen:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
   }
+}
 
   /**
    * Eliminar imagen de evidencia del disco local/Cloudinary y DB
    * DELETE /api/failures/:id/imagen
    */
   async deleteEvidenceImage(req, res) {
-    try {
-      const failureOrderId = parseInt(req.params.id, 10);
-      if (Number.isNaN(failureOrderId)) {
-        return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
-      }
-
-      const { FailureOrder } = require('../models');
-
-      const failureOrder = await FailureOrder.findByPk(failureOrderId);
-      if (!failureOrder) {
-        return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
-      }
-
-      await removeStoredEvidence(failureOrder);
-
-      await failureOrder.update({
-        evidence_url: null,
-        evidence_public_id: null
-      });
-
-      res.status(200).json({
-        success: true,
-        message: 'Imagen eliminada exitosamente'
-      });
-    } catch (error) {
-      console.error('❌ Error eliminando imagen:', error);
-      res.status(500).json({ success: false, error: { message: error.message } });
+  try {
+    const failureOrderId = parseInt(req.params.id, 10);
+    if (Number.isNaN(failureOrderId)) {
+      return res.status(400).json({ success: false, error: { message: 'ID inválido' } });
     }
+
+    const { FailureOrder } = require('../models');
+
+    const failureOrder = await FailureOrder.findByPk(failureOrderId);
+    if (!failureOrder) {
+      return res.status(404).json({ success: false, error: { message: 'Falla no encontrada' } });
+    }
+
+    await removeStoredEvidence(failureOrder);
+
+    await failureOrder.update({
+      evidence_url: null,
+      evidence_public_id: null
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Imagen eliminada exitosamente'
+    });
+  } catch (error) {
+    console.error('❌ Error eliminando imagen:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
   }
+}
 }
 
 module.exports = new FailureController();

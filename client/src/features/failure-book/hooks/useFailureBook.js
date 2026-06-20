@@ -212,6 +212,7 @@ export function useFailureBook() {
     all: bookStats.total ?? pagination.total ?? 0,
     pending: bookStats.pending ?? 0,
     resolved: bookStats.resolved ?? 0,
+    canceled: bookStats.canceled ?? 0,
     critical: bookStats.critical ?? 0
   };
 

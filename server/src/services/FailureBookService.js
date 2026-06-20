@@ -6,6 +6,7 @@ const {
   Inspectable,
   WorkOrder,
   WorkOrderPart,
+  RepairExecution,
   ChecklistItem,
   ChecklistType,
   Sequelize
@@ -31,9 +32,20 @@ function buildRoleWhere(userRole, allRoles) {
   return {};
 }
 
+const repairExecutionService = require('./repairExecutionService');
+
+function getEffectiveStatus(failure) {
+  return repairExecutionService.getEffectiveStatus(failure);
+}
+
 function isActiveFailure(failure) {
-  if (!failure.workOrder) return true;
-  return !RESOLVED_STATUSES.includes(failure.workOrder.status);
+  const status = getEffectiveStatus(failure);
+  if (!status) return true;
+  return !RESOLVED_STATUSES.includes(status);
+}
+
+function isCanceledFailure(failure) {
+  return getEffectiveStatus(failure) === 'CANCELADO';
 }
 
 function applyPostFilters(failures, { status, hasWorkOrder, hasRepairExecution, hasParts }) {
@@ -43,8 +55,10 @@ function applyPostFilters(failures, { status, hasWorkOrder, hasRepairExecution, 
     result = result.filter((f) => isActiveFailure(f));
   } else if (status === 'resolved') {
     result = result.filter(
-      (f) => f.workOrder && RESOLVED_STATUSES.includes(f.workOrder.status)
+      (f) => getEffectiveStatus(f) === 'RESUELTA'
     );
+  } else if (status === 'canceled') {
+    result = result.filter((f) => isCanceledFailure(f));
   }
 
   if (hasWorkOrder === 'true') {
@@ -174,7 +188,13 @@ function appendStatusWhere(whereConditions, status) {
   if (status === 'pending') {
     const statusClause = {
       [Op.or]: [
-        { '$workOrder.id$': { [Op.is]: null } },
+        {
+          [Op.and]: [
+            { '$repairExecution.id$': { [Op.is]: null } },
+            { '$workOrder.id$': { [Op.is]: null } }
+          ]
+        },
+        { '$repairExecution.status$': { [Op.notIn]: RESOLVED_STATUSES } },
         { '$workOrder.status$': { [Op.notIn]: RESOLVED_STATUSES } }
       ]
     };
@@ -191,6 +211,38 @@ function appendStatusWhere(whereConditions, status) {
           [Op.and]: [whereConditions, statusClause]
         };
         whereConditions = newWhere;
+      }
+    } else {
+      whereConditions = statusClause;
+    }
+  } else if (status === 'resolved') {
+    const statusClause = {
+      [Op.or]: [
+        { '$repairExecution.status$': 'RESUELTA' },
+        { '$workOrder.status$': 'RESUELTA' }
+      ]
+    };
+    if (Object.keys(whereConditions).length > 0) {
+      if (whereConditions[Op.and] && Array.isArray(whereConditions[Op.and])) {
+        whereConditions[Op.and].push(statusClause);
+      } else {
+        whereConditions = { [Op.and]: [whereConditions, statusClause] };
+      }
+    } else {
+      whereConditions = statusClause;
+    }
+  } else if (status === 'canceled') {
+    const statusClause = {
+      [Op.or]: [
+        { '$repairExecution.status$': 'CANCELADO' },
+        { '$workOrder.status$': 'CANCELADO' }
+      ]
+    };
+    if (Object.keys(whereConditions).length > 0) {
+      if (whereConditions[Op.and] && Array.isArray(whereConditions[Op.and])) {
+        whereConditions[Op.and].push(statusClause);
+      } else {
+        whereConditions = { [Op.and]: [whereConditions, statusClause] };
       }
     } else {
       whereConditions = statusClause;
@@ -227,14 +279,45 @@ function getListIncludes(status, needsSearchJoin) {
       required: false
     },
     {
+      model: RepairExecution,
+      as: 'repairExecution',
+      attributes: [
+        'id', 'repair_execution_id', 'status', 'activity_performed', 'evidence_url',
+        'start_time', 'end_time', 'resolved_by_id', 'cancellation_reason',
+        'cancelled_at', 'cancelled_by_id', 'linked_failure_ids', 'updatedAt'
+      ],
+      required: false,
+      where:
+        status === 'canceled'
+          ? { status: 'CANCELADO' }
+          : status === 'resolved'
+            ? { status: 'RESUELTA' }
+            : undefined,
+      include: [
+        {
+          model: User,
+          as: 'resolver',
+          attributes: ['user_id', 'user_name']
+        },
+        {
+          model: User,
+          as: 'cancelledBy',
+          attributes: ['user_id', 'user_name'],
+          required: false
+        }
+      ]
+    },
+    {
       model: WorkOrder,
       as: 'workOrder',
-      attributes: ['id', 'status', 'updatedAt', 'resolved_by_id'],
-      required: status === 'resolved',
+      attributes: ['id', 'work_order_id', 'status', 'updatedAt', 'resolved_by_id', 'linked_failure_ids'],
+      required: false,
       where:
         status === 'resolved'
           ? { status: { [Op.in]: RESOLVED_STATUSES } }
-          : undefined,
+          : status === 'canceled'
+            ? { status: 'CANCELADO' }
+            : undefined,
       include: [
         {
           model: User,
@@ -258,7 +341,7 @@ async function fetchFailuresForBook(userRole, query) {
   const needsSearchJoin = !!(searchQuery && searchQuery.trim());
   let where = whereConditions;
 
-  if (status === 'pending' || status === 'resolved') {
+  if (status === 'pending' || status === 'resolved' || status === 'canceled') {
     where = appendStatusWhere(where, status);
   }
 
@@ -274,7 +357,7 @@ async function fetchFailuresForBook(userRole, query) {
 
   return applyPostFilters(failures, {
     ...query,
-    status: status === 'pending' || status === 'resolved' ? 'all' : status
+    status: status === 'pending' || status === 'resolved' || status === 'canceled' ? 'all' : status
   });
 }
 
@@ -456,14 +539,19 @@ class FailureBookService {
 
     let pending = 0;
     let resolved = 0;
+    let canceled = 0;
     let critical = 0;
 
     failures.forEach((f) => {
       const plain = f.get ? f.get({ plain: true }) : f;
       if (plain.severity === 'CRITICA') critical += 1;
-      if (isActiveFailure(plain)) pending += 1;
-      else if (plain.workOrder && RESOLVED_STATUSES.includes(plain.workOrder.status)) {
+      const effective = getEffectiveStatus(plain);
+      if (!effective || (effective !== 'RESUELTA' && effective !== 'CANCELADO')) {
+        pending += 1;
+      } else if (effective === 'RESUELTA') {
         resolved += 1;
+      } else if (effective === 'CANCELADO') {
+        canceled += 1;
       }
     });
 
@@ -471,6 +559,7 @@ class FailureBookService {
       total: failures.length,
       pending,
       resolved,
+      canceled,
       critical,
       topChecklists: toTop(checklists),
       topDevices: toTop(devices),
