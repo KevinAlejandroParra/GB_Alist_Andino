@@ -632,7 +632,7 @@ const buildFailurePdfBlock = (failure, idx, imageCache, formatDate) => {
     if (ar.evidence_url) evidenceUrls.push(ar.evidence_url);
     arHtml = `
       <div style="margin-top:8px;padding:10px;background:#fff;border-radius:6px;border:1px solid #dbeafe;">
-        <div style="font-size:9px;font-weight:bold;color:#1d4ed8;margin-bottom:6px;">📋 Acta de Reparación (${ar.repair_execution_id})</div>
+        <div style="font-size:9px;font-weight:bold;color:#1d4ed8;margin-bottom:6px;"><i class="fas fa-clipboard-check" style="margin-right:4px;"></i> Acta de Reparación (${ar.repair_execution_id})</div>
         <div style="font-size:8px;color:#374151;margin-bottom:4px;"><strong>Actividad realizada:</strong> ${ar.activity_performed || 'N/A'}</div>
         <table style="width:100%;font-size:8px;border-collapse:collapse;margin:4px 0;">
           <tr><td style="padding:2px 4px;border:1px solid #e2e8f0;width:50%;"><strong>Técnico:</strong> ${ar.resolver_name || 'N/A'}</td>
@@ -658,7 +658,7 @@ const buildFailurePdfBlock = (failure, idx, imageCache, formatDate) => {
       : '';
     otHtml = `
       <div style="margin-top:8px;padding:10px;background:#fff;border-radius:6px;border:1px solid #fde68a;">
-        <div style="font-size:9px;font-weight:bold;color:#b45309;margin-bottom:6px;">🔧 Orden de Trabajo (${wo.work_order_id})</div>
+        <div style="font-size:9px;font-weight:bold;color:#b45309;margin-bottom:6px;"><i class="fas fa-tools" style="margin-right:4px;"></i> Orden de Trabajo (${wo.work_order_id})</div>
         <div style="font-size:8px;color:#374151;margin-bottom:4px;"><strong>Actividad:</strong> ${wo.activity_performed || 'N/A'}</div>
         <table style="width:100%;font-size:8px;border-collapse:collapse;margin:4px 0;">
           <tr><td style="padding:2px 4px;border:1px solid #e2e8f0;width:50%;"><strong>Estado:</strong> ${wo.status || 'N/A'}</td>
@@ -679,7 +679,7 @@ const buildFailurePdfBlock = (failure, idx, imageCache, formatDate) => {
     const cancelledAt = t.cancelled_at ? formatDate(t.cancelled_at) : 'N/A';
     cancelHtml = `
       <div style="margin-top:8px;padding:10px;background:#fef2f2;border-radius:6px;border:1px solid #fecaca;">
-        <div style="font-size:9px;font-weight:bold;color:#dc2626;">🚫 Falla cancelada</div>
+        <div style="font-size:9px;font-weight:bold;color:#dc2626;"><i class="fas fa-ban" style="margin-right:4px;"></i> Falla cancelada</div>
         <div style="font-size:8px;color:#374151;margin-top:4px;"><strong>Motivo:</strong> ${t.cancellation_reason || 'N/A'}</div>
         <div style="font-size:8px;color:#374151;margin-top:2px;"><strong>Cancelada por:</strong> ${cancelledBy} | <strong>Fecha:</strong> ${cancelledAt}</div>
       </div>`;
@@ -887,8 +887,8 @@ const generateChecklistHTML = async (data) => {
         // Renderizar el ítem padre en negrilla
         html += `
                     <tr class="parent-item-row" style="background-color: #f8fafc;">
-                        <td colspan="4" style="font-size: 10px; font-weight: bold; padding: 6px; color: #374151;">
-                            <strong>${item.item_number}. ${item.question_text}</strong>
+                        <td colspan="3" style="font-size: 10px; font-weight: bold; padding: 8px 12px; color: #374151;">
+                            ${item.item_number}. ${item.question_text}
                         </td>
                     </tr>
                  `
@@ -915,7 +915,7 @@ const generateChecklistHTML = async (data) => {
         if (itemFailures.length > 0) {
           failuresHtml = `
             <div style="margin-top: 6px; padding: 6px; background: #fefbeb; border-radius: 4px;">
-              <strong style="font-size: 9px; color: #92400e;">📋 Órdenes de Falla (${itemFailures.length})</strong>
+              <strong style="font-size: 9px; color: #92400e;"><i class="fas fa-clipboard-list" style="margin-right:4px;"></i> Órdenes de Falla (${itemFailures.length})</strong>
               ${itemFailures.map((failure, idx) => buildFailurePdfBlock(failure, idx, imageCache, formatDate)).join('')}
             </div>
           `;
@@ -930,20 +930,17 @@ const generateChecklistHTML = async (data) => {
 
         html += `
                     <tr class="sub-item-row">
-                        <td style="font-size: 9px; font-weight: bold;">${item.item_number}</td>
-                        <td style="font-size: 9px; line-height: 1.2; padding: 4px;">
-                            <div style="word-wrap: break-word;">${item.question_text}</div>
-                        </td>
-                        <td style="text-align: center; font-size: 9px; font-weight: bold; padding: 4px;" class="${displayValue.replace(" ", "-")}">
+                        <td style="font-size: 9px; font-weight: bold; padding: 8px 4px;">${item.item_number}</td>
+                        <td style="text-align: center; font-size: 9px; font-weight: bold; padding: 8px 6px;" class="${displayValue.replace(" ", "-")}">
                             ${displayValue}
                         </td>
-                        <td style="font-size: 9px; line-height: 1.3; padding: 4px 6px;">
-                            <div style="word-wrap: break-word;">${comment}</div>
+                        <td style="font-size: 9px; line-height: 1.4; padding: 6px 8px;">
+                            <div style="word-wrap: break-word;">${comment || '<span style="color:#9ca3af;font-style:italic;">Sin observaciones</span>'}</div>
                         </td>
                     </tr>
                     ${failuresHtml ? `
                     <tr class="failures-row" style="background-color: #fefbeb;">
-                        <td colspan="4" style="padding: 6px 10px; border-top: 1px solid #e5e7eb;">
+                        <td colspan="3" style="padding: 8px 12px; border-top: 1px solid #e5e7eb;">
                             ${failuresHtml}
                         </td>
                     </tr>
@@ -960,9 +957,9 @@ const generateChecklistHTML = async (data) => {
     deviceSections.forEach((deviceSection) => {
       // Encabezado del dispositivo (sección de color morado)
       html += `
-              <tr class="device-section-row" style="background-color: #7c3aed; color: white;">
-                  <td colspan="4" style="font-size: 10px; font-weight: bold; padding: 8px; color: white;">
-                      <strong>📱 ${deviceSection.item_number}. ${deviceSection.question_text}</strong>
+              <tr class="device-section-row">
+                  <td colspan="3" style="font-size: 10px; font-weight: bold; padding: 8px 12px; color: white;">
+                      <i class="fas fa-mobile-alt" style="margin-right:6px;"></i> ${deviceSection.item_number}. ${deviceSection.question_text}
                   </td>
               </tr>
            `
@@ -979,8 +976,8 @@ const generateChecklistHTML = async (data) => {
             // Renderizar item padre en negrilla (como separador de categoría)
             html += `
                 <tr class="parent-item-row" style="background-color: #f8fafc;">
-                    <td colspan="4" style="font-size: 10px; font-weight: bold; padding: 6px; color: #374151;">
-                        <strong>${item.item_number}. ${item.question_text}</strong>
+                    <td colspan="3" style="font-size: 10px; font-weight: bold; padding: 8px 12px; color: #374151;">
+                        ${item.item_number}. ${item.question_text}
                     </td>
                 </tr>
              `
@@ -1010,7 +1007,7 @@ const generateChecklistHTML = async (data) => {
             if (itemFailures.length > 0) {
               failuresHtml = `
                 <div style="margin-top: 4px; padding: 4px; background: #fefbeb; border-radius: 4px;">
-                  <strong style="font-size: 8px; color: #92400e;">📋 Fallas (${itemFailures.length})</strong>
+                  <strong style="font-size: 8px; color: #92400e;"><i class="fas fa-exclamation-triangle" style="margin-right:4px;"></i> Fallas (${itemFailures.length})</strong>
                   ${itemFailures.map((failure, idx) => {
                 const t = failure.traceability || { code: 'NONE', label: 'Sin seguimiento', color: '#9ca3af', bgColor: '#f3f4f6', shortLabel: '—' };
                 return `
@@ -1039,77 +1036,74 @@ const generateChecklistHTML = async (data) => {
 
             html += `
                         <tr class="sub-item-row">
-                            <td style="font-size: 9px; font-weight: bold;">${item.item_number}</td>
-                            <td style="font-size: 9px; line-height: 1.2; padding: 4px;">
-                                <div style="word-wrap: break-word;">${item.question_text}</div>
-                            </td>
-                            <td style="text-align: center; font-size: 9px; font-weight: bold; padding: 4px;" class="${displayValue.replace(" ", "-")}">
+                            <td style="font-size: 9px; font-weight: bold; padding: 8px 4px;">${item.item_number}</td>
+                            <td style="text-align: center; font-size: 9px; font-weight: bold; padding: 8px 6px;" class="${displayValue.replace(" ", "-")}">
                                 ${displayValue}
                             </td>
-                            <td style="font-size: 9px; line-height: 1.3; padding: 4px 6px;">
-                                <div style="word-wrap: break-word;">${comment}</div>
+                            <td style="font-size: 9px; line-height: 1.4; padding: 6px 8px;">
+                                <div style="word-wrap: break-word;">${comment || '<span style="color:#9ca3af;font-style:italic;">Sin observaciones</span>'}</div>
                             </td>
                         </tr>
                         ${failuresHtml ? `
                         <tr class="failures-row" style="background-color: #fefbeb;">
-                            <td colspan="4" style="padding: 6px 10px; border-top: 1px solid #e5e7eb;">
+                            <td colspan="3" style="padding: 8px 12px; border-top: 1px solid #e5e7eb;">
                                 ${failuresHtml}
                             </td>
                         </tr>
                         ` : ''}
-                     `
-          }
-        })
-      }
-    })
-    return html
-  }
+                     `;
+            }
+          })
+        }
+      })
+      return html
+    }
 
+    const signaturesHTML = data.signatures
+      .map(
+        (sig) => `
+          <div class="signature">
+              <img src="${sig.digital_token || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='}" alt="Firma de ${sig.user.user_name}" onerror="this.onerror=null;this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';"/>
+              <p><strong>${sig.user.user_name}</strong></p>
+              <p class="role">${sig.role?.role_name || 'Rol Desconocido'}</p>
+              <p class="date">Firmado: ${formatDate(sig.signed_at)}</p>
+          </div>
+      `,
+      )
+      .join("")
 
-  const signaturesHTML = data.signatures
-    .map(
-      (sig) => `
-        <div class="signature">
-            <img src="${sig.digital_token || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='}" alt="Firma de ${sig.user.user_name}" onerror="this.onerror=null;this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';"/>
-            <p><strong>${sig.user.user_name}</strong></p>
-            <p class="role">${sig.role?.role_name || 'Rol Desconocido'}</p>
-            <p class="date">Firmado: ${formatDate(sig.signed_at)}</p>
-        </div>
-    `,
-    )
-    .join("")
+    const closedFailuresHtml = (data.failures?.closed_on_cutoff || []).length > 0 ? `
+                  <div class="items-section" style="margin-top: 24px;">
+                      <h2>Fallas cerradas en la fecha del reporte</h2>
+                      <div style="margin-top:12px;">
+                          ${data.failures.closed_on_cutoff.map((f, idx) =>
+          buildFailurePdfBlock({
+            failure_order_id: f.failure_order_id,
+            description: f.description,
+            traceability: f.traceability,
+            created_at: f.created_at,
+            severity: f.severity,
+            affected_machine: f.affected_machine,
+            reporter_name: f.reporter_name,
+            assigned_to_name: f.assigned_to_name,
+            assigned_to: f.assigned_to,
+            recurrence_count: f.recurrence_count,
+            evidence_url: f.evidence_url,
+            repairExecution: f.repairExecution,
+            workOrder: f.workOrder
+          }, idx, imageCache, formatDate)
+        ).join('<hr style="border:none;border-top:2px dashed #d1d5db;margin:12px 0;">')}
+                      </div>
+                  </div>
+                  ` : '';
 
-  const closedFailuresHtml = (data.failures?.closed_on_cutoff || []).length > 0 ? `
-                <div class="items-section" style="margin-top: 24px;">
-                    <h2>Fallas cerradas en la fecha del reporte</h2>
-                    <div style="margin-top:12px;">
-                        ${data.failures.closed_on_cutoff.map((f, idx) =>
-        buildFailurePdfBlock({
-          failure_order_id: f.failure_order_id,
-          description: f.description,
-          traceability: f.traceability,
-          created_at: f.created_at,
-          severity: f.severity,
-          affected_machine: f.affected_machine,
-          reporter_name: f.reporter_name,
-          assigned_to_name: f.assigned_to_name,
-          assigned_to: f.assigned_to,
-          recurrence_count: f.recurrence_count,
-          evidence_url: f.evidence_url,
-          repairExecution: f.repairExecution,
-          workOrder: f.workOrder
-        }, idx, imageCache, formatDate)
-      ).join('<hr style="border:none;border-top:2px dashed #d1d5db;margin:12px 0;">')}
-                    </div>
-                </div>
-                ` : '';
-
-  return `
+    return `
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="UTF-8">
             <title>Reporte de Checklist - Alist GBX</title>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
             <style>
                 :root {
                     --primary-purple: #8b5cf6;
@@ -1345,29 +1339,26 @@ const generateChecklistHTML = async (data) => {
                     font-weight: 600;
                 }
                 
-                /* Distribución mejorada de columnas (4 columnas, sin evidencia) */
+                /* Distribución mejorada de columnas (3 columnas: Item, Respuesta, Observaciones) */
                 .sub-item-row td:first-child { 
                     width: 8%; 
                     text-align: center; 
                     font-weight: 600;
                     color: var(--primary-purple-dark);
+                    vertical-align: middle;
                 }
                 
                 .sub-item-row td:nth-child(2) { 
-                    width: 42%; 
-                    line-height: 1.4;
+                    width: 17%; 
+                    text-align: center; 
+                    font-weight: 600;
+                    vertical-align: middle;
                 }
                 
                 .sub-item-row td:nth-child(3) { 
-                    width: 18%; 
-                    text-align: center; 
-                    font-weight: 600;
-                }
-                
-                .sub-item-row td:nth-child(4) { 
-                    width: 32%; 
-                    line-height: 1.3; 
-                    padding: 4px 6px;
+                    width: 75%; 
+                    line-height: 1.4; 
+                    padding: 6px 8px;
                 }
                 
                 /* Estados de respuesta con colores mejorados */
@@ -1580,7 +1571,7 @@ const generateChecklistHTML = async (data) => {
                             <th>Ubicación</th>
                             <td colspan="3">
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="color: var(--primary-purple-dark); font-weight: 600;">📍</span>
+                                    <span style="color: var(--primary-purple-dark); font-weight: 600;"><i class="fas fa-map-marker-alt"></i></span>
                                     <span><strong>GAME BOX ANDINO local 404</strong></span>
                                 </div>
                             </td>
@@ -1594,9 +1585,8 @@ const generateChecklistHTML = async (data) => {
                         <thead>
                             <tr>
                                 <th style="width: 8%;">Item</th>
-                                <th style="width: 42%;">Descripción</th>
-                                <th style="width: 18%;">Respuesta</th>
-                                <th style="width: 32%;">Observaciones</th>
+                                <th style="width: 17%;">Respuesta</th>
+                                <th style="width: 75%;">Observaciones</th>
                             </tr>
                         </thead>
                         <tbody>
