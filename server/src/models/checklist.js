@@ -46,6 +46,12 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'checklist_id',
                 as: 'signatures'
             });
+
+            // Un checklist puede tener muchas requisiciones
+            Checklist.hasMany(models.Requisition, {
+                foreignKey: 'checklist_id',
+                as: 'requisitions'
+            });
         }
     }
     Checklist.init(

@@ -21,6 +21,12 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'work_order_id',
         as: 'workOrder'
       });
+
+      // Relación con el checklist
+      Requisition.belongsTo(models.Checklist, {
+        foreignKey: 'checklist_id',
+        as: 'checklist'
+      });
     }
   }
 
@@ -83,6 +89,13 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: true,
       comment: 'ID del usuario que aprobó la requisición'
+    },
+
+    // Relación con el checklist
+    checklist_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'ID del checklist asociado a la requisición'
     }
   }, {
     sequelize,

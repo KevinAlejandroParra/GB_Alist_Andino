@@ -968,7 +968,8 @@ const generateChecklistHTML = async (data) => {
             // Obtener las fallas asociadas a este item de este dispositivo
             // La clave usa unique_frontend_id que es "{device_ins_id}-{checklist_item_id}"
             const failureKey = item.unique_frontend_id || item.checklist_item_id;
-            const itemFailures = data.failures?.failures_by_item?.[failureKey] || [];
+            const itemFailures = data.failures?.failures_by_item?.[failureKey] ||
+                                 data.failures?.failures_by_item?.[item.checklist_item_id] || [];
 
             let failuresHtml = '';
             if (itemFailures.length > 0) {
@@ -1590,6 +1591,37 @@ const generateChecklistHTML = async (data) => {
                 
                 ${closedFailuresHtml}
 
+                ${(() => {
+                  const reqs = data.pending_requisitions || [];
+                  if (reqs.length === 0) return '';
+                  return `
+                  <div class="items-section" style="margin-top: 24px;">
+                    <h2>Requisiciones Pendientes</h2>
+                    <table class="items-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Repuesto</th>
+                          <th>Cant.</th>
+                          <th>Estado</th>
+                          <th>Solicitada</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${reqs.map(r => `
+                        <tr>
+                          <td style="font-size:9px;">${r.id}</td>
+                          <td style="font-size:9px;">${r.part_reference}</td>
+                          <td style="font-size:9px;text-align:center;">${r.quantity_requested}</td>
+                          <td style="font-size:9px;">${r.status}</td>
+                          <td style="font-size:9px;">${formatDate(r.created_at)}</td>
+                        </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>`;
+                })()}
+
                 <div class="page-break"></div>
 
                 <div class="signatures-section">
@@ -1893,6 +1925,25 @@ const getChecklistTypeDetails = async (req, res) => {
   }
 };
 
+const getPendingRequisitionsByChecklist = async (req, res) => {
+  try {
+    const { checklist_id } = req.params;
+    const requisitions = await checklistService.getPendingRequisitionsForChecklist(
+      parseInt(checklist_id)
+    );
+    res.status(200).json({
+      success: true,
+      data: { requisitions }
+    });
+  } catch (error) {
+    console.error('Error obteniendo requisiciones pendientes:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'PENDING_REQUISITIONS_ERROR', message: error.message }
+    });
+  }
+};
+
 module.exports = {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -1914,5 +1965,6 @@ module.exports = {
   getWorkOrdersByChecklistType,
   getResolvedFailuresByChecklistType,
   getChecklistTypeDetails,
-  getParentItemsByChecklistType
+  getParentItemsByChecklistType,
+  getPendingRequisitionsByChecklist
 }

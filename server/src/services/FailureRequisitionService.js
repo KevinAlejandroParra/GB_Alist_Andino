@@ -1,7 +1,8 @@
 'use strict';
 
-const { FailureOrder, WorkOrder, Requisition, Inventory, User, RepairExecution } = require('../models');
+const { FailureOrder, WorkOrder, Requisition, Inventory, User, RepairExecution, WorkOrderPart, ChecklistItem, Checklist } = require('../models');
 const repairExecutionService = require('./repairExecutionService');
+const InventoryService = require('./InventoryService');
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 
@@ -259,10 +260,15 @@ class FailureRequisitionService {
    */
   async resolveFailureWithPart(failureOrderId, data) {
     const transaction = await FailureOrder.sequelize.transaction();
-    
+
     try {
-      // 1. Buscar failure order
-      const failureOrder = await FailureOrder.findByPk(failureOrderId);
+      // 1. Buscar failure order con relaciones
+      const failureOrder = await FailureOrder.findByPk(failureOrderId, {
+        include: [
+          { model: WorkOrder, as: 'workOrder' },
+          { model: ChecklistItem, as: 'checklistItem' }
+        ]
+      });
       if (!failureOrder) {
         throw new Error(`Orden de falla con ID ${failureOrderId} no encontrada`);
       }
@@ -278,42 +284,22 @@ class FailureRequisitionService {
         completed_by_id
       } = data;
 
-      // 2. Buscar item de inventario
-      const inventoryItem = await Inventory.findByPk(inventory_id);
-      if (!inventoryItem) {
-        throw new Error(`Item de inventario con ID ${inventory_id} no encontrado`);
-      }
+      // 2. Descontar del inventario usando InventoryService
+      const deductResult = await InventoryService.deductStock(
+        inventory_id,
+        quantity_used,
+        `Resolución de falla OF-${failureOrder.failure_order_id}`,
+        completed_by_id
+      );
 
-      // 3. Verificar stock suficiente
-      if (inventoryItem.quantity < quantity_used) {
-        throw new Error(`Stock insuficiente. Disponible: ${inventoryItem.quantity}, Solicitado: ${quantity_used}`);
-      }
-
-      // 4. Descontar del inventario (usando InventoryService)
-      const newQuantity = inventoryItem.quantity - quantity_used;
-      await inventoryItem.update({
-        quantity: newQuantity,
-        status: newQuantity === 0 ? 'agotado' : 'disponible'
-      }, { transaction });
-
-      // 5. Actualizar failure order
-      const partsUsed = [
-        {
-          inventory_id: inventoryItem.id,
-          part_name: inventoryItem.part_name,
-          quantity: quantity_used,
-          location: inventoryItem.location,
-          used_at: new Date()
-        }
-      ];
-
+      // 3. Actualizar failure order
       await failureOrder.update({
         status: 'RESUELTO',
         resolution_details,
         resolved_at: new Date()
       }, { transaction });
 
-      // 6. Actualizar work order si existe
+      // 4. Actualizar work order si existe y crear WorkOrderPart
       const workOrder = await WorkOrder.findOne({
         where: { failure_order_id: failureOrderId }
       });
@@ -323,19 +309,54 @@ class FailureRequisitionService {
           status: 'COMPLETADO',
           completed_at: new Date()
         }, { transaction });
+
+        // Crear WorkOrderPart para registrar el repuesto usado
+        await WorkOrderPart.create({
+          work_order_id: workOrder.id,
+          inventory_id: inventory_id,
+          quantity_used: quantity_used
+        }, { transaction });
       }
 
-      // 7. Confirmar transacción
+      // 5. Poblar checklist_id en requisiciones asociadas
+      if (workOrder) {
+        const requisitions = await Requisition.findAll({
+          where: { work_order_id: workOrder.id, checklist_id: null }
+        });
+        if (requisitions.length > 0) {
+          let checklistId = null;
+          if (failureOrder.checklistItem) {
+            const checklist = await Checklist.findOne({
+              where: { checklist_type_id: failureOrder.checklistItem.checklist_type_id },
+              attributes: ['checklist_id'],
+              order: [['createdAt', 'DESC']],
+              transaction
+            });
+            if (checklist) {
+              checklistId = checklist.checklist_id;
+            }
+          }
+          if (checklistId) {
+            await Requisition.update(
+              { checklist_id: checklistId },
+              { where: { id: { [Op.in]: requisitions.map(r => r.id) } }, transaction }
+            );
+          }
+        }
+      }
+
+      // 6. Confirmar transacción
       await transaction.commit();
 
-      // 8. Retornar resultado
+      // 7. Retornar resultado
       return {
         success: true,
         data: {
           failure_order: await FailureOrder.findByPk(failureOrderId, {
             include: [
               { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] },
-              { model: User, as: 'technician', attributes: ['user_id', 'user_name'] }
+              { model: User, as: 'technician', attributes: ['user_id', 'user_name'] },
+              { model: WorkOrder, as: 'workOrder', include: [{ model: WorkOrderPart, as: 'parts' }] }
             ]
           }),
           inventory_item: await Inventory.findByPk(inventory_id),
@@ -345,7 +366,6 @@ class FailureRequisitionService {
       };
 
     } catch (error) {
-      // Revertir transacción en caso de error
       await transaction.rollback();
       console.error('❌ Error resolviendo falla:', error);
       throw new Error(`Error al resolver falla: ${error.message}`);

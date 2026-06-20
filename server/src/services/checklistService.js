@@ -16,7 +16,8 @@ const {
   Premise,
   Entity,
   ChecklistQrCode,
-  ChecklistQrItemAssociation
+  ChecklistQrItemAssociation,
+  Requisition
 } = require("../models");
 const { Sequelize } = require("../models");
 const workOrderService = require("./workOrderService");
@@ -2042,12 +2043,21 @@ const getChecklistDataForPDF = async (checklistId) => {
       }
     }
 
+    // Obtener requisiciones pendientes para este checklist
+    let pendingRequisitions = [];
+    try {
+      pendingRequisitions = await getPendingRequisitionsForChecklist(checklistId);
+    } catch (reqError) {
+      console.error('Error obteniendo requisiciones pendientes para PDF:', reqError);
+    }
+
     return {
       ...checklist.toJSON(),
       items,
       failures: failuresData,
       qr_scans: qrScans,
-      week_info: weekInfo
+      week_info: weekInfo,
+      pending_requisitions: pendingRequisitions
     };
   } catch (error) {
     console.error('Error in getChecklistDataForPDF:', error);
@@ -2055,6 +2065,81 @@ const getChecklistDataForPDF = async (checklistId) => {
   }
 };
 
+
+const getPendingRequisitionsForChecklist = async (checklistId) => {
+  try {
+    const checklist = await Checklist.findByPk(checklistId, {
+      attributes: ['checklist_id', 'checklist_type_id']
+    });
+    if (!checklist) return [];
+
+    const checklistItems = await ChecklistItem.findAll({
+      where: { checklist_type_id: checklist.checklist_type_id },
+      attributes: ['checklist_item_id']
+    });
+    const itemIds = checklistItems.map(i => i.checklist_item_id);
+    if (itemIds.length === 0) return [];
+
+    const failureOrders = await FailureOrder.findAll({
+      where: { checklist_item_id: { [Op.in]: itemIds } },
+      attributes: ['id']
+    });
+    const foIds = failureOrders.map(fo => fo.id);
+    if (foIds.length === 0) return [];
+
+    const workOrders = await WorkOrder.findAll({
+      where: { failure_order_id: { [Op.in]: foIds } },
+      attributes: ['id'],
+      include: [{
+        model: Requisition,
+        as: 'requisitions',
+        where: {
+          status: { [Op.in]: ['SOLICITADO', 'PENDIENTE'] }
+        },
+        required: false
+      }]
+    });
+
+    const pendingFromChain = workOrders
+      .flatMap(wo => (wo.requisitions || []))
+      .filter(Boolean)
+      .map(r => ({
+        id: r.id,
+        part_reference: r.part_reference,
+        quantity_requested: r.quantity_requested,
+        status: r.status,
+        created_at: r.createdAt,
+        source: 'chain'
+      }));
+
+    const pendingDirect = await Requisition.findAll({
+      where: {
+        checklist_id: checklistId,
+        status: { [Op.in]: ['SOLICITADO', 'PENDIENTE'] }
+      }
+    });
+
+    const pendingFromDirect = pendingDirect.map(r => ({
+      id: r.id,
+      part_reference: r.part_reference,
+      quantity_requested: r.quantity_requested,
+      status: r.status,
+      created_at: r.createdAt,
+      source: 'direct'
+    }));
+
+    const combined = [...pendingFromChain, ...pendingFromDirect];
+    const seen = new Set();
+    return combined.filter(r => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+  } catch (error) {
+    console.error('[getPendingRequisitionsForChecklist] Error:', error);
+    return [];
+  }
+};
 
 const getWorkOrdersByStatus = async ({ checklist_id, status }) => {
   try {
@@ -2360,7 +2445,7 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode
               model: require('../models').WorkOrderPart,
               as: 'parts',
               required: false,
-              include: [{ model: require('../models').Inventory, as: 'inventory', attributes: ['id', 'name'] }]
+              include: [{ model: require('../models').Inventory, as: 'inventory', attributes: ['id', 'part_name'] }]
             },
             {
               model: require('../models').Requisition,
@@ -2459,7 +2544,7 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode
           cancelled_by_name: failureOrder.workOrder.cancelledBy?.user_name || null,
           resolver_name: failureOrder.workOrder.resolver?.user_name || null,
           parts: (failureOrder.workOrder.parts || []).map(p => ({
-            name: p.inventory?.name || 'Repuesto',
+            name: p.inventory?.part_name || 'Repuesto',
             quantity: p.quantity_used
           })),
           requisitions: (failureOrder.workOrder.requisitions || []).map(r => ({
@@ -2716,5 +2801,6 @@ module.exports = {
   getWorkOrdersByChecklistType,
   getChecklistFailures,
   resetQrCodesForChecklist,
-  getChecklistById
+  getChecklistById,
+  getPendingRequisitionsForChecklist
 };
