@@ -182,20 +182,26 @@ const SyncSolutionModal = ({
                           <span className="font-mono text-sm font-semibold text-blue-600">
                             {failure.failure_order_id || `OF-${failure.id}`}
                           </span>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            failure.repairExecution?.status === 'RESUELTA'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {failure.repairExecution?.status || 'SIN AR'}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-green-700 font-medium">✅ Resuelta</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              failure.repairExecution?.status === 'RESUELTA'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {failure.repairExecution?.status || 'SIN AR'}
+                            </span>
+                          </div>
                         </div>
                         <p className="text-sm text-gray-700 line-clamp-2 mb-1">
                           {failure.description}
                         </p>
                         <div className="flex items-center gap-3 text-xs text-gray-500">
+                          {failure.repairExecution?.end_time && (
+                            <span>📅 {new Date(failure.repairExecution.end_time).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                          )}
                           {failure.repairExecution?.activity_performed && (
-                            <span className="truncate max-w-[200px]">
+                            <span className="truncate max-w-[180px]">
                               Actividad: {failure.repairExecution.activity_performed}
                             </span>
                           )}
@@ -266,14 +272,8 @@ const SyncSolutionModal = ({
                     </span>
                   </div>
                   <div>
-                    <span className="text-xs font-medium text-gray-600 block">Estado AR</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      selectedSource.repairExecution?.status === 'RESUELTA'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {selectedSource.repairExecution?.status || 'Sin AR'}
-                    </span>
+                    <span className="text-xs font-medium text-gray-600 block">Estado</span>
+                    <span className="text-xs text-green-700 font-medium">✅ Resuelta</span>
                   </div>
                 </div>
 
@@ -281,6 +281,15 @@ const SyncSolutionModal = ({
                   <span className="text-xs font-medium text-gray-600 block">Descripción</span>
                   <p className="text-sm text-gray-700">{selectedSource.description}</p>
                 </div>
+
+                {selectedSource.repairExecution?.end_time && (
+                  <div>
+                    <span className="text-xs font-medium text-gray-600 block">Fecha de resolución</span>
+                    <p className="text-sm text-gray-700">
+                      📅 {new Date(selectedSource.repairExecution.end_time).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
+                )}
 
                 {selectedSource.repairExecution?.resolver?.user_name && (
                   <div>

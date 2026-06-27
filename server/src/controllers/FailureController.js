@@ -2848,7 +2848,7 @@ class FailureController {
             where: {
               status: { [Op.in]: ['RESUELTA', 'CANCELADO'] }
             },
-            attributes: ['id', 'repair_execution_id', 'status', 'activity_performed'],
+            attributes: ['id', 'repair_execution_id', 'status', 'activity_performed', 'end_time'],
             include: [
               {
                 model: User,
@@ -2890,6 +2890,7 @@ class FailureController {
             repair_execution_id: plain.repairExecution.repair_execution_id,
             status: plain.repairExecution.status,
             activity_performed: plain.repairExecution.activity_performed,
+            end_time: plain.repairExecution.end_time,
             resolver: plain.repairExecution.resolver || null
           } : null,
           workOrder: plain.workOrder ? {
