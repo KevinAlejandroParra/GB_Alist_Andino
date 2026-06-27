@@ -1516,7 +1516,45 @@ class FailureController {
         linked_failure_ids: JSON.stringify(originalLinkedIds)
       });
 
-      console.log('✅ Fallas enlazadas en ambas WorkOrders:', originalLinkedIds);
+      // ✅ Actualizar también la RepairExecution (AR) fuente y crear/espejo para destino
+      const { RepairExecution } = require('../models');
+      const sourceRepairExecution = await RepairExecution.findOne({
+        where: { failure_order_id: originalWorkOrder.failure_order_id }
+      });
+      if (sourceRepairExecution) {
+        // Actualizar linked_failure_ids en la AR fuente
+        const sourceARLinkedIds = sourceRepairExecution.linked_failure_ids
+          ? JSON.parse(sourceRepairExecution.linked_failure_ids)
+          : [sourceRepairExecution.failure_order_id];
+        if (!sourceARLinkedIds.includes(failureOrder.id)) {
+          sourceARLinkedIds.push(failureOrder.id);
+        }
+        await sourceRepairExecution.update({
+          linked_failure_ids: JSON.stringify(sourceARLinkedIds)
+        });
+
+        // Crear AR espejo para la falla destino si no tiene
+        const targetRepairExecution = await RepairExecution.findOne({
+          where: { failure_order_id: failureOrder.id }
+        });
+        if (!targetRepairExecution) {
+          await RepairExecution.create({
+            repair_execution_id: `AR-SYNC-${Date.now().toString().slice(-6)}`,
+            failure_order_id: failureOrder.id,
+            status: sourceRepairExecution.status,
+            activity_performed: sourceRepairExecution.activity_performed,
+            evidence_url: sourceRepairExecution.evidence_url,
+            closure_signature: sourceRepairExecution.closure_signature,
+            start_time: sourceRepairExecution.start_time,
+            end_time: sourceRepairExecution.end_time,
+            resolved_by_id: sourceRepairExecution.resolved_by_id,
+            linked_failure_ids: JSON.stringify(sourceARLinkedIds)
+          });
+          console.log('✅ AR espejo creada para falla destino');
+        }
+      }
+
+      console.log('✅ Fallas enlazadas en ambas WorkOrders y ARs:', originalLinkedIds);
 
       // Recargar la falla con la OT asociada
       await failureOrder.reload({
@@ -2779,6 +2817,58 @@ class FailureController {
     } catch (error) {
       console.error('❌ Error eliminando imagen:', error);
       res.status(500).json({ success: false, error: { message: error.message } });
+    }
+  }
+
+  /**
+   * Sincronizar solución (AR + OT) desde una falla resuelta hacia otra falla
+   * POST /api/failures/:targetId/sync-solution
+   * Body: { source_failure_id: number }
+   */
+  async syncSolution(req, res) {
+    try {
+      const targetId = parseInt(req.params.targetId);
+      const { source_failure_id } = req.body;
+
+      if (isNaN(targetId)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_TARGET_ID', message: 'ID de falla destino inválido' }
+        });
+      }
+
+      if (!source_failure_id || isNaN(parseInt(source_failure_id))) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_SOURCE_ID', message: 'source_failure_id debe ser un ID numérico válido' }
+        });
+      }
+
+      const SolutionSyncService = require('../services/SolutionSyncService');
+      const result = await SolutionSyncService.syncSolution(
+        targetId,
+        parseInt(source_failure_id),
+        req.user?.user_id
+      );
+
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'SYNC_FAILED', message: result.message }
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } catch (error) {
+      console.error('❌ Error en syncSolution:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'SYNC_ERROR', message: error.message }
+      });
     }
   }
 }

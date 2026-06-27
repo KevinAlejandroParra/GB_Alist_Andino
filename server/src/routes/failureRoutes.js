@@ -126,6 +126,9 @@ router.post('/repair-executions/:repairExecutionId/create-work-order', (req, res
   FailureController.createFormalWorkOrderFromRepair(req, res)
 );
 
+// POST /api/failures/:targetId/sync-solution - Sincronizar solución (AR+OT) desde falla resuelta
+router.post('/:targetId/sync-solution', (req, res) => FailureController.syncSolution(req, res));
+
 // GET /api/failures/:id - Obtener detalles de OF específica
 router.get('/:id', (req, res) => FailureController.getFailureOrderById(req, res));
 

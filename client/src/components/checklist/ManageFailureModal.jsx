@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import WorkOrderProcessModal from './WorkOrderProcessModal';
+import SyncSolutionModal from './SyncSolutionModal';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../utils/axiosConfig';
 
@@ -18,6 +19,7 @@ const ManageFailureModal = ({
   const [showProcessModal, setShowProcessModal] = useState(false);
   const [creatingWorkOrder, setCreatingWorkOrder] = useState(false);
   const [createdWorkOrder, setCreatedWorkOrder] = useState(null);
+  const [showSyncModal, setShowSyncModal] = useState(false);
 
   if (!show || !failure) return null;
 
@@ -102,36 +104,60 @@ const ManageFailureModal = ({
 
             <div className="space-y-4">
               {!hasExecution ? (
-                // Sin AR ni OT: Opción de crear
-                <div className="border-2 border-blue-200 rounded-lg p-6 bg-blue-50">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl flex-shrink-0">
-                      🔧
+                // Sin AR ni OT: Opción de crear o sincronizar
+                <div className="space-y-4">
+                  <div className="border-2 border-blue-200 rounded-lg p-6 bg-blue-50">
+                    <div className="flex items-start gap-4">
+                      <div className="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl flex-shrink-0">
+                        🔧
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 mb-2">
+                          Crear Acta de Reparación
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Esta falla no tiene un acta de reparación. Crea una para poder gestionarla y resolverla.
+                        </p>
+                        <button
+                          onClick={handleCreateWorkOrder}
+                          disabled={creatingWorkOrder}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {creatingWorkOrder ? (
+                            <>
+                              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>Creando...</span>
+                            </>
+                          ) : (
+                            'Crear Acta de Reparación'
+                          )}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-gray-900 mb-2">
-                        Crear Acta de Reparación
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Esta falla no tiene un acta de reparación. Crea una para poder gestionarla y resolverla.
-                      </p>
-                      <button
-                        onClick={handleCreateWorkOrder}
-                        disabled={creatingWorkOrder}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                      >
-                        {creatingWorkOrder ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span>Creando...</span>
-                          </>
-                        ) : (
-                          'Crear Acta de Reparación'
-                        )}
-                      </button>
+                  </div>
+
+                  <div className="border-2 border-green-200 rounded-lg p-6 bg-green-50">
+                    <div className="flex items-start gap-4">
+                      <div className="bg-green-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl flex-shrink-0">
+                        🔄
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 mb-2">
+                          Sincronizar Solución Existente
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Si ya resolviste esta misma falla en otro checklist, puedes sincronizar su AR y OT aquí, sin necesidad de volver a registrar todo.
+                        </p>
+                        <button
+                          onClick={() => setShowSyncModal(true)}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+                        >
+                          Sincronizar Solución
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -194,6 +220,21 @@ const ManageFailureModal = ({
           </div>
         </div>
       </div>
+
+      {/* Modal de sincronización de solución */}
+      {showSyncModal && (
+        <SyncSolutionModal
+          show={showSyncModal}
+          onClose={() => setShowSyncModal(false)}
+          targetFailure={failure}
+          user={user}
+          onSuccess={() => {
+            setShowSyncModal(false);
+            onClose();
+            onSuccess?.();
+          }}
+        />
+      )}
 
       {/* Modal de proceso de OT */}
       {showProcessModal && (
