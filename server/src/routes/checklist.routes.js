@@ -26,7 +26,8 @@ const {
   getResolvedFailuresByChecklistType,
   getChecklistTypeDetails,
   getParentItemsByChecklistType,
-  getPendingRequisitionsByChecklist
+  getPendingRequisitionsByChecklist,
+  getOperationChecklistsWithFailures
 } = require("../controllers/checklistController")
 
 // Importar funciones de diagnóstico (temporal para debugging)
@@ -56,6 +57,7 @@ router.post("/:id/sign", verifyToken, signChecklist)
 router.get("/:id/download", verifyToken, downloadChecklistPDF)
 router.get("/:id/download-pdf", verifyToken, downloadChecklistPDF)
 router.get("/:id/pending-requisitions", verifyToken, getPendingRequisitionsByChecklist)
+router.get("/:id/operation-failures", verifyToken, getOperationChecklistsWithFailures)
 
 
 // Rutas de diagnóstico (temporal para debugging)
