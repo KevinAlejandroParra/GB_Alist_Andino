@@ -126,6 +126,9 @@ router.post('/repair-executions/:repairExecutionId/create-work-order', (req, res
   FailureController.createFormalWorkOrderFromRepair(req, res)
 );
 
+// GET /api/failures/search-resolved-sources - Buscar fallas resueltas para sincronizar
+router.get('/search-resolved-sources', (req, res) => FailureController.searchResolvedSources(req, res));
+
 // POST /api/failures/:targetId/sync-solution - Sincronizar solución (AR+OT) desde falla resuelta
 router.post('/:targetId/sync-solution', (req, res) => FailureController.syncSolution(req, res));
 

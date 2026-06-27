@@ -2821,6 +2821,96 @@ class FailureController {
   }
 
   /**
+   * Buscar fallas resueltas para sincronizar solución (autocomplete inteligente)
+   * GET /api/failures/search-resolved-sources?q=
+   * Busca por: description, failure_order_id, activity_performed, resolver name
+   */
+  async searchResolvedSources(req, res) {
+    try {
+      const { q = '', limit = 10 } = req.query;
+      const query = (q || '').trim();
+
+      if (query.length < 1) {
+        return res.status(200).json({ success: true, data: [] });
+      }
+
+      const { FailureOrder, RepairExecution, WorkOrder, User, Sequelize } = require('../models');
+      const { Op } = Sequelize;
+      const pattern = `%${query}%`;
+
+      const resolvedFailures = await FailureOrder.findAll({
+        attributes: ['id', 'failure_order_id', 'description', 'createdAt'],
+        include: [
+          {
+            model: RepairExecution,
+            as: 'repairExecution',
+            required: true,
+            where: {
+              status: { [Op.in]: ['RESUELTA', 'CANCELADO'] }
+            },
+            attributes: ['id', 'repair_execution_id', 'status', 'activity_performed'],
+            include: [
+              {
+                model: User,
+                as: 'resolver',
+                attributes: ['user_id', 'user_name'],
+                required: false
+              }
+            ]
+          },
+          {
+            model: WorkOrder,
+            as: 'workOrder',
+            required: false,
+            attributes: ['id', 'work_order_id', 'status']
+          }
+        ],
+        where: {
+          [Op.or]: [
+            { failure_order_id: { [Op.like]: pattern } },
+            { description: { [Op.like]: pattern } },
+            { '$repairExecution.activity_performed$': { [Op.like]: pattern } },
+            { '$repairExecution.resolver.user_name$': { [Op.like]: pattern } }
+          ]
+        },
+        order: [['createdAt', 'DESC']],
+        limit: Math.min(parseInt(limit, 10) || 10, 20),
+        subQuery: false
+      });
+
+      const data = resolvedFailures.map(f => {
+        const plain = f.get({ plain: true });
+        return {
+          id: plain.id,
+          failure_order_id: plain.failure_order_id,
+          description: plain.description,
+          createdAt: plain.createdAt,
+          repairExecution: plain.repairExecution ? {
+            id: plain.repairExecution.id,
+            repair_execution_id: plain.repairExecution.repair_execution_id,
+            status: plain.repairExecution.status,
+            activity_performed: plain.repairExecution.activity_performed,
+            resolver: plain.repairExecution.resolver || null
+          } : null,
+          workOrder: plain.workOrder ? {
+            id: plain.workOrder.id,
+            work_order_id: plain.workOrder.work_order_id,
+            status: plain.workOrder.status
+          } : null
+        };
+      });
+
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      console.error('❌ Error en searchResolvedSources:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'SEARCH_RESOLVED_ERROR', message: error.message }
+      });
+    }
+  }
+
+  /**
    * Sincronizar solución (AR + OT) desde una falla resuelta hacia otra falla
    * POST /api/failures/:targetId/sync-solution
    * Body: { source_failure_id: number }
