@@ -2829,6 +2829,110 @@ const getChecklistById = async (checklistId) => {
   }
 };
 
+const getOperationChecklistsWithFailures = async (checklistId) => {
+  try {
+    const checklist = await Checklist.findByPk(checklistId, {
+      include: [
+        { model: ChecklistType, as: 'type' }
+      ]
+    });
+    if (!checklist) throw new Error('Checklist no encontrado');
+
+    const associatedId = checklist.type?.associated_id;
+    if (!associatedId) {
+      return { operation_checklists: [] };
+    }
+
+    const operationTypes = await ChecklistType.findAll({
+      where: {
+        associated_id: associatedId,
+        role_id: 4
+      }
+    });
+
+    if (operationTypes.length === 0) {
+      return { operation_checklists: [] };
+    }
+
+    const repairExecutionService = require('./repairExecutionService');
+    const result = [];
+
+    for (const opType of operationTypes) {
+      const { startDate, endDate, identifier, isWeekly } = weekUtils.getDateBoundsForChecklistType(opType);
+
+      const whereClause = {
+        checklist_type_id: opType.checklist_type_id,
+        createdAt: { [Op.between]: [startDate, endDate] }
+      };
+      if (isWeekly && identifier) {
+        whereClause.week_identifier = identifier;
+      }
+
+      const opChecklists = await Checklist.findAll({
+        where: whereClause,
+        include: [
+          {
+            model: User,
+            as: 'creator',
+            attributes: ['user_id', 'user_name']
+          },
+          {
+            model: ChecklistSignature,
+            as: 'signatures',
+            include: [
+              { model: Role, as: 'role', attributes: ['role_name'] },
+              { model: User, as: 'user', attributes: ['user_name'] }
+            ]
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      for (const opChecklist of opChecklists) {
+        const failuresData = await getChecklistFailures(opChecklist.checklist_id, false, 'active');
+        const failures = [];
+        for (const [itemKey, itemFailures] of Object.entries(failuresData.failures_by_item || {})) {
+          for (const f of itemFailures) {
+            failures.push({
+              id: f.id,
+              failure_order_id: f.failure_order_id,
+              description: f.description,
+              severity: f.severity,
+              assigned_to: f.assigned_to,
+              reporter_name: f.reporter_name,
+              checklist_item_id: f.checklist_item_id,
+              item_number: f.checklist_item?.item_number || 'N/A',
+              question_text: f.checklist_item?.question_text || '',
+              created_at: f.created_at,
+              traceability: f.traceability,
+              repairExecution: f.repairExecution,
+              workOrder: f.workOrder
+            });
+          }
+        }
+
+        result.push({
+          checklist_id: opChecklist.checklist_id,
+          checklist_type_name: opType.name,
+          created_at: opChecklist.createdAt,
+          created_by: opChecklist.creator?.user_name || 'Desconocido',
+          signatures: opChecklist.signatures || [],
+          failures,
+          total_failures: failures.length,
+          active_failures: failures.filter(f =>
+            f.traceability && f.traceability.code !== 'RESUELTA' && f.traceability.code !== 'CANCELLED'
+          ).length
+        });
+      }
+    }
+
+    return { operation_checklists: result };
+  } catch (error) {
+    console.error('[getOperationChecklistsWithFailures] Error:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -2844,5 +2948,6 @@ module.exports = {
   getChecklistFailures,
   resetQrCodesForChecklist,
   getChecklistById,
-  getPendingRequisitionsForChecklist
+  getPendingRequisitionsForChecklist,
+  getOperationChecklistsWithFailures
 };

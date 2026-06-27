@@ -930,7 +930,10 @@ const generateChecklistHTML = async (data) => {
 
         html += `
                     <tr class="sub-item-row">
-                        <td style="font-size: 9px; font-weight: bold; padding: 8px 4px;">${item.item_number}</td>
+                        <td style="font-size: 9px; padding: 8px 4px;">
+                            <strong>${item.item_number}</strong>
+                            <div style="font-size: 8px; color: #4b5563; margin-top: 2px;">${item.question_text || ''}</div>
+                        </td>
                         <td style="text-align: center; font-size: 9px; font-weight: bold; padding: 8px 6px;" class="${displayValue.replace(" ", "-")}">
                             ${displayValue}
                         </td>
@@ -1036,7 +1039,10 @@ const generateChecklistHTML = async (data) => {
 
             html += `
                         <tr class="sub-item-row">
-                            <td style="font-size: 9px; font-weight: bold; padding: 8px 4px;">${item.item_number}</td>
+                            <td style="font-size: 9px; padding: 8px 4px;">
+                                <strong>${item.item_number}</strong>
+                                <div style="font-size: 8px; color: #4b5563; margin-top: 2px;">${item.question_text || ''}</div>
+                            </td>
                             <td style="text-align: center; font-size: 9px; font-weight: bold; padding: 8px 6px;" class="${displayValue.replace(" ", "-")}">
                                 ${displayValue}
                             </td>
@@ -1339,7 +1345,7 @@ const generateChecklistHTML = async (data) => {
                     font-weight: 600;
                 }
                 
-                /* Distribución mejorada de columnas (3 columnas: Item, Respuesta, Observaciones) */
+                /* Distribución mejorada de columnas (3 columnas: Item con texto, Respuesta, Observaciones) */
                 .sub-item-row td:first-child { 
                     width: 8%; 
                     text-align: center; 
@@ -1584,9 +1590,9 @@ const generateChecklistHTML = async (data) => {
                     <table class="items-table">
                         <thead>
                             <tr>
-                                <th style="width: 8%;">Item</th>
+                                <th style="width: 35%;">Item</th>
                                 <th style="width: 17%;">Respuesta</th>
-                                <th style="width: 75%;">Observaciones</th>
+                                <th style="width: 48%;">Observaciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1950,6 +1956,20 @@ const getPendingRequisitionsByChecklist = async (req, res) => {
   }
 };
 
+const getOperationChecklistsWithFailures = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await checklistService.getOperationChecklistsWithFailures(parseInt(id));
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error('Error obteniendo checklists de operación:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'OPERATION_CHECKLISTS_ERROR', message: error.message }
+    });
+  }
+};
+
 module.exports = {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -1972,5 +1992,6 @@ module.exports = {
   getResolvedFailuresByChecklistType,
   getChecklistTypeDetails,
   getParentItemsByChecklistType,
-  getPendingRequisitionsByChecklist
+  getPendingRequisitionsByChecklist,
+  getOperationChecklistsWithFailures
 }

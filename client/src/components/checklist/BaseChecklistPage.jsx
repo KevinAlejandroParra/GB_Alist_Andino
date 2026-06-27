@@ -26,6 +26,7 @@ import useSupportContext from './hooks/useSupportContext';
 import QrScannerModal from './QrScannerModal';
 import CreateFailureWithRequisitionModal from './CreateFailureWithRequisitionModal';
 import InventorySearchModal from './InventorySearchModal';
+import OperationFailuresSection from './OperationFailuresSection';
 import axiosInstance from '../../utils/axiosConfig';
 
 export default function BaseChecklistPage({
@@ -394,6 +395,13 @@ export default function BaseChecklistPage({
               isLocked={isLocked}
             />
           </div>
+
+          {(user?.role_id === 3 || user?.role_name?.toLowerCase()?.includes('tecnico')) && (
+            <OperationFailuresSection
+              checklistId={checklistData.checklist?.checklist_id}
+              user={user}
+            />
+          )}
 
           <ChecklistActions
             onSign={signatureManager.openSignaturePad}
