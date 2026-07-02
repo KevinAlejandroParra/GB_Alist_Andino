@@ -1,6 +1,4 @@
 {
-  "/AdminDashboard/page": "app/AdminDashboard/page.js",
-  "/Profile/page": "app/Profile/page.js",
   "/_not-found/page": "app/_not-found/page.js",
   "/checklists/attraction/[checklistTypeId]/page": "app/checklists/attraction/[checklistTypeId]/page.js",
   "/checklists/detail/[checklistTypeId]/page": "app/checklists/detail/[checklistTypeId]/page.js",
