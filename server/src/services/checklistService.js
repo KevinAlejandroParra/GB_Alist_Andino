@@ -2843,11 +2843,16 @@ const getOperationChecklistsWithFailures = async (checklistId) => {
       return { operation_checklists: [] };
     }
 
+    const typeCategory = checklist.type?.type_category;
+    const whereOperation = {
+      associated_id: associatedId,
+      role_id: 4
+    };
+    if (typeCategory) {
+      whereOperation.type_category = typeCategory;
+    }
     const operationTypes = await ChecklistType.findAll({
-      where: {
-        associated_id: associatedId,
-        role_id: 4
-      }
+      where: whereOperation
     });
 
     if (operationTypes.length === 0) {
