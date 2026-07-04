@@ -123,9 +123,9 @@ export function useFailureBook() {
     }
   }, [refreshTrigger]);
 
-  useEffect(() => {
-    if (loading) return;
+  const statsKey = `${activeTab}|${JSON.stringify(filters)}|${debouncedSearch}|${refreshTrigger}`;
 
+  useEffect(() => {
     const loadStats = async () => {
       setStatsLoading(true);
       try {
@@ -144,7 +144,8 @@ export function useFailureBook() {
     };
 
     loadStats();
-  }, [activeTab, filters, debouncedSearch, loading, refreshTrigger]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statsKey]);
 
   const toggleSection = (sectionId) => {
     setCollapsedSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
