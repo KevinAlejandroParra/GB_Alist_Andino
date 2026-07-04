@@ -85,6 +85,7 @@ const ChecklistItemRenderer = React.memo((props) => {
     onManageItemFailures,
     onWorkOrdersUpdate,
     isLocked,
+    checklistTypeCategory,
   } = props;
 
   const [showGuidanceModal, setShowGuidanceModal] = useState(false);
@@ -290,7 +291,7 @@ const ChecklistItemRenderer = React.memo((props) => {
                 onUpdate={onWorkOrdersUpdate}
                 currentResponse={currentResponse}
                 isReadOnly={isLocked}
-                checklistTypeCategory={checklist?.type?.type_category}
+                checklistTypeCategory={checklistTypeCategory}
               />
             </div>
           ) : null}
@@ -311,7 +312,7 @@ const ChecklistItemRenderer = React.memo((props) => {
               handleMarkAllSiblings={handleMarkAllSiblings}
               isFamilyChecklist={isFamilyChecklist}
               config={config}
-              disabled={itemDisabled}
+              disabled={disabled}
               isItemUnlocked={isItemUnlocked}
               onUnlockSection={onUnlockSection}
               user={user}
@@ -320,6 +321,7 @@ const ChecklistItemRenderer = React.memo((props) => {
               onManageItemFailures={onManageItemFailures}
               onWorkOrdersUpdate={onWorkOrdersUpdate}
               isLocked={isLocked}
+              checklistTypeCategory={checklistTypeCategory}
             />
           ))}
         </div>
@@ -693,6 +695,7 @@ const ChecklistSection = (props) => {
             onManageItemFailures={handleManageItemFailures}
             onWorkOrdersUpdate={handleRefreshWorkOrders}
             isLocked={isLocked}
+            checklistTypeCategory={checklist?.type?.type_category}
           />
         );
       })}
