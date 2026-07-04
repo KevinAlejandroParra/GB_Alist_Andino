@@ -110,13 +110,22 @@ class FailureController {
 
       // ✅ PUNTO 1: Validar inspectableId para fallas desde checklist (no independientes)
       if (finalChecklistItemId && !inspectableId) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'INSPECTABLE_ID_REQUIRED',
-            message: 'Para fallas desde checklist, el inspectableId es obligatorio cuando checklistItemId existe'
-          }
+        // Verificar si el item pertenece a un checklist static (no requiere dispositivo)
+        const { ChecklistItem, ChecklistType } = require('../models');
+        const checklistItem = await ChecklistItem.findByPk(finalChecklistItemId, {
+          include: [{ model: ChecklistType, as: 'checklistType', attributes: ['type_category'] }]
         });
+        const isStatic = checklistItem?.checklistType?.type_category === 'static';
+
+        if (!isStatic) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: 'INSPECTABLE_ID_REQUIRED',
+              message: 'Para fallas desde checklist, el inspectableId es obligatorio cuando checklistItemId existe'
+            }
+          });
+        }
       }
 
       console.log('🔍 [CREATE FAILURE] Llamando al servicio con datos:', {

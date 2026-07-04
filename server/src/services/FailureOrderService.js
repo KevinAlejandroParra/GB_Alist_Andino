@@ -1,6 +1,6 @@
 'use strict';
 
-const { FailureOrder, WorkOrder, Inventory, User, ChecklistItem, Sequelize } = require('../models');
+const { FailureOrder, WorkOrder, Inventory, User, ChecklistItem, ChecklistType, Sequelize } = require('../models');
 const { Op } = Sequelize;
 
 class FailureOrderService {
@@ -28,7 +28,15 @@ class FailureOrderService {
 
       // ✅ PUNTO 1: Validar inspectableId para fallas desde checklist (no independientes)
       if (checklistItemId && !inspectableId) {
-        throw new Error('Para fallas desde checklist, el inspectableId es obligatorio cuando checklistItemId existe');
+        // Verificar si el item pertenece a un checklist static (no requiere dispositivo)
+        const checklistItem = await ChecklistItem.findByPk(checklistItemId, {
+          include: [{ model: ChecklistType, as: 'checklistType', attributes: ['type_category'] }]
+        });
+        const isStatic = checklistItem?.checklistType?.type_category === 'static';
+
+        if (!isStatic) {
+          throw new Error('Para fallas desde checklist, el inspectableId es obligatorio cuando checklistItemId existe');
+        }
       }
 
       // Normalizar severidad

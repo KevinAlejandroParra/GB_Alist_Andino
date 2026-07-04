@@ -40,7 +40,8 @@ export default function RecurringFailureModal({
   onWorkOrdersUpdate,
   responseData,
   checklistItemId,
-  inspectableId // ID del dispositivo/inspectable del checklist
+  inspectableId, // ID del dispositivo/inspectable del checklist
+  checklistTypeCategory // 'static', 'attraction', 'family', etc.
 }) {
   const [activeTab, setActiveTab] = useState('new')
   const [selectedWorkOrderIndex, setSelectedWorkOrderIndex] = useState(0)
@@ -260,8 +261,8 @@ export default function RecurringFailureModal({
       console.log('📝 effectiveChecklistItemId:', effectiveChecklistItemId);
       console.log('🔍 ==================================================');
 
-      // Validar inspectableId
-      if (!inspectableId) {
+      // Validar inspectableId (no requerido para checklists static/generales)
+      if (!inspectableId && checklistTypeCategory !== 'static') {
         Swal.fire('Error', 'No se pudo identificar el dispositivo asociado al checklist. Contacte al administrador.', 'error')
         setLoading(false)
         return

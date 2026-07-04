@@ -290,6 +290,7 @@ const ChecklistItemRenderer = React.memo((props) => {
                 onUpdate={onWorkOrdersUpdate}
                 currentResponse={currentResponse}
                 isReadOnly={isLocked}
+                checklistTypeCategory={checklist?.type?.type_category}
               />
             </div>
           ) : null}
@@ -612,6 +613,7 @@ const ChecklistSection = (props) => {
           }}
           checklistItemId={currentChecklistItem?.checklist_item_id}
           inspectableId={currentChecklistItem?.extractedInspectableId} // ✅ NUEVO: Usar el inspectable_id extraído
+          checklistTypeCategory={checklist?.type?.type_category}
         />
       )}
 
@@ -653,6 +655,7 @@ const ChecklistSection = (props) => {
             selectedItemForFailures.item?.inspectable_id_for_response ||
             checklist?.inspectable_id
           }
+          checklistTypeCategory={checklist?.type?.type_category}
         />
       )}
 

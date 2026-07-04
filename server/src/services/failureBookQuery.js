@@ -137,14 +137,38 @@ async function buildWhereConditions(userRole, query) {
 }
 
 function appendStatusWhere(whereConditions, status) {
+  let statusClause;
+
   if (status === 'pending') {
-    const statusClause = {
+    statusClause = {
       [Op.or]: [
-        { '$workOrder.id$': { [Op.is]: null } },
+        {
+          [Op.and]: [
+            { '$repairExecution.id$': { [Op.is]: null } },
+            { '$workOrder.id$': { [Op.is]: null } }
+          ]
+        },
+        { '$repairExecution.status$': { [Op.notIn]: RESOLVED_STATUSES } },
         { '$workOrder.status$': { [Op.notIn]: RESOLVED_STATUSES } }
       ]
     };
-    
+  } else if (status === 'resolved') {
+    statusClause = {
+      [Op.or]: [
+        { '$repairExecution.status$': 'RESUELTA' },
+        { '$workOrder.status$': 'RESUELTA' }
+      ]
+    };
+  } else if (status === 'canceled') {
+    statusClause = {
+      [Op.or]: [
+        { '$repairExecution.status$': 'CANCELADO' },
+        { '$workOrder.status$': 'CANCELADO' }
+      ]
+    };
+  }
+
+  if (statusClause) {
     // Si ya hay condiciones en whereConditions, combinar con AND
     // para no sobreescribir estructura existente
     if (Object.keys(whereConditions).length > 0) {
@@ -162,6 +186,7 @@ function appendStatusWhere(whereConditions, status) {
       whereConditions = statusClause;
     }
   }
+
   return whereConditions;
 }
 
@@ -253,7 +278,7 @@ async function fetchAllFailures(userRole, query = {}) {
   const { whereConditions, cutoffDate } = await buildWhereConditions(userRole, query);
   let where = whereConditions;
 
-  if (status === 'pending' || status === 'resolved') {
+  if (status === 'pending' || status === 'resolved' || status === 'canceled') {
     where = appendStatusWhere(where, status);
   }
 

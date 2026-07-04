@@ -17,7 +17,7 @@ import RecurringFailureModal from './RecurringFailureModal'
  * - Checklists firmados (isReadOnly = true): Acceso directo para revisión
  * - Otros usuarios en edición: Deben marcar "Observación" o "No Cumple" primero
  */
-export default function ActiveFailuresList({ workOrders, user, onUpdate, currentResponse, isReadOnly = false }) {
+export default function ActiveFailuresList({ workOrders, user, onUpdate, currentResponse, isReadOnly = false, checklistTypeCategory }) {
   const [showModal, setShowModal] = React.useState(false)
   const [selectedWorkOrders, setSelectedWorkOrders] = React.useState([])
   const [responseData, setResponseData] = React.useState(null)
@@ -172,6 +172,7 @@ export default function ActiveFailuresList({ workOrders, user, onUpdate, current
           onSuccess={handleModalSuccess}
           onWorkOrdersUpdate={() => onUpdate && onUpdate()}
           responseData={responseData}
+          checklistTypeCategory={checklistTypeCategory}
         />
       )}
     </>
