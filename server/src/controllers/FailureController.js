@@ -683,6 +683,7 @@ class FailureController {
         severity,
         type_maintenance,
         hasWorkOrder, // 'true', 'false', o undefined
+        hasRepairExecution, // 'true', 'false', o undefined
         hasParts, // 'true', 'false', o undefined
         page = 1,
         limit = 100,
@@ -1017,6 +1018,13 @@ class FailureController {
         filteredFailures = filteredFailures.filter(f => !f.workOrder);
       }
 
+      // Filtro por tiene/no tiene Acta de Reparación
+      if (hasRepairExecution === 'true') {
+        filteredFailures = filteredFailures.filter(f => f.repairExecution);
+      } else if (hasRepairExecution === 'false') {
+        filteredFailures = filteredFailures.filter(f => !f.repairExecution);
+      }
+
       // Filtro por tiene/no tiene repuestos
       if (hasParts === 'true') {
         filteredFailures = filteredFailures.filter(f => f.workOrder && f.workOrder.parts && f.workOrder.parts.length > 0);
@@ -1026,6 +1034,7 @@ class FailureController {
 
       const hasPostQueryFilters =
         hasWorkOrder === 'true' || hasWorkOrder === 'false' ||
+        hasRepairExecution === 'true' || hasRepairExecution === 'false' ||
         hasParts === 'true' || hasParts === 'false';
 
       if (hasPostQueryFilters) {

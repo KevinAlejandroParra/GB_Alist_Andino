@@ -35,33 +35,38 @@ function ChecklistChart({ items }) {
         {items.length === 0 ? (
           <div className="h-40 flex items-center justify-center text-gray-500 text-xs">No hay datos disponibles</div>
         ) : (
-          <svg width="100%" height="160" viewBox="0 0 320 160" className="overflow-visible">
-            {items.map((item, index) => {
+          <svg width="100%" height="160" viewBox="0 0 380 160" className="overflow-visible">
+            <defs>
+              {items.map((item, index) => (
+                <linearGradient key={item.name} id={`gradient-bar-${index}`} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#c084fc" />
+                  <stop offset="100%" stopColor="#6366f1" />
+                </linearGradient>
+              ))}
+            </defs>
+            {(() => {
               const maxCount = Math.max(...items.map((c) => c.count)) || 1;
-              const barWidth = 32;
-              const spacing = 26;
-              const x = 30 + index * (barWidth + spacing);
-              const barHeight = (item.count / maxCount) * 100;
-              const y = 130 - barHeight;
-              return (
-                <g key={item.name}>
-                  <defs>
-                    <linearGradient id={`gradient-bar-${index}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#c084fc" />
-                      <stop offset="100%" stopColor="#6366f1" />
-                    </linearGradient>
-                  </defs>
-                  <rect x={x} y={y} width={barWidth} height={barHeight} rx={5} fill={`url(#gradient-bar-${index})`} />
-                  <text x={x + barWidth / 2} y={y - 6} textAnchor="middle" fill="#6d28d9" fontSize="10" fontWeight="bold">
-                    {item.count}
-                  </text>
-                  <text x={x + barWidth / 2} y={145} textAnchor="middle" fill="#4b5563" fontSize="8">
-                    {item.name.length > 8 ? `${item.name.slice(0, 8)}..` : item.name}
-                  </text>
-                </g>
-              );
-            })}
-            <line x1="15" y1="130" x2="310" y2="130" stroke="#d1d5db" strokeWidth="1" />
+              const barH = 22;
+              const labelX = 5;
+              const barX = 120;
+              const maxBarW = 245;
+              return items.map((item, index) => {
+                const y = 12 + index * 30;
+                const barWidth = (item.count / maxCount) * maxBarW;
+                return (
+                  <g key={item.name}>
+                    <title>{`${item.name}: ${item.count} ${item.count === 1 ? 'falla' : 'fallas'}`}</title>
+                    <text x={labelX} y={y + 15} fill="#4b5563" fontSize="9" fontFamily="sans-serif">
+                      {item.name.length > 20 ? `${item.name.slice(0, 19)}\u2026` : item.name}
+                    </text>
+                    <rect x={barX} y={y} width={Math.max(barWidth, 4)} height={barH} rx={4} fill={`url(#gradient-bar-${index})`} />
+                    <text x={barX + Math.max(barWidth, 4) + 5} y={y + 15} fill="#6d28d9" fontSize="10" fontWeight="bold">
+                      {item.count}
+                    </text>
+                  </g>
+                );
+              });
+            })()}
           </svg>
         )}
       </div>

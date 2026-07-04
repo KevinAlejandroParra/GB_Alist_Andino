@@ -62,7 +62,6 @@ export default function FailureFiltersPanel({
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 relative">
       <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
         {[
-          { id: 'status', icon: 'fa-clipboard-check', label: 'Estado OT' },
           { id: 'checklist', icon: 'fa-file-invoice', label: 'Checklist' },
           { id: 'device', icon: 'fa-cogs', label: 'Dispositivo' }
         ].map((mode) => (
@@ -87,18 +86,7 @@ export default function FailureFiltersPanel({
         estaban activas al cierre de ese momento (igual que en el PDF del checklist).
       </p>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-3 pt-4 border-t border-gray-100">
-        <FilterSelect
-          label="Mostrar"
-          value={filters.failureType}
-          onChange={(v) => onFiltersChange({ failureType: v })}
-          className="col-span-2 md:col-span-1"
-        >
-          <option value="all">Todas las fallas</option>
-          <option value="ar">Actas de Reparación</option>
-          <option value="ot">Órdenes de Trabajo</option>
-        </FilterSelect>
-
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-3 pt-4 border-t border-gray-100">
         <FilterSelect
           label="Tipo de checklist"
           value={filters.checklistTypeId}

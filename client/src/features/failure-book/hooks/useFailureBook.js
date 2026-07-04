@@ -31,7 +31,7 @@ export function useFailureBook() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const [viewMode, setViewMode] = useState('status');
+  const [viewMode, setViewMode] = useState('checklist');
   const [showCharts, setShowCharts] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
