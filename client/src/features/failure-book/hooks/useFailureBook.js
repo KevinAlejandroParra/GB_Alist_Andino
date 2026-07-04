@@ -45,6 +45,8 @@ export function useFailureBook() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const searchDebounceRef = useRef(null);
+  const failuresFetchIdRef = useRef(0);
+  const statsFetchIdRef = useRef(0);
   const initialChecklistTypeId = searchParams.get('checklistTypeId');
   const [checklistFilterFromUrl, setChecklistFilterFromUrl] = useState(initialChecklistTypeId);
 
@@ -75,6 +77,7 @@ export function useFailureBook() {
   }, [activeTab, filters]);
 
   const loadFailures = useCallback(async () => {
+    const requestId = ++failuresFetchIdRef.current;
     setLoading(true);
     setLoadError(null);
     try {
@@ -87,10 +90,12 @@ export function useFailureBook() {
         searchQuery: debouncedSearch
       });
 
+      if (requestId !== failuresFetchIdRef.current) return;
       setFailures(rows);
       setPagination(pag);
       setTotalInDb(pag.total);
     } catch (error) {
+      if (requestId !== failuresFetchIdRef.current) return;
       if (error.code === 401 || error.message === 'UNAUTHORIZED') {
         Swal.fire({
           title: 'Autenticación requerida',
@@ -126,6 +131,7 @@ export function useFailureBook() {
   const statsKey = `${activeTab}|${JSON.stringify(filters)}|${debouncedSearch}|${refreshTrigger}`;
 
   useEffect(() => {
+    const requestId = ++statsFetchIdRef.current;
     const loadStats = async () => {
       setStatsLoading(true);
       try {
@@ -135,11 +141,15 @@ export function useFailureBook() {
           ...filters,
           searchQuery: debouncedSearch
         });
+        if (requestId !== statsFetchIdRef.current) return;
         setBookStats(data);
       } catch (err) {
+        if (requestId !== statsFetchIdRef.current) return;
         console.error('Error cargando estadísticas:', err);
       } finally {
-        setStatsLoading(false);
+        if (requestId === statsFetchIdRef.current) {
+          setStatsLoading(false);
+        }
       }
     };
 
