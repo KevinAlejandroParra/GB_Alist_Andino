@@ -790,6 +790,18 @@ class FailureController {
                 { '$reporter.user_id$': { [Op.not]: null } },
                 { '$reporter.user_name$': { [Op.like]: pattern } }
               ]
+            },
+            {
+              [Op.and]: [
+                { '$workOrder.resolver.user_id$': { [Op.not]: null } },
+                { '$workOrder.resolver.user_name$': { [Op.like]: pattern } }
+              ]
+            },
+            {
+              [Op.and]: [
+                { '$repairExecution.resolver.user_id$': { [Op.not]: null } },
+                { '$repairExecution.resolver.user_name$': { [Op.like]: pattern } }
+              ]
             }
           ]
         };
