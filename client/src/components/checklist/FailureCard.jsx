@@ -254,6 +254,17 @@ const FailureCard = ({ failure, onViewDetail, onResolve, onLinkToWorkOrder, user
             </span>
           </div>
         )}
+
+        {/* Resuelto por (resolver de OT o AR) */}
+        {(failure.workOrder?.resolver?.user_name || failure.repairExecution?.resolver?.user_name) && (
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <i className="fas fa-check-circle w-4 text-emerald-600"></i>
+            <span className="font-medium">Resolvió:</span>
+            <span className="text-emerald-700 font-medium">
+              {failure.workOrder?.resolver?.user_name || failure.repairExecution?.resolver?.user_name}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Botones de acción */}
