@@ -5,8 +5,7 @@ export const DEFAULT_FILTERS = {
   year: 'all',
   month: 'all',
   day: 'all',
-  week: 'all',
-  failureType: 'all'
+  week: 'all'
 };
 
 export const MONTH_OPTIONS = [
@@ -223,7 +222,6 @@ export const hasActiveFilters = (searchQuery, filters, activeTab) =>
   filters.month !== 'all' ||
   filters.day !== 'all' ||
   filters.week !== 'all' ||
-  filters.failureType !== 'all' ||
   activeTab !== 'all';
 
 export function appendBookQueryParams(params, { activeTab, filters, searchQuery }) {
@@ -236,12 +234,6 @@ export function appendBookQueryParams(params, { activeTab, filters, searchQuery 
     week: filters?.week,
     searchQuery: searchQuery?.trim()
   };
-
-  if (filters?.failureType === 'ar') {
-    map.hasRepairExecution = 'true';
-  } else if (filters?.failureType === 'ot') {
-    map.hasWorkOrder = 'true';
-  }
 
   Object.entries(map).forEach(([key, value]) => {
     if (value && value !== 'all' && value !== '') {
