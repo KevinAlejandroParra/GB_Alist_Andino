@@ -17,7 +17,8 @@ const {
   Entity,
   ChecklistQrCode,
   ChecklistQrItemAssociation,
-  Requisition
+  Requisition,
+  ChecklistQrScan
 } = require("../models");
 const { Sequelize } = require("../models");
 const workOrderService = require("./workOrderService");
@@ -2987,6 +2988,53 @@ const getOperationChecklistsWithFailures = async (checklistId) => {
   }
 };
 
+const deleteChecklist = async (checklistId) => {
+  const transaction = await connection.transaction();
+  try {
+    const checklist = await Checklist.findByPk(checklistId, { transaction });
+    if (!checklist) {
+      throw new Error('Checklist no encontrado');
+    }
+
+    const signatureCount = await ChecklistSignature.count({
+      where: { checklist_id: checklistId },
+      transaction
+    });
+
+    if (signatureCount > 0) {
+      throw new Error('No se puede eliminar un checklist que tiene firmas registradas');
+    }
+
+    await ChecklistResponse.destroy({
+      where: { checklist_id: checklistId },
+      transaction
+    });
+
+    await ChecklistQrScan.destroy({
+      where: { checklist_id: checklistId },
+      transaction
+    });
+
+    await Requisition.destroy({
+      where: { checklist_id: checklistId },
+      transaction
+    });
+
+    await ChecklistSignature.destroy({
+      where: { checklist_id: checklistId },
+      transaction
+    });
+
+    await checklist.destroy({ transaction });
+
+    await transaction.commit();
+    return { success: true, message: 'Checklist eliminado exitosamente' };
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+};
+
 module.exports = {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -3003,5 +3051,6 @@ module.exports = {
   resetQrCodesForChecklist,
   getChecklistById,
   getPendingRequisitionsForChecklist,
-  getOperationChecklistsWithFailures
+  getOperationChecklistsWithFailures,
+  deleteChecklist
 };

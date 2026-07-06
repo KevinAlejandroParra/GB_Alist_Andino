@@ -1974,6 +1974,20 @@ const getOperationChecklistsWithFailures = async (req, res) => {
   }
 };
 
+const deleteChecklist = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await checklistService.deleteChecklist(parseInt(id));
+    res.status(200).json({ success: true, message: result.message });
+  } catch (error) {
+    console.error('Error eliminando checklist:', error);
+    res.status(400).json({
+      success: false,
+      error: { code: 'DELETE_CHECKLIST_ERROR', message: error.message }
+    });
+  }
+};
+
 module.exports = {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -1997,5 +2011,6 @@ module.exports = {
   getChecklistTypeDetails,
   getParentItemsByChecklistType,
   getPendingRequisitionsByChecklist,
-  getOperationChecklistsWithFailures
+  getOperationChecklistsWithFailures,
+  deleteChecklist
 }

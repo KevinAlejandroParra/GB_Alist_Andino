@@ -29,6 +29,7 @@ export default function HistorySection({ checklistTypeId }) {
   const [historicalChecklists, setHistoricalChecklists] = useState([])
   const [expandedHistoricalChecklists, setExpandedHistoricalChecklists] = useState({})
   const [downloading, setDownloading] = useState(null)
+  const [deleting, setDeleting] = useState(null)
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -120,6 +121,36 @@ export default function HistorySection({ checklistTypeId }) {
     }
   }
 
+  const handleDelete = async (checklistId, checklistDate) => {
+    if (!user || !user.token) {
+      alert('No estás autenticado. Por favor, inicia sesión de nuevo.')
+      return
+    }
+    if (!window.confirm(`¿Estás seguro de eliminar el checklist del ${formatLocalDate(checklistDate)}?\n\nEsta acción no se puede deshacer. Solo se pueden eliminar checklists sin firmas registradas.`)) {
+      return
+    }
+    setDeleting(checklistId)
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API}/api/checklists/${checklistId}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${user.token}` },
+        }
+      )
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error?.message || 'Error al eliminar el checklist')
+      }
+      fetchHistory()
+    } catch (error) {
+      console.error('Error al eliminar:', error)
+      alert(`Error: ${error.message}`)
+    } finally {
+      setDeleting(null)
+    }
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-md mb-8">
       <div className="p-6">
@@ -140,6 +171,14 @@ export default function HistorySection({ checklistTypeId }) {
             <span className="inline-block w-4 h-4 rounded border-2 border-blue-500 bg-blue-50" />
             2+ firmas
           </span>
+        </div>
+
+        {/* Delete info note */}
+        <div className="flex items-center gap-2 mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+          <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Solo se pueden eliminar checklists que <strong>no tengan ninguna firma</strong>. Si ingresaste a un checklist equivocado por error, puedes eliminarlo siempre que esté sin firmar.</span>
         </div>
 
         {/* Filters */}
@@ -205,7 +244,19 @@ export default function HistorySection({ checklistTypeId }) {
                           Firmas: {sigCount}
                         </p>
                       </div>
-                      <div className="flex items-center">
+                      <div className="flex items-center gap-2">
+                        {sigCount === 0 && (
+                          <button
+                            onClick={() => handleDelete(historyChecklist.checklist_id, historyChecklist.createdAt)}
+                            disabled={deleting === historyChecklist.checklist_id}
+                            className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-3 rounded text-sm disabled:bg-gray-400 flex items-center gap-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            {deleting === historyChecklist.checklist_id ? 'Eliminando...' : 'Eliminar'}
+                          </button>
+                        )}
                         {user && user.role_id == 1 && (
                           <button
                             onClick={() => handleDownload(historyChecklist.checklist_id, historyChecklist.createdAt)}
@@ -216,7 +267,7 @@ export default function HistorySection({ checklistTypeId }) {
                           </button>
                         )}
                         <div
-                          className="text-xl text-gray-500 ml-4 cursor-pointer"
+                          className="text-xl text-gray-500 ml-2 cursor-pointer"
                           onClick={() => setExpandedHistoricalChecklists((prev) => ({
                             ...prev,
                             [historyChecklist.checklist_id]: !prev[historyChecklist.checklist_id]
