@@ -1788,8 +1788,12 @@ const getLatestChecklistByType = async (req, res) => {
 const getChecklistHistoryByType = async (req, res) => {
   try {
     const { checklistTypeId } = req.params
-    const checklists = await checklistService.getChecklistHistoryByType(Number.parseInt(checklistTypeId))
-    res.status(200).json(checklists)
+    const { month, year, page, limit } = req.query
+    const result = await checklistService.getChecklistHistoryByType(
+      Number.parseInt(checklistTypeId),
+      { month, year, page, limit }
+    )
+    res.status(200).json(result)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }

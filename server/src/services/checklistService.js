@@ -1821,28 +1821,77 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
   }
 }
 
-const getChecklistHistoryByType = async (checklistTypeId) => {
+const getChecklistHistoryByType = async (checklistTypeId, { month, year, page, limit } = {}) => {
   const checklistType = await ChecklistType.findByPk(checklistTypeId, {
     include: [{ model: ChecklistItem, as: "items", where: { parent_item_id: null } }],
   });
 
+  // Build date filter
+  const whereClause = { checklist_type_id: checklistTypeId };
+  if (year) {
+    const yearNum = Number.parseInt(year);
+    if (month) {
+      const monthNum = Number.parseInt(month);
+      const startDate = new Date(Date.UTC(yearNum, monthNum - 1, 1));
+      const endDate = new Date(Date.UTC(yearNum, monthNum, 1));
+      whereClause.createdAt = { [Op.between]: [startDate, endDate] };
+    } else {
+      const startDate = new Date(Date.UTC(yearNum, 0, 1));
+      const endDate = new Date(Date.UTC(yearNum + 1, 0, 1));
+      whereClause.createdAt = { [Op.between]: [startDate, endDate] };
+    }
+  }
+
   if (!checklistType || checklistType.name !== 'Apoyo - Técnico (Premios)') {
-    // Para otros checklists, devolver el formato genérico
-    const checklists = await Checklist.findAll({
-      where: { checklist_type_id: checklistTypeId },
-      include: [
-        { model: ChecklistType, as: "type", attributes: ["name", "description"] },
-        { model: User, as: "creator", attributes: ["user_name"] },
-        {
-          model: ChecklistSignature,
-          as: "signatures",
-          attributes: ["role_id", "signed_at"],
-          include: [{ model: User, as: "user", attributes: ["user_name"] }],
-        },
-      ],
+    // Para otros checklists, devolver el formato genérico con paginación
+    const includeConfig = [
+      { model: ChecklistType, as: "type", attributes: ["name", "description"] },
+      { model: User, as: "creator", attributes: ["user_name"] },
+      {
+        model: ChecklistSignature,
+        as: "signatures",
+        attributes: ["role_id", "signed_at"],
+        include: [
+          { model: User, as: "user", attributes: ["user_name"] },
+          { model: Role, as: "role", attributes: ["role_name"] },
+        ],
+      },
+    ];
+
+    // If pagination params provided, return paginated format
+    if (page || limit) {
+      const pageNum = Number.parseInt(page) || 1;
+      const limitNum = Number.parseInt(limit) || 10;
+      const total = await Checklist.count({ where: whereClause });
+      const totalPages = Math.ceil(total / limitNum);
+      const offset = (pageNum - 1) * limitNum;
+
+      const checklists = await Checklist.findAll({
+        where: whereClause,
+        include: includeConfig,
+        order: [["createdAt", "DESC"]],
+        offset,
+        limit: limitNum,
+      });
+
+      const dateMinMax = await Checklist.findOne({
+        where: { checklist_type_id: checklistTypeId },
+        attributes: [
+          [Sequelize.fn('MIN', Sequelize.col('createdAt')), 'minDate'],
+          [Sequelize.fn('MAX', Sequelize.col('createdAt')), 'maxDate'],
+        ],
+        raw: true,
+      });
+
+      return { data: checklists, total, page: pageNum, totalPages, dateRange: dateMinMax };
+    }
+
+    // Backward compatible: return plain array when no pagination
+    return await Checklist.findAll({
+      where: whereClause,
+      include: includeConfig,
       order: [["createdAt", "DESC"]],
     });
-    return checklists;
   }
 
   // Para el checklist de premios, crear formato tabular

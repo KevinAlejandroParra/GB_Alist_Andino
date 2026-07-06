@@ -2318,12 +2318,12 @@ class FailureController {
           {
             model: WorkOrder,
             as: 'workOrder',
-            attributes: ['work_order_id', 'status', 'start_time', 'activity_performed']
+            attributes: ['id', 'work_order_id', 'status', 'start_time', 'activity_performed']
           },
           {
             model: RepairExecution,
             as: 'repairExecution',
-            attributes: ['repair_execution_id', 'status', 'start_time', 'activity_performed']
+            attributes: ['id', 'repair_execution_id', 'status', 'start_time', 'activity_performed']
           }
         ],
         order: [['createdAt', 'DESC']]
@@ -2437,12 +2437,12 @@ class FailureController {
           {
             model: WorkOrder,
             as: 'workOrder',
-            attributes: ['work_order_id', 'status', 'start_time', 'activity_performed']
+            attributes: ['id', 'work_order_id', 'status', 'start_time', 'activity_performed']
           },
           {
             model: RepairExecution,
             as: 'repairExecution',
-            attributes: ['repair_execution_id', 'status', 'start_time', 'activity_performed']
+            attributes: ['id', 'repair_execution_id', 'status', 'start_time', 'activity_performed']
           }
         ],
         order: [['createdAt', 'DESC']]
@@ -2585,13 +2585,13 @@ class FailureController {
             model: WorkOrder,
             as: 'workOrder',
             required: false,
-            attributes: ['work_order_id', 'status', 'start_time', 'activity_performed']
+            attributes: ['id', 'work_order_id', 'status', 'start_time', 'activity_performed']
           },
           {
             model: RepairExecution,
             as: 'repairExecution',
             required: false,
-            attributes: ['repair_execution_id', 'status', 'start_time', 'activity_performed']
+            attributes: ['id', 'repair_execution_id', 'status', 'start_time', 'activity_performed']
           }
         ],
         order: [['createdAt', 'DESC']]

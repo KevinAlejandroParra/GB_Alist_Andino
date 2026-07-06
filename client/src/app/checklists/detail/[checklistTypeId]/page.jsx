@@ -7,7 +7,7 @@ import { useAuth } from '../../../../components/AuthContext';
 import ChecklistHeader from '../../../../components/checklist/components/ChecklistHeader';
 import HistorySection from '../../../../components/checklist/HistorySection';
 import axiosInstance from '../../../../utils/axiosConfig';
-import { formatLocalDate, formatLocalDateTime } from '../../../../utils/dateUtils';
+import { formatLocalDate } from '../../../../utils/dateUtils';
 
 export default function ChecklistDetailPage() {
   const params = useParams();
@@ -17,96 +17,23 @@ export default function ChecklistDetailPage() {
   
   const [checklistType, setChecklistType] = useState(null);
   const [todayChecklist, setTodayChecklist] = useState(null);
-  const [checklistHistory, setChecklistHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [expandedHistoricalChecklists, setExpandedHistoricalChecklists] = useState({});
-  const [downloading, setDownloading] = useState(null);
 
   const fetchChecklistData = async () => {
     try {
       setLoading(true);
       
-      const [typeResponse, historyResponse] = await Promise.all([
+      const [typeResponse, latestResponse] = await Promise.all([
         axiosInstance.get(`/api/checklists/type/${checklistTypeId}/details`),
-        axiosInstance.get(`/api/checklists/type/${checklistTypeId}/history`),
+        axiosInstance.get(`/api/checklists/type/${checklistTypeId}/latest`).catch(() => null),
       ]);
 
       setChecklistType(typeResponse.data);
-      
-      if (historyResponse.data && historyResponse.data.length > 0) {
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        
-        // Para checklists semanales, buscar por week_identifier
-        // Para checklists diarios, buscar por fecha de creación
-        const isWeeklyChecklist = typeResponse.data?.frequency?.toLowerCase() === 'semanal' || 
-                                   typeResponse.data?.frequency?.toLowerCase() === 'weekly';
-        
-        let todayChecklist;
-        
-        if (isWeeklyChecklist) {
-          // Para checklists semanales, calcular el identificador de la semana actual
-          const now = new Date();
-          const dayOfWeek = now.getUTCDay();
-          const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-          const monday = new Date(now);
-          monday.setUTCDate(now.getUTCDate() + diff);
-          monday.setUTCHours(0, 0, 0, 0);
-          
-          const year = monday.getUTCFullYear();
-          const startOfYear = new Date(Date.UTC(year, 0, 1));
-          const firstMonday = new Date(startOfYear);
-          const firstMondayDay = firstMonday.getUTCDay();
-          const daysToMonday = firstMondayDay === 0 ? -6 : 1 - firstMondayDay;
-          firstMonday.setUTCDate(firstMonday.getUTCDate() + daysToMonday);
-          
-          if (firstMonday.getUTCFullYear() < year) {
-            firstMonday.setUTCDate(firstMonday.getUTCDate() + 7);
-          }
-          
-          const weekNumber = Math.floor((monday - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
-          const currentWeekIdentifier = `${year}-W${String(weekNumber).padStart(2, '0')}`;
-          
-          console.log('🔍 [ChecklistDetailPage] Buscando checklist semanal:', {
-            currentWeekIdentifier,
-            availableChecklists: historyResponse.data.map(c => ({
-              id: c.checklist_id,
-              weekId: c.week_identifier,
-              created: c.createdAt
-            }))
-          });
-          
-          // Buscar checklist con el week_identifier de la semana actual
-          todayChecklist = historyResponse.data.find(checklist =>
-            checklist.week_identifier === currentWeekIdentifier
-          );
-          
-          if (todayChecklist) {
-            console.log('✅ [ChecklistDetailPage] Checklist semanal encontrado:', {
-              id: todayChecklist.checklist_id,
-              weekId: todayChecklist.week_identifier
-            });
-          } else {
-            console.log('⚠️ [ChecklistDetailPage] No se encontró checklist para la semana actual');
-          }
-        } else {
-          // Para checklists diarios, buscar por fecha de creación
-          todayChecklist = historyResponse.data.find(checklist =>
-            checklist.createdAt.split('T')[0] === today
-          );
-          
-          console.log('🔍 [ChecklistDetailPage] Buscando checklist diario:', {
-            today,
-            found: !!todayChecklist
-          });
-        }
-        
-        if (todayChecklist) {
-          setTodayChecklist(todayChecklist);
-        }
+
+      if (latestResponse?.data?.checklist_id) {
+        setTodayChecklist(latestResponse.data);
       }
-      
-      setChecklistHistory(historyResponse.data);
     } catch (err) {
       console.error('Error al cargar datos del checklist:', err);
       setError('Error al cargar los datos del checklist. Por favor, intente nuevamente.');
@@ -157,47 +84,6 @@ export default function ChecklistDetailPage() {
       console.error("Error al obtener el tipo de checklist:", error);
       // En caso de error, usar el comportamiento anterior
       router.push(`/checklists/attraction/${checklistTypeId}`);
-    }
-  };
-
-  const handleViewHistoricChecklist = (checklistId) => {
-    router.push(`/checklists/view/${checklistId}`);
-  };
-
-  const toggleHistoricalChecklist = (checklistId) => {
-    setExpandedHistoricalChecklists(prev => ({
-      ...prev,
-      [checklistId]: !prev[checklistId]
-    }));
-  };
-
-  const handleDownload = async (checklistId, date) => {
-    if (!user || !user.token) {
-      alert('No estás autenticado. Por favor, inicia sesión de nuevo.');
-      return;
-    }
-
-    setDownloading(checklistId);
-    try {
-      const response = await axiosInstance.get(`/api/checklists/${checklistId}/download`, {
-        responseType: 'blob',
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      const formattedDate = new Date(date).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-      link.download = `checklist-${checklistType?.name}-${formattedDate}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Error al descargar el PDF:', err);
-      setError('No se pudo descargar el PDF.');
-    } finally {
-      setDownloading(null);
     }
   };
 
@@ -324,14 +210,7 @@ export default function ChecklistDetailPage() {
 
           {/* Historial de Checklists */}
           <div className="bg-white rounded-xl shadow-sm p-6">
-            <HistorySection
-              historicalChecklists={checklistHistory}
-              expandedHistoricalChecklists={expandedHistoricalChecklists}
-              onToggleExpand={toggleHistoricalChecklist}
-              onDownload={handleDownload}
-              onView={handleViewHistoricChecklist}
-              downloading={downloading}
-            />
+            <HistorySection checklistTypeId={checklistTypeId} />
           </div>
         </div>
       </div>
