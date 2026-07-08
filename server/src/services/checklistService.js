@@ -361,14 +361,15 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, created_by, 
     // Construir la cláusula where para buscar checklist existente
     const whereClause = {
       checklist_type_id: checklistTypeInstance.checklist_type_id,
-      createdAt: {
-        [Op.between]: [startDate, endDate],
-      }
     };
-    
-    // Para checklists semanales de familia, agregar week_identifier
+
+    // Semanales: buscar solo por week_identifier (no depender de createdAt/timezone)
     if (isWeekly && identifier) {
       whereClause.week_identifier = identifier;
+    } else {
+      whereClause.createdAt = {
+        [Op.between]: [startDate, endDate],
+      };
     }
     
     if (inspectableId !== null && inspectableId !== undefined) {
@@ -489,15 +490,15 @@ const getLatestChecklist = async ({ inspectableId, role_id, checklist_type_id })
   console.log(`[getLatestChecklist] Buscando en rango: ${startDate.toISOString()} - ${endDate.toISOString()}`);
 
   const whereClause = {
-    createdAt: {
-      [Op.between]: [startDate, endDate],
-    },
-    checklist_type_id: definitiveChecklistType.checklist_type_id
+    checklist_type_id: definitiveChecklistType.checklist_type_id,
   };
-  
-  // Para checklists semanales, agregar week_identifier
+
   if (isWeekly && identifier) {
     whereClause.week_identifier = identifier;
+  } else {
+    whereClause.createdAt = {
+      [Op.between]: [startDate, endDate],
+    };
   }
   
   if (inspectableId !== null && inspectableId !== undefined) {
@@ -1399,7 +1400,7 @@ const signChecklist = async ({ checklist_id, user_id, role_id, digital_token }) 
   }
 };
 
-const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) => {
+const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id, createIfMissing = true }) => {
   const normalizedInputDate = new Date();
   normalizedInputDate.setUTCHours(0, 0, 0, 0);
 
@@ -1576,6 +1577,26 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
     });
 
     if (!checklist) {
+      if (!createIfMissing) {
+        console.log(`[getLatestChecklistByType] Sin checklist para ${weekIdentifier || 'hoy'} (solo lectura)`);
+        return {
+          checklist_id: null,
+          type: definitiveChecklistType.toJSON(),
+          items: [],
+          signatures: [],
+          pending_work_orders: [],
+          ...(isWeekly && {
+            week_info: {
+              week_identifier: weekIdentifier,
+              week_range: weekUtils.formatWeekRange(periodStart, periodEnd),
+              days_remaining: weekUtils.getDaysRemainingInWeek(),
+              start_date: periodStart,
+              end_date: periodEnd,
+            },
+          }),
+        };
+      }
+
       let premise_id = null;
       if (inspectableId) {
         const inspectable = await Inspectable.findByPk(inspectableId);
@@ -1690,26 +1711,33 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id }) =
       include: { model: Inspectable, as: "parentInspectable" },
     });
 
-    // Si no existe checklist para esta semana, crearlo
+    // Si no existe checklist para esta semana
     if (!familyChecklist) {
+      const emptyWeekResponse = {
+        checklist_id: null,
+        type: definitiveChecklistType.toJSON(),
+        items: [],
+        signatures: [],
+        pending_work_orders: [],
+        week_info: {
+          week_identifier: weekIdentifier,
+          week_range: weekUtils.formatWeekRange(startOfWeek, endOfWeek),
+          days_remaining: weekUtils.getDaysRemainingInWeek(),
+          start_date: startOfWeek,
+          end_date: endOfWeek,
+        },
+      };
+
+      if (!createIfMissing) {
+        console.log(`[getLatestChecklistByType] Sin checklist de familia para ${weekIdentifier} (solo lectura)`);
+        return emptyWeekResponse;
+      }
+
       if (devices.length === 0) {
         console.log('[getLatestChecklistByType] No hay dispositivos activos para esta familia');
-        return {
-          checklist_id: null,
-          type: definitiveChecklistType.toJSON(),
-          items: [],
-          signatures: [],
-          pending_work_orders: [],
-          week_info: {
-            week_identifier: weekIdentifier,
-            week_range: weekUtils.formatWeekRange(startOfWeek, endOfWeek),
-            days_remaining: weekUtils.getDaysRemainingInWeek(),
-            start_date: startOfWeek,
-            end_date: endOfWeek
-          }
-        };
+        return emptyWeekResponse;
       }
-      
+
       const firstDeviceInspectable = devices[0].parentInspectable;
       if (!firstDeviceInspectable || !firstDeviceInspectable.premise_id) {
         throw new Error('Cannot create family checklist: premise_id not found on the first device.');

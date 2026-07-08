@@ -1,5 +1,6 @@
 const { ChecklistType, ChecklistItem, Checklist, ChecklistResponse, ChecklistSignature, User, ChecklistQrCode, ChecklistQrItemAssociation } = require("../models")
 const checklistService = require("../services/checklistService")
+const weekUtils = require("../utils/weekUtils")
 const puppeteer = require("puppeteer")
 
 const ensureChecklistInstance = async (req, res) => {
@@ -48,22 +49,30 @@ const createChecklist = async (req, res) => {
 
     console.log(`🔍 Solicitando checklist tipo ${checklistTypeId} para inspectable ${inspectableId || 'null'}`);
 
-    // PRIMERO: Verificar si ya existe un checklist válido usando database query directa
-    const Checklist = require('../models').Checklist;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const ChecklistType = require('../models').ChecklistType;
+    const checklistType = await ChecklistType.findByPk(Number.parseInt(checklistTypeId));
+    if (!checklistType) {
+      return res.status(404).json({ error: 'Tipo de checklist no encontrado' });
+    }
+
+    const { startDate, endDate, identifier, isWeekly } =
+      weekUtils.getDateBoundsForChecklistType(checklistType);
+
+    const existingWhere = {
+      checklist_type_id: Number.parseInt(checklistTypeId),
+      ...(inspectableId && { inspectable_id: Number.parseInt(inspectableId) }),
+    };
+
+    if (isWeekly && identifier) {
+      existingWhere.week_identifier = identifier;
+    } else {
+      existingWhere.createdAt = {
+        [require('sequelize').Op.between]: [startDate, endDate],
+      };
+    }
 
     const existingChecklist = await Checklist.findOne({
-      where: {
-        checklist_type_id: Number.parseInt(checklistTypeId),
-        ...(inspectableId && { inspectable_id: Number.parseInt(inspectableId) }),
-        createdAt: {
-          [require('sequelize').Op.gte]: today,
-          [require('sequelize').Op.lt]: tomorrow
-        }
-      },
+      where: existingWhere,
       include: [
         { model: require('../models').ChecklistType, as: 'type' },
         { model: require('../models').ChecklistSignature, as: 'signatures' },
@@ -1756,11 +1765,13 @@ const getLatestChecklistByType = async (req, res) => {
   try {
     const { checklistTypeId } = req.params
     const { user_id, role_id } = req.user
+    const createIfMissing = req.query.createIfMissing !== 'false'
 
     console.log(`📥 [getLatestChecklistByType] Request received:`, {
       checklistTypeId,
       user_id,
       role_id,
+      createIfMissing,
       query: req.query
     });
 
@@ -1768,6 +1779,7 @@ const getLatestChecklistByType = async (req, res) => {
       checklistTypeId: Number.parseInt(checklistTypeId),
       user_id,
       role_id,
+      createIfMissing,
     })
 
     console.log(`📤 [getLatestChecklistByType] Response:`, {

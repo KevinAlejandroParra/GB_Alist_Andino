@@ -65,41 +65,81 @@ export function getDayOptions(year, month) {
   return options;
 }
 
-function getMondayOfWeekUTC(date) {
-  const d = new Date(date);
-  d.setUTCHours(0, 0, 0, 0);
-  const day = d.getUTCDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setUTCDate(d.getUTCDate() + diff);
-  return d;
+const APP_TIMEZONE = 'America/Bogota';
+const BOGOTA_UTC_OFFSET_HOURS = 5;
+const WEEKDAY_MAP = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+function getCalendarPartsInAppTz(date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIMEZONE,
+    weekday: 'short',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour12: false,
+  }).formatToParts(new Date(date));
+
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+
+  return {
+    year: parseInt(get('year'), 10),
+    month: parseInt(get('month'), 10),
+    day: parseInt(get('day'), 10),
+    dayOfWeek: WEEKDAY_MAP[get('weekday')] ?? 0,
+  };
 }
 
-function getWeekIdentifierUTC(date) {
-  const monday = getMondayOfWeekUTC(date);
-  const year = monday.getUTCFullYear();
-  const startOfYear = new Date(Date.UTC(year, 0, 1));
-  let firstMonday = getMondayOfWeekUTC(startOfYear);
-  if (firstMonday.getUTCFullYear() < year) {
-    firstMonday = new Date(firstMonday);
-    firstMonday.setUTCDate(firstMonday.getUTCDate() + 7);
+function addCalendarDays(year, month, day, delta) {
+  const dt = new Date(Date.UTC(year, month - 1, day + delta));
+  return {
+    year: dt.getUTCFullYear(),
+    month: dt.getUTCMonth() + 1,
+    day: dt.getUTCDate(),
+  };
+}
+
+function bogotaStartOfDayUtc(year, month, day) {
+  return new Date(Date.UTC(year, month - 1, day, BOGOTA_UTC_OFFSET_HOURS, 0, 0, 0));
+}
+
+function getMondayOfWeekAppTz(date) {
+  const { year, month, day, dayOfWeek } = getCalendarPartsInAppTz(date);
+  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = addCalendarDays(year, month, day, diff);
+  return bogotaStartOfDayUtc(monday.year, monday.month, monday.day);
+}
+
+function getWeekIdentifierAppTz(date) {
+  const monday = getMondayOfWeekAppTz(date);
+  const mondayParts = getCalendarPartsInAppTz(monday);
+  const year = mondayParts.year;
+
+  const startOfYear = bogotaStartOfDayUtc(year, 1, 1);
+  let firstMonday = getMondayOfWeekAppTz(startOfYear);
+  const firstMondayParts = getCalendarPartsInAppTz(firstMonday);
+
+  if (firstMondayParts.year < year) {
+    const adjusted = addCalendarDays(firstMondayParts.year, firstMondayParts.month, firstMondayParts.day, 7);
+    firstMonday = bogotaStartOfDayUtc(adjusted.year, adjusted.month, adjusted.day);
   }
+
   const weekNumber =
     Math.floor((monday - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
   return `${year}-W${String(weekNumber).padStart(2, '0')}`;
 }
 
-function getSundayOfWeekUTC(monday) {
-  const sunday = new Date(monday);
-  sunday.setUTCDate(monday.getUTCDate() + 6);
-  sunday.setUTCHours(23, 59, 59, 999);
-  return sunday;
+function getSundayOfWeekAppTz(monday) {
+  const mondayParts = getCalendarPartsInAppTz(monday);
+  const sunday = addCalendarDays(mondayParts.year, mondayParts.month, mondayParts.day, 6);
+  return new Date(Date.UTC(sunday.year, sunday.month - 1, sunday.day + 1, BOGOTA_UTC_OFFSET_HOURS - 1, 59, 59, 999));
 }
 
 function formatWeekRangeLabel(monday, sunday) {
   const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
   const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  const fmt = (d) => `${days[d.getUTCDay()]} ${d.getUTCDate()} ${months[d.getUTCMonth()]}`;
-  return `${fmt(monday)} – ${fmt(sunday)}`;
+  const startParts = getCalendarPartsInAppTz(monday);
+  const endParts = getCalendarPartsInAppTz(sunday);
+  return `${days[startParts.dayOfWeek]} ${startParts.day} ${months[startParts.month - 1]} – ${days[endParts.dayOfWeek]} ${endParts.day} ${months[endParts.month - 1]}`;
 }
 
 export function getWeekOptionsForMonth(year, month) {
@@ -114,11 +154,11 @@ export function getWeekOptionsForMonth(year, month) {
   const seen = new Map();
 
   for (let d = 1; d <= daysInMonth; d++) {
-    const date = new Date(Date.UTC(y, m, d));
-    const weekId = getWeekIdentifierUTC(date);
+    const date = new Date(Date.UTC(y, m, d, 12, 0, 0));
+    const weekId = getWeekIdentifierAppTz(date);
     if (seen.has(weekId)) continue;
-    const monday = getMondayOfWeekUTC(date);
-    const sunday = getSundayOfWeekUTC(monday);
+    const monday = getMondayOfWeekAppTz(date);
+    const sunday = getSundayOfWeekAppTz(monday);
     const weekNum = weekId.split('-W')[1];
     seen.set(weekId, {
       value: weekId,

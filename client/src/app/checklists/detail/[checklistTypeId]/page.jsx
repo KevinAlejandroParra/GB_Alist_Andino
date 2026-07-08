@@ -26,7 +26,9 @@ export default function ChecklistDetailPage() {
       
       const [typeResponse, latestResponse] = await Promise.all([
         axiosInstance.get(`/api/checklists/type/${checklistTypeId}/details`),
-        axiosInstance.get(`/api/checklists/type/${checklistTypeId}/latest`).catch(() => null),
+        axiosInstance.get(`/api/checklists/type/${checklistTypeId}/latest`, {
+          params: { createIfMissing: false },
+        }).catch(() => null),
       ]);
 
       setChecklistType(typeResponse.data);
