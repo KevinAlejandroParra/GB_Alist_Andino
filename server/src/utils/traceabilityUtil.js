@@ -36,7 +36,8 @@ function computeTraceability({ repairExecution, workOrder, requisitions = [], pa
       label: 'Sin seguimiento',
       shortLabel: 'Sin seguimiento',
       color: '#9ca3af',
-      bgColor: '#f3f4f6'
+      bgColor: '#f3f4f6',
+      status: null
     };
   }
 
@@ -52,7 +53,8 @@ function computeTraceability({ repairExecution, workOrder, requisitions = [], pa
       bgColor: '#fef2f2',
       showInPdf: showCancelled,
       cancellation_reason: repairExecution?.cancellation_reason || workOrder?.cancellation_reason || null,
-      cancelled_at: cancelledAt
+      cancelled_at: cancelledAt,
+      status: 'CANCELADO'
     };
   }
 
