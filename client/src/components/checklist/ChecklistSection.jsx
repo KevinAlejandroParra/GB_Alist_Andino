@@ -381,6 +381,17 @@ const ChecklistSection = (props) => {
     }, 500);
   }, [workOrderDetection]);
 
+  // ✅ Sincronizar selectedWorkOrder con datos frescos después de refresh
+  useEffect(() => {
+    if (!showRecurringFailureModal || !selectedWorkOrder || !workOrderDetection.workOrders.length) return;
+    const updated = selectedWorkOrder.map(wo => {
+      const fresh = workOrderDetection.workOrders.find(f => f.id === wo.id);
+      return fresh ? { ...fresh, userResponse: wo.userResponse, uniqueResponseId: wo.uniqueResponseId, checklistItemId: wo.checklistItemId } : wo;
+    });
+    const changed = updated.some((wo, i) => wo.evidence_url !== selectedWorkOrder[i]?.evidence_url || wo.status !== selectedWorkOrder[i]?.status);
+    if (changed) setSelectedWorkOrder(updated);
+  }, [workOrderDetection.workOrders, showRecurringFailureModal]);
+
   useEffect(() => {
     if (user && checklist?.signatures) {
       const hasTechnicalSignature = checklist.signatures.some(

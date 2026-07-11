@@ -7,6 +7,7 @@ import WorkOrderProcessModal from './WorkOrderProcessModal'
 import SignaturePad from './SignaturePad'
 import Swal from 'sweetalert2'
 import { formatLocalDate } from '../../utils/dateUtils'
+import { resolveEvidenceUrl } from '../../utils/evidenceUrl'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faTools,
@@ -558,11 +559,7 @@ export default function RecurringFailureModal({
                     )}
 
                     {selectedWorkOrder && (() => {
-                      const fullEvidenceUrl = selectedWorkOrder.evidence_url
-                        ? (selectedWorkOrder.evidence_url.startsWith('http')
-                          ? selectedWorkOrder.evidence_url
-                          : `${API_URL}${selectedWorkOrder.evidence_url}`)
-                        : null
+                      const fullEvidenceUrl = resolveEvidenceUrl(selectedWorkOrder.evidence_url)
 
                       const daysOpen = getDaysOpen(selectedWorkOrder.createdAt);
                       const alertConfig = getDaysAlertConfig(daysOpen);
@@ -889,11 +886,7 @@ export default function RecurringFailureModal({
                     </div>
 
                     {workOrders.map((wo) => {
-                      const fullEvidenceUrl = wo.evidence_url
-                        ? (wo.evidence_url.startsWith('http')
-                          ? wo.evidence_url
-                          : `${API_URL}${wo.evidence_url}`)
-                        : null
+                      const fullEvidenceUrl = resolveEvidenceUrl(wo.evidence_url)
 
                       const daysOpen = getDaysOpen(wo.createdAt);
                       const alertConfig = getDaysAlertConfig(daysOpen);

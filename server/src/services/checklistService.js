@@ -2594,6 +2594,7 @@ const getChecklistFailures = async (checklistId, isFamilyChecklist = false, mode
         assigned_to_name: failureOrder.assigned_to || 'No asignado',
         reporter_name: failureOrder.reporter?.user_name || 'Desconocido',
         affected_machine: failureOrder.affectedInspectable?.name || 'No especificada',
+        affected_id: failureOrder.affected_id || null,
         recurrence_count: failureOrder.recurrence_count || 0,
         is_recurring: failureOrder.is_recurring || false,
         created_at: failureOrder.createdAt,
@@ -2989,7 +2990,9 @@ const getOperationChecklistsWithFailures = async (checklistId) => {
               created_at: f.created_at,
               traceability: f.traceability,
               repairExecution: f.repairExecution,
-              workOrder: f.workOrder
+              workOrder: f.workOrder,
+              affected_machine: f.affected_machine,
+              affected_id: f.affected_id
             });
           }
         }

@@ -112,6 +112,7 @@ export default function OperationFailuresSection({ checklistId, user }) {
                   <thead>
                     <tr className="border-b border-slate-200">
                       <th className="text-left py-2 px-2 text-slate-600 font-medium text-xs">Item</th>
+                      <th className="text-left py-2 px-2 text-slate-600 font-medium text-xs">Dispositivo</th>
                       <th className="text-left py-2 px-2 text-slate-600 font-medium text-xs">Falla</th>
                       <th className="text-left py-2 px-2 text-slate-600 font-medium text-xs">Severidad</th>
                       <th className="text-left py-2 px-2 text-slate-600 font-medium text-xs">Estado</th>
@@ -122,6 +123,7 @@ export default function OperationFailuresSection({ checklistId, user }) {
                     {selectedChecklist.failures.map((failure) => (
                       <tr key={failure.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="py-2 px-2 text-xs font-medium text-slate-700">{failure.item_number}</td>
+                        <td className="py-2 px-2 text-xs text-slate-600">{failure.affected_machine || 'No especificada'}</td>
                         <td className="py-2 px-2 text-xs text-slate-600 max-w-[200px] truncate">{failure.description}</td>
                         <td className="py-2 px-2">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getSeverityColor(failure.severity)}`}>
