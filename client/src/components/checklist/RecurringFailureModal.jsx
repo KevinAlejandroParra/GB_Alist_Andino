@@ -691,14 +691,33 @@ export default function RecurringFailureModal({
                               </div>
                             </div>
 
+                            {/* Firma del Reporte */}
+                            {selectedWorkOrder.report_signature && (
+                              <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-sm font-bold text-purple-900">✍️ Firma del Reporte</span>
+                                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-semibold">Firmado</span>
+                                </div>
+                                <div className="border rounded-lg overflow-hidden bg-white cursor-pointer" onClick={() => window.open(selectedWorkOrder.report_signature, '_blank')}>
+                                  <img
+                                    src={selectedWorkOrder.report_signature}
+                                    alt="Firma de reporte"
+                                    className="w-full h-16 object-contain hover:opacity-80 transition-opacity"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
                             {/* ✅ Acciones sobre falla existente: Firmar + Actualizar imagen */}
                             <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
-                              <button
-                                onClick={() => handleOpenSignExisting(selectedWorkOrder.id)}
-                                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors"
-                              >
-                                ✍️ {selectedWorkOrder.report_signature ? 'Re-firmar reporte' : 'Firmar reporte'}
-                              </button>
+                              {!selectedWorkOrder.report_signature && (
+                                <button
+                                  onClick={() => handleOpenSignExisting(selectedWorkOrder.id)}
+                                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors"
+                                >
+                                  ✍️ Firmar reporte
+                                </button>
+                              )}
                               <button
                                 onClick={() => setUpdatingImageForId(v => v === selectedWorkOrder.id ? null : selectedWorkOrder.id)}
                                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
@@ -965,6 +984,23 @@ export default function RecurringFailureModal({
                                 </div>
                               </div>
 
+                              {/* Firma del Reporte */}
+                              {wo.report_signature && (
+                                <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-xs font-bold text-purple-900">✍️ Firma del Reporte</span>
+                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-semibold">Firmado</span>
+                                  </div>
+                                  <div className="border rounded-lg overflow-hidden bg-white cursor-pointer" onClick={() => window.open(wo.report_signature, '_blank')}>
+                                    <img
+                                      src={wo.report_signature}
+                                      alt="Firma de reporte"
+                                      className="w-full h-14 object-contain hover:opacity-80 transition-opacity"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+
                               {/* Evidencia */}
                               {fullEvidenceUrl && (
                                 <div className="bg-orange-50 rounded-lg p-4">
@@ -998,12 +1034,14 @@ export default function RecurringFailureModal({
 
                             {/* ✅ Acciones rápidas: firmar + actualizar imagen */}
                             <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                              <button
-                                onClick={() => handleOpenSignExisting(wo.id)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 transition-colors"
-                              >
-                                ✍️ {wo.report_signature ? 'Re-firmar' : 'Firmar reporte'}
-                              </button>
+                              {!wo.report_signature && (
+                                <button
+                                  onClick={() => handleOpenSignExisting(wo.id)}
+                                  className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 transition-colors"
+                                >
+                                  ✍️ Firmar reporte
+                                </button>
+                              )}
                               <button
                                 onClick={() => setUpdatingImageForId(v => v === wo.id ? null : wo.id)}
                                 className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
