@@ -2942,18 +2942,9 @@ const getOperationChecklistsWithFailures = async (checklistId) => {
     const result = [];
 
     for (const opType of operationTypes) {
-      const { startDate, endDate, identifier, isWeekly } = weekUtils.getDateBoundsForChecklistType(opType);
-
-      const whereClause = {
-        checklist_type_id: opType.checklist_type_id,
-        createdAt: { [Op.between]: [startDate, endDate] }
-      };
-      if (isWeekly && identifier) {
-        whereClause.week_identifier = identifier;
-      }
-
       const opChecklists = await Checklist.findAll({
-        where: whereClause,
+        where: { checklist_type_id: opType.checklist_type_id },
+        limit: 2,
         include: [
           {
             model: User,

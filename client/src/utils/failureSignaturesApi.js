@@ -265,8 +265,8 @@ export const canUserCreateReportSignature = (user) => {
  */
 export const canUserCreateAdminSignature = (user) => {
   if (!user) return false;
-  // Solo rol ID 1 es administrador
-  return user.role_id === 1;
+  const roleName = (user.role_name || user.role?.role_name || '').toUpperCase();
+  return user.role_id === 1 || user.role_id === 2 || roleName.includes('ADMIN');
 };
 
 /**

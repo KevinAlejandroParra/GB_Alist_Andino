@@ -581,12 +581,10 @@ const FailureDetailModal = ({
                 <p className="font-semibold text-orange-800 text-sm">Sin dispositivo asociado</p>
                 <p className="text-orange-700 text-xs mt-0.5">Esta falla no tiene ningún dispositivo/atracción asignado.</p>
               </div>
-              {(user?.role_id === 1 || user?.role_id === 2) && (
-                <button onClick={handleOpenAssignInspectable}
-                  className="shrink-0 px-3 py-1.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-xs font-semibold">
-                  Asignar Dispositivo
-                </button>
-              )}
+              <button onClick={handleOpenAssignInspectable}
+                className="shrink-0 px-3 py-1.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-xs font-semibold">
+                Asignar Dispositivo
+              </button>
             </div>
           )}
 
@@ -1053,7 +1051,7 @@ const FailureDetailModal = ({
                     const hasAdminSig = !!failureDetail?.admin_signature;
                     const adminName = failureDetail?.adminSigner?.user_name || null;
                     const adminDate = failureDetail?.admin_signature_at;
-                    const canSign = user?.role_id === 1 || user?.role_id === 2;
+                    const canSign = canUserCreateAdminSignature(user);
                     return (
                       <div className="bg-white p-4 rounded-lg border border-gray-200">
                         <div className="flex items-center justify-between mb-3">
