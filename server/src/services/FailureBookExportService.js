@@ -44,6 +44,9 @@ function getParkStatusLabel(stats) {
 function getInspectableTypeLabel(typeCode) {
   return { device: 'Dispositivo', attraction: 'Atracción', other: 'Otro' }[typeCode] || typeCode || 'N/D';
 }
+function getChecklistCategoryLabel(typeCategory) {
+  return typeCategory === 'attraction' ? 'ATRACCION' : 'LOCATIVO';
+}
 function partsSummary(f) {
   const parts = f.workOrder?.parts;
   if (!parts?.length) return '';
@@ -550,7 +553,7 @@ function failureToRow(f) {
     f.severity,
     f.type_maintenance,
     f.assigned_to || '',
-    f.affectedInspectable?.name || 'Sin equipo',
+    f.affectedInspectable?.name || getChecklistCategoryLabel(f.checklistItem?.checklistType?.type_category),
     getInspectableTypeLabel(f.affectedInspectable?.type_code),
     f.affectedInspectable?.premise?.premise_name || '',
     f.checklistItem?.checklistType?.name || 'Independiente / Directo',
