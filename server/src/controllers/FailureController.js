@@ -1761,7 +1761,15 @@ class FailureController {
             model: ChecklistItem,
             as: 'checklistItem',
             attributes: ['checklist_item_id', 'question_text', 'item_number', 'guidance_text'],
-            required: false
+            required: false,
+            include: [
+              {
+                model: ChecklistItem,
+                as: 'parent',
+                attributes: ['checklist_item_id', 'question_text', 'item_number', 'guidance_text'],
+                required: false
+              }
+            ]
           },
           // Dispositivo afectado
           {

@@ -526,6 +526,22 @@ const FailureDetailModal = ({
                     </div>
                   </div>
 
+                  {/* Información del item padre del checklist */}
+                  {failureDetail?.checklistItem?.parent && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 block mb-1">Ítem Padre del Checklist</label>
+                      <div className="bg-white p-3 rounded border border-blue-200">
+                        <p className="text-gray-900 text-sm font-medium">{failureDetail.checklistItem.parent.question_text}</p>
+                        {failureDetail.checklistItem.parent.item_number && (
+                          <p className="text-gray-600 text-xs mt-1">Ítem #{failureDetail.checklistItem.parent.item_number}</p>
+                        )}
+                        {failureDetail.checklistItem.parent.guidance_text && (
+                          <p className="text-gray-500 text-xs mt-1">Guía: {failureDetail.checklistItem.parent.guidance_text}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Información de checklist */}
                   {failureDetail?.checklistItem && (
                     <div>
