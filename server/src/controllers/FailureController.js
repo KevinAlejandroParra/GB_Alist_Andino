@@ -1768,6 +1768,12 @@ class FailureController {
                 as: 'parent',
                 attributes: ['checklist_item_id', 'question_text', 'item_number', 'guidance_text'],
                 required: false
+              },
+              {
+                model: ChecklistType,
+                as: 'checklistType',
+                attributes: ['name', 'type_category'],
+                required: false
               }
             ]
           },

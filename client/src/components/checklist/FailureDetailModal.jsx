@@ -292,8 +292,12 @@ const FailureDetailModal = ({
     const hasAffectedItem = !!failureDetail?.affected_id;
 
     if (hasChecklistItem) {
+      const checklistTypeName = failureDetail?.checklistItem?.checklistType?.name;
+      const deviceName = failureDetail?.affectedInspectable?.name;
+      const typeLabel = checklistTypeName ? `Checklist ${checklistTypeName}` : 'Checklist';
+      const typeWithDevice = deviceName ? `${typeLabel} · ${deviceName}` : typeLabel;
       return {
-        type: 'Checklist',
+        type: typeWithDevice,
         description: 'Falla reportada desde checklist',
         color: 'bg-purple-100 text-purple-800'
       };
