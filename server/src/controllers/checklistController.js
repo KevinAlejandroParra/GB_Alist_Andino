@@ -1521,7 +1521,7 @@ const generateChecklistHTML = async (data) => {
                                 <small style="color: var(--slate-600);">${data.type.description}</small>
                             </td>
                         </tr>
-                        ${data.type.type_category === 'family' ? `
+                        ${(data.type.type_category === 'family' || data.type.type_category === 'specific') && data.week_identifier ? `
                         <tr>
                             <th>Período</th>
                             <td colspan="3">
@@ -1576,7 +1576,7 @@ const generateChecklistHTML = async (data) => {
                             </tr>
                         </thead>
                         <tbody>
-                            ${data.type.type_category === 'family' ? renderFamilyResponses(data.items) : renderResponses(data.items)}
+                        ${data.type.type_category === 'family' || data.type.type_category === 'specific' ? renderFamilyResponses(data.items) : renderResponses(data.items)}
                         </tbody>
                     </table>
                 </div>

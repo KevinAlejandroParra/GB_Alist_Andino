@@ -1991,6 +1991,65 @@ const getChecklistHistoryByType = async (checklistTypeId, { month, year, page, l
     }
   }
 
+  // Para checklists de tipo 'specific' (ej: Premios), agrupar por week_identifier
+  // y exponer UNA SOLA entrada por semana en el historial. El checklist_id representativo
+  // es el menor de las filas hermanas para que el PDF lo agrupe correctamente.
+  if (checklistType && checklistType.type_category === 'specific') {
+    const allRows = await Checklist.findAll({
+      where: whereClause,
+      include: [
+        { model: User, as: "creator", attributes: ["user_name"] },
+        {
+          model: ChecklistSignature,
+          as: "signatures",
+          attributes: ["role_id", "signed_at"],
+          include: [
+            { model: User, as: "user", attributes: ["user_name"] },
+            { model: Role, as: "role", attributes: ["role_name"] },
+          ],
+        },
+        { model: ChecklistType, as: "type", attributes: ["name", "description", "type_category"] },
+      ],
+      order: [["week_identifier", "DESC"], ["checklist_id", "ASC"]],
+    });
+
+    // Agrupar por week_identifier
+    const weekGroups = new Map();
+    for (const row of allRows) {
+      const key = row.week_identifier || `daily-${row.createdAt?.toISOString()?.substring(0,10)}`;
+      if (!weekGroups.has(key)) {
+        // Primera fila del grupo = la representativa (checklist_id más bajo)
+        weekGroups.set(key, {
+          ...row.toJSON(),
+          sibling_count: 1,
+        });
+      } else {
+        weekGroups.get(key).sibling_count += 1;
+        // Agregar firmas únicas de las filas hermanas
+        const existing = weekGroups.get(key);
+        for (const sig of (row.signatures || [])) {
+          const alreadyExists = (existing.signatures || []).some(s => s.user_id === sig.user_id);
+          if (!alreadyExists) existing.signatures.push(sig.toJSON ? sig.toJSON() : sig);
+        }
+      }
+    }
+
+    const grouped = Array.from(weekGroups.values());
+
+    if (page || limit) {
+      const pageNum = Number.parseInt(page) || 1;
+      const limitNum = Number.parseInt(limit) || 10;
+      const total = grouped.length;
+      const totalPages = Math.ceil(total / limitNum);
+      const offset = (pageNum - 1) * limitNum;
+      const dateMinMax = allRows.length > 0
+        ? { minDate: allRows[allRows.length - 1].createdAt, maxDate: allRows[0].createdAt }
+        : { minDate: null, maxDate: null };
+      return { data: grouped.slice(offset, offset + limitNum), total, page: pageNum, totalPages, dateRange: dateMinMax };
+    }
+    return grouped;
+  }
+
   if (!checklistType || checklistType.name !== 'Apoyo - Técnico (Premios)') {
     // Para otros checklists, devolver el formato genérico con paginación
     const includeConfig = [
@@ -2163,14 +2222,37 @@ const getChecklistDataForPDF = async (checklistId) => {
       return null;
     }
 
-    const isFamilyChecklist = checklist.type?.type_category === 'family';
+    const typeCategory = checklist.type?.type_category;
     let items;
 
-    if (isFamilyChecklist) {
+    if (typeCategory === 'family') {
       // Para checklists de familia: usar la función dinámica que mapea dispositivos + hijos + respuestas
       items = await processFamilyChecklistItems(checklist.checklist_type_id, checklistId);
+    } else if (typeCategory === 'specific') {
+      // Para checklists de tipo 'specific' (Premios): recoger TODAS las filas hermanas
+      // (mismo checklist_type_id + week_identifier) para armar los 7 bloques completos.
+      const siblingWhere = { checklist_type_id: checklist.checklist_type_id };
+      if (checklist.week_identifier) {
+        siblingWhere.week_identifier = checklist.week_identifier;
+      } else {
+        // Fallback diario si no hay week_identifier
+        const dayStart = new Date(checklist.createdAt);
+        dayStart.setUTCHours(0, 0, 0, 0);
+        const dayEnd = new Date(checklist.createdAt);
+        dayEnd.setUTCHours(23, 59, 59, 999);
+        siblingWhere.createdAt = { [Op.between]: [dayStart, dayEnd] };
+      }
+      const siblingChecklists = await Checklist.findAll({ where: siblingWhere });
+      const siblingIds = siblingChecklists.map(c => c.checklist_id);
+
+      const allResponses = await ChecklistResponse.findAll({
+        where: { checklist_id: { [Op.in]: siblingIds } },
+        include: [{ model: User, as: "respondedBy", attributes: ["user_id", "user_name"] }],
+      });
+
+      items = await processSpecificChecklistItems(checklist.checklist_type_id, siblingChecklists, allResponses);
     } else {
-      // Para checklists normales (atracción, etc.)
+      // Para checklists normales (atracción, estático, etc.)
       const rawItems = await ChecklistItem.findAll({
         where: {
           checklist_type_id: checklist.checklist_type_id
