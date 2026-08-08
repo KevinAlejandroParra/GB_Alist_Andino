@@ -2,10 +2,6 @@ const express = require("express")
 const router = express.Router()
 const { verifyToken } = require("../middleware/authMiddleware")
 const { uploadFailureEvidence, toRelativePath } = require("../config/multerConfig")
-
-
-
-// Usar las rutas de checklist de familia
 const {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -28,11 +24,14 @@ const {
   getParentItemsByChecklistType,
   getPendingRequisitionsByChecklist,
   getOperationChecklistsWithFailures,
-  deleteChecklist
+  deleteChecklist,
+  savePremiosConfig,
+  getPremiosConfig,
+  getPremiosAnalytics,
+  approvePremiosWeek,
+  getPremiosWeekReview,
+  exportPremiosAnalytics
 } = require("../controllers/checklistController")
-
-// Importar funciones de diagnóstico (temporal para debugging)
-const { diagnoseChecklists, fixProblematicChecklists } = require("../utils/diagnose-checklists")
 
 // Rutas genéricas para checklists
 router.post("/:inspectableId/ensure", verifyToken, ensureChecklistInstance)
@@ -62,26 +61,13 @@ router.get("/:id/operation-failures", verifyToken, getOperationChecklistsWithFai
 router.delete("/:id", verifyToken, deleteChecklist)
 
 
-// Rutas de diagnóstico (temporal para debugging)
-router.get("/diagnose", async (req, res) => {
-  try {
-    await diagnoseChecklists()
-    res.json({ message: "Diagnóstico completado. Revisa la consola del servidor." })
-  } catch (error) {
-    console.error("Error en diagnóstico:", error)
-    res.status(500).json({ error: "Error en diagnóstico", details: error.message })
-  }
-})
-
-router.post("/fix-checklists", async (req, res) => {
-  try {
-    await fixProblematicChecklists()
-    res.json({ message: "Corrección de checklists completada. Revisa la consola del servidor." })
-  } catch (error) {
-    console.error("Error corrigiendo checklists:", error)
-    res.status(500).json({ error: "Error corrigiendo checklists", details: error.message })
-  }
-})
+// Rutas de análisis de premios
+router.get("/type/:checklistTypeId/analytics/premios", verifyToken, getPremiosAnalytics)
+router.get("/type/:checklistTypeId/analytics/premios/revision", verifyToken, getPremiosWeekReview)
+router.get("/type/:checklistTypeId/analytics/premios/export", verifyToken, exportPremiosAnalytics)
+router.post("/type/:checklistTypeId/analytics/premios/aprobar", verifyToken, approvePremiosWeek)
+router.get("/type/:checklistTypeId/premios-config", verifyToken, getPremiosConfig)
+router.post("/type/:checklistTypeId/premios-config", verifyToken, savePremiosConfig)
 
 router.post("/upload-evidence", verifyToken, uploadFailureEvidence.single("evidence"), (req, res) => {
   try {

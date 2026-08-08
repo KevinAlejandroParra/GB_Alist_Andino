@@ -22,6 +22,7 @@ const {
 } = require("../models");
 const { Sequelize } = require("../models");
 const workOrderService = require("./workOrderService");
+const premiosAnalyticsService = require("./premiosAnalyticsService");
 const weekUtils = require("../utils/weekUtils");
 const Op = Sequelize.Op
 
@@ -817,101 +818,6 @@ const getChecklistHistory = async (inspectableId) => {
   return checklists
 }
 
-const handlePremiosCalculations = async (checklist, transaction) => {
-  // Find the responses for this checklist
-  const checklistResponses = await ChecklistResponse.findAll({
-    where: { checklist_id: checklist.checklist_id },
-    include: [{ model: ChecklistItem, as: 'checklistItem' }],
-    transaction,
-  });
-
-  // Find items by question_text
-  const jugadasItem = checklistResponses.find(r => r.checklistItem.question_text === 'JUGADAS');
-  const premiosItem = checklistResponses.find(r => r.checklistItem.question_text === 'PREMIOS');
-  const configItem = checklistResponses.find(r => r.checklistItem.question_text === 'CONFIGURACION DE LA MAQUINA');
-
-  if (!jugadasItem || !premiosItem) return;
-
-  const jugadasActuales = jugadasItem.response_numeric || 0;
-  const premiosActuales = premiosItem.response_numeric || 0;
-  const configuracionActual = configItem?.response_text || '';
-
-  // Find the last checklist for this inspectable
-  const lastChecklist = await Checklist.findOne({
-    where: {
-      inspectable_id: checklist.inspectable_id,
-      checklist_type_id: checklist.checklist_type_id,
-      createdAt: { [Op.lt]: checklist.createdAt },
-    },
-    include: [
-      {
-        model: ChecklistResponse,
-        as: 'responses',
-        include: [{ model: ChecklistItem, as: 'checklistItem' }],
-      },
-    ],
-    order: [['createdAt', 'DESC']],
-    transaction,
-  });
-
-  let jugadasAnteriores = 0;
-  let premiosAnteriores = 0;
-  let configAnterior = '';
-
-  if (lastChecklist) {
-    const lastJugadas = lastChecklist.responses.find(r => r.checklistItem.question_text === 'JUGADAS');
-    const lastPremios = lastChecklist.responses.find(r => r.checklistItem.question_text === 'PREMIOS');
-    const lastConfig = lastChecklist.responses.find(r => r.checklistItem.question_text === 'CONFIGURACION DE LA MAQUINA');
-
-    jugadasAnteriores = lastJugadas?.jugadas_acumuladas || 0;
-    premiosAnteriores = lastPremios?.premios_acumulados || 0;
-    configAnterior = lastConfig?.configuracion_maquina || '';
-  }
-
-  const jugadasDesdeUltima = Math.max(0, jugadasActuales - jugadasAnteriores);
-  const premiosDesdeUltima = Math.max(0, premiosActuales - premiosAnteriores);
-
-  // La eficiencia se calcula como (premios reales / premios esperados) * 100.
-  // Se espera 1 premio por cada 15 jugadas.
-  const premiosEsperadosCalculados = jugadasDesdeUltima / 15;
-  const promedio = premiosEsperadosCalculados > 0 ? (premiosDesdeUltima / premiosEsperadosCalculados) * 100 : 0;
-
-  // Mantener el campo `premios_esperados` para compatibilidad, usando el nuevo cálculo.
-  const premiosEsperados = premiosEsperadosCalculados;
-
-  // Update responses
-  if (jugadasItem) {
-    await ChecklistResponse.update({
-      jugadas_acumuladas: jugadasActuales,
-      jugadas_desde_ultima: jugadasDesdeUltima,
-    }, {
-      where: { response_id: jugadasItem.response_id },
-      transaction,
-    });
-  }
-
-  if (premiosItem) {
-    await ChecklistResponse.update({
-      premios_acumulados: premiosActuales,
-      premios_desde_ultima: premiosDesdeUltima,
-      promedio_premios: promedio,
-      premios_esperados: premiosEsperados,
-    }, {
-      where: { response_id: premiosItem.response_id },
-      transaction,
-    });
-  }
-
-  if (configItem) {
-    await ChecklistResponse.update({
-      configuracion_maquina: configuracionActual,
-    }, {
-      where: { response_id: configItem.response_id },
-      transaction,
-    });
-  }
-};
-
 const submitResponses = async ({ checklist_id, responses, responded_by, role_id }) => {
   const transaction = await connection.transaction()
   try {
@@ -1137,9 +1043,9 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
         response_id: response_id || undefined,
         checklist_id: response.checklist_id || checklist_id,
         checklist_item_id,
-        // Para family: respetar el inspectable_id del dispositivo (requerido)
-        // Para todos los demás tipos: siempre null, aunque el frontend envíe undefined o un valor
-        inspectable_id: checklist.type.type_category === 'family'
+        // Guardar el inspectable_id para tipos dinámicos (family, specific, attraction):
+        // es requerido para recomponer las respuestas con la clave inspectable_id + checklist_item_id
+        inspectable_id: (['family', 'specific', 'attraction'].includes(checklist.type.type_category))
           ? (inspectable_id ?? null)
           : null,
         responded_by,
@@ -1236,25 +1142,17 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
       console.log(`Respuesta guardada para item ${checklist_item_id} con compliance: ${responseData.response_compliance}`);
     }
 
-    // Special logic for "Apoyo - Técnico (Premios)" checklist
+    // Análisis de Premios: se calcula por bloque/sección usando la configuración maestra
     if (checklist.type.name === 'Apoyo - Técnico (Premios)' || checklist.type.name.includes('Premios')) {
       try {
-        if (checklist.type.type_category === 'specific') {
-          // For specific checklists, calculate for all checklists created
-          const createdChecklists = await Checklist.findAll({
-            where: {
-              checklist_type_id: checklist.checklist_type_id,
-              createdAt: {
-                [Op.between]: [startOfDay, endOfDay],
-              }
-            },
-            transaction
+        const { identifier: weekIdentifier } = weekUtils.getDateBoundsForChecklistType(checklist.type);
+        if (weekIdentifier) {
+          await premiosAnalyticsService.updatePremiosAnalysis({
+            checklistTypeId: checklist.checklist_type_id,
+            weekIdentifier,
+            createdBy: responded_by,
+            transaction,
           });
-          for (const createdChecklist of createdChecklists) {
-            await handlePremiosCalculations(createdChecklist, transaction);
-          }
-        } else {
-          await handlePremiosCalculations(checklist, transaction);
         }
         console.log('Cálculos de premios realizados correctamente');
       } catch (error) {
@@ -1557,7 +1455,13 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id, cre
 
       const items = parentItems.map((parent, index) => {
         let inspectable = null;
-        if (parent.question_text.toUpperCase().startsWith('TOY BOX - SECCION')) {
+        const textUp = parent.question_text.toUpperCase();
+        // Atrapar TODAS las variantes de secciones del TOY BOX 4P MINI:
+        // "TOY BOX - SECCION N" (nuevo) y "TOY BOX N" (legado sin guion)
+        const isToyBoxSection =
+          textUp.startsWith('TOY BOX - SECCION') ||
+          /^TOY BOX \d/.test(textUp);
+        if (isToyBoxSection) {
           inspectable = specificInspectables.find(i => i.name === 'TOY BOX 4P MINI');
         } else {
           inspectable = specificInspectables.find(i => i.name.toLowerCase() === parent.question_text.toLowerCase());
@@ -1611,7 +1515,13 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id, cre
 
     const items = parentItems.map((parent, index) => {
       let inspectable = null;
-      if (parent.question_text.toUpperCase().startsWith('TOY BOX - SECCION')) {
+      const textUp = parent.question_text.toUpperCase();
+      // Atrapar TODAS las variantes de secciones del TOY BOX 4P MINI:
+      // "TOY BOX - SECCION N" (nuevo) y "TOY BOX N" (legado sin guion)
+      const isToyBoxSection =
+        textUp.startsWith('TOY BOX - SECCION') ||
+        /^TOY BOX \d/.test(textUp);
+      if (isToyBoxSection) {
         inspectable = specificInspectables.find(i => i.name === 'TOY BOX 4P MINI');
       } else {
         inspectable = specificInspectables.find(i => i.name.toLowerCase() === parent.question_text.toLowerCase());
@@ -2258,6 +2168,8 @@ const getChecklistDataForPDF = async (checklistId) => {
       });
 
       items = await processSpecificChecklistItems(checklist.checklist_type_id, siblingChecklists, allResponses);
+      // Ordenar bloques por item_number (1..7) para que el PDF respete el orden del form
+      items = naturalSortItemNumbers(items);
     } else {
       // Para checklists normales (atracción, estático, etc.)
       const rawItems = await ChecklistItem.findAll({

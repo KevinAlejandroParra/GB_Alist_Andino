@@ -42,6 +42,8 @@ const WorkOrderPartModel = require("./workOrderPart.js");
 const ChecklistQrCodeModel = require("./checklistQrCode.js");
 const ChecklistQrScanModel = require("./checklistQrScan.js");
 const ChecklistQrItemAssociationModel = require("./checklistQrItemAssociation.js");
+const PremiosConfigModel = require("./premiosConfig.js");
+const PremiosAnalisisModel = require("./premiosAnalisis.js");
 
 // Inicializar modelos
 const User = UserModel(connection, DataTypes);
@@ -68,13 +70,16 @@ const WorkOrderPart = WorkOrderPartModel(connection, DataTypes);
 const ChecklistQrCode = ChecklistQrCodeModel(connection, DataTypes);
 const ChecklistQrScan = ChecklistQrScanModel(connection, DataTypes);
 const ChecklistQrItemAssociation = ChecklistQrItemAssociationModel(connection, DataTypes);
+const PremiosConfig = PremiosConfigModel(connection, DataTypes);
+const PremiosAnalisis = PremiosAnalisisModel(connection, DataTypes);
 
 const models = {
       User, Role, Premise, ChecklistType, Checklist, ChecklistItem, ChecklistResponse,
       ChecklistSignature, MaintenanceAction, Requisition, 
       Inventory, Inspectable, Device, Attraction, Family, Entity, Audit,
       FailureOrder, RepairExecution, WorkOrder, WorkOrderPart, 
-      ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation
+      ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation,
+      PremiosConfig, PremiosAnalisis
   };
 
 
@@ -90,5 +95,6 @@ module.exports = {
       Inventory, Inspectable, Device, Attraction, Family, Entity, Audit,
       FailureOrder, RepairExecution, WorkOrder, WorkOrderPart, 
       ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation,
+      PremiosConfig, PremiosAnalisis,
       connection, Sequelize,
   };

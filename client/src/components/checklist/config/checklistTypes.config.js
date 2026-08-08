@@ -131,9 +131,13 @@ export const CHECKLIST_TYPES = {
       create: '/api/checklists/type/{checklistTypeId}/create',
       history: '/api/checklists/type/{checklistTypeId}/history',
       responses: '/api/checklists/{checklistId}/responses',
-      download: '/api/checklists/{checklistId}/download-pdf'
+      download: '/api/checklists/{checklistId}/download-pdf',
+      analytics: '/api/checklists/type/{checklistTypeId}/analytics/premios',
+      analyticsApprove: '/api/checklists/type/{checklistTypeId}/analytics/premios/aprobar',
+      analyticsExport: '/api/checklists/type/{checklistTypeId}/analytics/premios/export',
+      premiosConfig: '/api/checklists/type/{checklistTypeId}/premios-config',
     },
-    
+
     // Configuración de UI
     ui: {
       icon: (
@@ -144,7 +148,7 @@ export const CHECKLIST_TYPES = {
       primaryColor: 'green',
       breadcrumbLabel: 'Checklists de Premios'
     },
-    
+
     // Configuración de datos
     data: {
       requiresEntitySelection: false,
@@ -152,14 +156,7 @@ export const CHECKLIST_TYPES = {
       createInstance: true,
       hasQrValidation: false,
       hideHistory: true,
-      allowDownload: true,
-      customActions: [
-        {
-          key: 'premios-data',
-          label: 'Registrar Datos de Premios',
-          variant: 'secondary'
-        }
-      ]
+      allowDownload: true
     }
   }
 };

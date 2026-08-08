@@ -3,6 +3,8 @@ import ProtectedRoute from '../ProtectedRoute';
 import { useAuth } from '../AuthContext';
 import InspectablesList from './InspectablesList';
 import { useRouter } from 'next/navigation';
+import axiosInstance from '../../utils/axiosConfig';
+import Swal from 'sweetalert2';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -67,6 +69,47 @@ export default function Dashboard() {
     });
   }
 
+  const handlePremiosAnalytics = async () => {
+    try {
+      const token = localStorage.getItem('authToken')
+      const res = await axiosInstance.get(
+        [1, 2].includes(user?.role_id)
+          ? '/api/checklist-types'
+          : `/api/checklist-types?role_id=${user?.role_id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      const types = res.data || []
+      const premiosType = types.find(
+        (t) => String(t.name || '').toLowerCase().includes('premios')
+      )
+      if (!premiosType) {
+        Swal.fire({
+          title: 'No encontrado',
+          text: 'No se encontró el tipo de checklist de premios.',
+          icon: 'warning',
+          confirmButtonText: 'Entendido',
+        })
+        return
+      }
+      router.push(`/checklists/premios/${premiosType.checklist_type_id}/analytics`)
+    } catch (err) {
+      Swal.fire({
+        title: 'Error',
+        text: 'No se pudo acceder al análisis de premios.',
+        icon: 'error',
+        confirmButtonText: 'Entendido',
+      })
+    }
+  }
+
+  quickActions.push({
+    title: "Análisis de Premios",
+    description: "Jugadas, premios entregados y configuración por máquina",
+    icon: "fas fa-gift",
+    onClick: handlePremiosAnalytics,
+    color: "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700"
+  });
+
   const dashboardTitle = getDashboardTitle(user?.role_id);
   const dashboardDescription = getDashboardDescription(user?.role_id);
 
@@ -96,7 +139,7 @@ export default function Dashboard() {
                 {quickActions.map((action, index) => (
                   <div
                     key={index}
-                    onClick={() => router.push(action.href)}
+                    onClick={() => (action.onClick ? action.onClick() : router.push(action.href))}
                     className={`${action.color} text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer p-6 transform hover:scale-105`}
                   >
                     <div className="flex items-center mb-3">

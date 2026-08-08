@@ -1,5 +1,7 @@
-const { ChecklistType, ChecklistItem, Checklist, ChecklistResponse, ChecklistSignature, User, ChecklistQrCode, ChecklistQrItemAssociation } = require("../models")
+const { ChecklistType, ChecklistItem, Checklist, ChecklistResponse, ChecklistSignature, User, ChecklistQrCode, ChecklistQrItemAssociation, PremiosConfig, PremiosAnalisis } = require("../models")
 const checklistService = require("../services/checklistService")
+const premiosAnalyticsService = require("../services/premiosAnalyticsService")
+const premiosExportService = require("../services/premiosExportService")
 const weekUtils = require("../utils/weekUtils")
 const puppeteer = require("puppeteer")
 
@@ -1971,6 +1973,154 @@ const deleteChecklist = async (req, res) => {
   }
 };
 
+const savePremiosConfig = async (req, res) => {
+  try {
+    const { checklistTypeId } = req.params;
+    const { section_key, inspectable_id, ratio_premios, precio_juego, tipo_premio, activo } = req.body;
+    const user_id = req.user.user_id;
+
+    if (!section_key) {
+      return res.status(400).json({ error: 'section_key es requerido' });
+    }
+    if (!ratio_premios || Number(ratio_premios) <= 0) {
+      return res.status(400).json({ error: 'ratio_premios debe ser un número mayor a 0' });
+    }
+
+    const existing = await PremiosConfig.findOne({
+      where: { checklist_type_id: checklistTypeId, section_key },
+    });
+
+    const config = existing
+      ? await existing.update({
+          inspectable_id: inspectable_id ?? existing.inspectable_id,
+          ratio_premios: Number(ratio_premios),
+          precio_juego: precio_juego ?? existing.precio_juego,
+          tipo_premio: tipo_premio ?? existing.tipo_premio,
+          activo: activo ?? existing.activo,
+          updated_by: user_id,
+        })
+      : await PremiosConfig.create({
+          checklist_type_id: checklistTypeId,
+          section_key,
+          inspectable_id: inspectable_id ?? null,
+          ratio_premios: Number(ratio_premios),
+          precio_juego: precio_juego ?? null,
+          tipo_premio: tipo_premio ?? null,
+          activo: activo ?? true,
+          created_by: user_id,
+          updated_by: user_id,
+        });
+
+    res.status(201).json({ success: true, data: config });
+  } catch (error) {
+    console.error('Error guardando configuración de premios:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getPremiosConfig = async (req, res) => {
+  try {
+    const { checklistTypeId } = req.params;
+    const configs = await PremiosConfig.findAll({
+      where: { checklist_type_id: checklistTypeId },
+      order: [['section_key', 'ASC']],
+    });
+    res.status(200).json({ success: true, data: configs });
+  } catch (error) {
+    console.error('Error obteniendo configuración de premios:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getPremiosAnalytics = async (req, res) => {
+  try {
+    const { checklistTypeId } = req.params;
+    const { week_identifier } = req.query;
+    const result = await premiosAnalyticsService.getPremiosAnalytics(checklistTypeId, { week_identifier });
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error('Error obteniendo análisis de premios:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const approvePremiosWeek = async (req, res) => {
+  try {
+    const { checklistTypeId } = req.params;
+    const { week_identifier, firma } = req.body;
+    const user_id = req.user.user_id;
+
+    if (!week_identifier) {
+      return res.status(400).json({ error: 'week_identifier es requerido' });
+    }
+
+    const updated = await PremiosAnalisis.update(
+      {
+        revisado_por: user_id,
+        revisado_en: new Date(),
+        revisado_firma: firma || null,
+      },
+      { where: { checklist_type_id: checklistTypeId, week_identifier } }
+    );
+
+    res.status(200).json({ success: true, updated: updated[0] || 0 });
+  } catch (error) {
+    console.error('Error aprobando semana de premios:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getPremiosWeekReview = async (req, res) => {
+  try {
+    const { checklistTypeId } = req.params;
+    const { week_identifier } = req.query;
+
+    if (!week_identifier) {
+      return res.status(400).json({ error: 'week_identifier es requerido' });
+    }
+
+    const review = await premiosAnalyticsService.getPremiosWeekReview(checklistTypeId, week_identifier);
+    res.status(200).json({ success: true, data: review });
+  } catch (error) {
+    console.error('Error obteniendo revisión de semana de premios:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const exportPremiosAnalytics = async (req, res) => {
+  try {
+    const { checklistTypeId } = req.params;
+    const { week_identifier } = req.query;
+
+    const type = await ChecklistType.findByPk(checklistTypeId, {
+      attributes: ['checklist_type_id', 'name'],
+    });
+    if (!type) {
+      return res.status(404).json({ error: 'Tipo de checklist no encontrado' });
+    }
+
+    const analytics = await premiosAnalyticsService.getPremiosAnalytics(checklistTypeId, { week_identifier });
+
+    const workbook = await premiosExportService.buildPremiosWorkbook({
+      checklistTypeName: type.name,
+      rows: analytics.rows,
+      rollup: analytics.rollup,
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    const datePart = new Date().toISOString().slice(0, 10);
+    const filename = `Analisis_Premios_${datePart}${week_identifier ? `_${week_identifier}` : ''}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error('Error exportando análisis de premios:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -1995,5 +2145,11 @@ module.exports = {
   getParentItemsByChecklistType,
   getPendingRequisitionsByChecklist,
   getOperationChecklistsWithFailures,
-  deleteChecklist
+  deleteChecklist,
+  savePremiosConfig,
+  getPremiosConfig,
+  getPremiosAnalytics,
+  approvePremiosWeek,
+  getPremiosWeekReview,
+  exportPremiosAnalytics
 }
