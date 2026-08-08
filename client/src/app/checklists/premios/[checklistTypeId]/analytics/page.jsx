@@ -2,8 +2,8 @@
 
 import React from 'react'
 import { useParams } from 'next/navigation'
-import ProtectedRoute from '../../../../components/ProtectedRoute'
-import PremiosDashboard from '../../../../components/premios/PremiosDashboard'
+import ProtectedRoute from '../../../../../components/ProtectedRoute'
+import PremiosDashboard from '../../../../../components/premios/PremiosDashboard'
 
 export default function PremiosAnalyticsPage() {
   const params = useParams()
