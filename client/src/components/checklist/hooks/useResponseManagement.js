@@ -446,7 +446,7 @@ export function useResponseManagement(checklist) {
     console.error('Error al guardar:', error);
     Swal.fire({
       title: 'Error',
-      text: error.response?.data?.message || 'No se pudo guardar el checklist',
+      text: error.response?.data?.error || error.response?.data?.message || 'No se pudo guardar el checklist',
       icon: 'error'
     });
     if (onSuccess) onSuccess(false);

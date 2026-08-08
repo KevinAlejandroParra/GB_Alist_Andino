@@ -280,7 +280,7 @@ export default function BaseChecklistPage({
       responseManager.saveResponses(dynamicConfig, user, checklistTypeId, signatureManager.signature, validation, handleSaveSuccess);
     } catch (error) {
       console.error('Error al guardar:', error);
-      Swal.fire({ title: 'Error', text: error.response?.data?.message || 'No se pudo guardar el checklist', icon: 'error' });
+      Swal.fire({ title: 'Error', text: error.response?.data?.error || error.response?.data?.message || 'No se pudo guardar el checklist', icon: 'error' });
     }
   }, [
     config, checklistData.checklist?.checklist_id, user, checklistTypeId,
