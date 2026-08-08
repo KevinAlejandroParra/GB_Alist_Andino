@@ -1720,7 +1720,7 @@ class FailureController {
   async getFailureOrderById(req, res) {
     try {
       const {
-        FailureOrder, User, ChecklistItem, Inspectable,
+        FailureOrder, User, ChecklistItem, ChecklistType, Inspectable,
         WorkOrder, WorkOrderPart, Inventory, Role, RepairExecution, Requisition
       } = require('../models');
 

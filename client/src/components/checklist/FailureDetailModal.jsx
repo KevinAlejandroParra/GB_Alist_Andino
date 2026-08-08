@@ -294,7 +294,7 @@ const FailureDetailModal = ({
     if (hasChecklistItem) {
       const checklistTypeName = failureDetail?.checklistItem?.checklistType?.name;
       const deviceName = failureDetail?.affectedInspectable?.name;
-      const typeLabel = checklistTypeName ? `Checklist ${checklistTypeName}` : 'Checklist';
+      const typeLabel = checklistTypeName ? `${checklistTypeName}` : 'Checklist';
       const typeWithDevice = deviceName ? `${typeLabel} · ${deviceName}` : typeLabel;
       return {
         type: typeWithDevice,
