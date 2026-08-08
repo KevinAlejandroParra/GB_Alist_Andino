@@ -413,7 +413,7 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, created_by, 
 
     // Si el checklist existe, lo retornamos
     if (existingChecklist) {
-      const message = isWeekly 
+      const message = isWeekly
         ? `Checklist semanal existente encontrado (Semana ${identifier})`
         : 'Checklist diario existente encontrado';
       console.log(`[ensureChecklistInstance] ${message}:`, existingChecklist.checklist_id);
@@ -428,6 +428,89 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, created_by, 
     }
 
     // Si no existe, lo creamos
+    // Caso especial: type_category === 'specific' sin inspectableId explícito.
+    // Esto cubre el flujo de Premios (y similares): una sola "instancia semanal"
+    // debe materializarse como UNA FILA DE CHECKLIST POR CADA inspectable asociado
+    // (vía ChecklistTypeInspectables), todas compartiendo el mismo week_identifier.
+    // Cada fila se identifica por su inspectable_id y soporta respuestas por máquina.
+    if (checklistTypeInstance.type_category === 'specific'
+        && (inspectableId === null || inspectableId === undefined)) {
+      // Cargar los inspectables vinculados al tipo si no vinieron eager-loaded
+      let specificInspectables = checklistTypeInstance.specificInspectables;
+      if (!specificInspectables) {
+        specificInspectables = await Inspectable.findAll({
+          include: [{
+            model: ChecklistType,
+            as: 'specificChecklistTypes',
+            where: { checklist_type_id: checklistTypeInstance.checklist_type_id },
+            through: { attributes: [] },
+          }],
+          transaction,
+        });
+      }
+
+      if (!specificInspectables || specificInspectables.length === 0) {
+        throw new Error(
+          `No hay inspectables vinculados al ChecklistType ${checklistTypeInstance.checklist_type_id} ` +
+          `(type_category=specific). Verifica la tabla ChecklistTypeInspectables.`
+        );
+      }
+
+      const createdRows = [];
+      for (const ins of specificInspectables) {
+        // Para cada inspectable, resolvemos su premise_id si no lo tenemos
+        let rowPremiseId = effectivePremiseId;
+        if (!rowPremiseId) {
+          rowPremiseId = ins.premise_id;
+        }
+
+        const rowCreateData = {
+          checklist_type_id: checklistTypeInstance.checklist_type_id,
+          inspectable_id: ins.ins_id,
+          premise_id: rowPremiseId,
+          created_by,
+          version_label: checklistTypeInstance.version_label,
+        };
+
+        if (isWeekly && identifier) {
+          rowCreateData.week_identifier = identifier;
+        }
+
+        // findOrCreate por (checklist_type_id, week_identifier, inspectable_id)
+        // para idempotencia si una request previa creó la fila.
+        const [row] = await Checklist.findOrCreate({
+          where: {
+            checklist_type_id: rowCreateData.checklist_type_id,
+            inspectable_id: rowCreateData.inspectable_id,
+            ...(isWeekly && identifier ? { week_identifier: identifier } : {}),
+          },
+          defaults: rowCreateData,
+          transaction,
+        });
+        createdRows.push(row);
+      }
+
+      const message = isWeekly
+        ? `Nueva instancia de checklist semanal creada (Semana ${identifier}) - ${createdRows.length} filas`
+        : `Nueva instancia de checklist diario creada - ${createdRows.length} filas`;
+
+      console.log(`[ensureChecklistInstance] ${message}:`, createdRows.map(r => ({
+        checklist_id: r.checklist_id,
+        inspectable_id: r.inspectable_id,
+        week_identifier: r.week_identifier,
+      })));
+
+      await transaction.commit();
+      return {
+        checklist: createdRows,
+        isNew: true,
+        message,
+        isWeekly,
+        weekIdentifier: identifier
+      };
+    }
+
+    // Flujo normal (daily, weekly no-specific, o specific con inspectableId explícito)
     const createData = {
       checklist_type_id: checklistTypeInstance.checklist_type_id,
       inspectable_id: inspectableId,
@@ -435,7 +518,7 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, created_by, 
       created_by,
       version_label: checklistTypeInstance.version_label,
     };
-    
+
     // Agregar week_identifier solo para checklists semanales
     if (isWeekly && identifier) {
       createData.week_identifier = identifier;
@@ -956,20 +1039,31 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
         console.log(`Procesando checklist de tipo: ${checklist.type.type_category}`);
         if (inspectableIds.length > 0) {
           console.log('Creando/buscando checklists para inspectableIds:', inspectableIds);
+
+          // Determinar bounds: semanales (e.g. Premios) usan week_identifier; diarios usan createdAt.
+          const { identifier: weekIdentifier, isWeekly } =
+            weekUtils.getDateBoundsForChecklistType(checklist.type);
+
+          // Construir el where base según sea semanal o diario
+          const baseLookupWhere = isWeekly && weekIdentifier
+            ? { week_identifier: weekIdentifier }
+            : { createdAt: { [Op.between]: [startOfDay, endOfDay] } };
+
           for (const insId of inspectableIds) {
             const inspectable = await Inspectable.findByPk(insId, { transaction });
             const [checklistInstance, created] = await Checklist.findOrCreate({
               where: {
                 inspectable_id: insId,
                 checklist_type_id: checklist.checklist_type_id,
-                createdAt: {
-                  [Op.between]: [startOfDay, endOfDay],
-                }
+                ...baseLookupWhere,
               },
               defaults: {
                 created_by: responded_by,
                 version_label: checklist.type.version_label,
-                premise_id: inspectable ? inspectable.premise_id : null
+                premise_id: inspectable ? inspectable.premise_id : null,
+                // Si es semanal, persistir week_identifier también en defaults para que
+                // findOrCreate no cree duplicados por la cláusula where incompleta.
+                ...(isWeekly && weekIdentifier ? { week_identifier: weekIdentifier } : {}),
               },
               transaction
             });
@@ -981,9 +1075,7 @@ const submitResponses = async ({ checklist_id, responses, responded_by, role_id 
             where: {
               inspectable_id: { [Op.in]: inspectableIds },
               checklist_type_id: checklist.checklist_type_id,
-              createdAt: {
-                [Op.between]: [startOfDay, endOfDay],
-              }
+              ...baseLookupWhere,
             },
             transaction
           });
@@ -1423,14 +1515,25 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id, cre
     const specificInspectables = definitiveChecklistType.specificInspectables || [];
     const inspectableIds = specificInspectables.map(i => i.ins_id);
 
+    // Resolver bounds: semanales (e.g. Premios) usan week_identifier; diarios usan createdAt.
+    const { identifier: weekIdentifier, isWeekly } =
+      weekUtils.getDateBoundsForChecklistType(definitiveChecklistType);
+
+    const whereClause = {
+      inspectable_id: { [Op.in]: inspectableIds },
+      checklist_type_id: checklistTypeId,
+    };
+
+    if (isWeekly && weekIdentifier) {
+      whereClause.week_identifier = weekIdentifier;
+    } else {
+      whereClause.createdAt = {
+        [Op.between]: [startOfDay, endOfDay],
+      };
+    }
+
     const checklists = await Checklist.findAll({
-      where: {
-        inspectable_id: { [Op.in]: inspectableIds },
-        checklist_type_id: checklistTypeId,
-        createdAt: {
-          [Op.between]: [startOfDay, endOfDay],
-        },
-      },
+      where: whereClause,
       include: [{ model: ChecklistType, as: "type" }]
     });
 

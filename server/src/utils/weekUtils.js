@@ -125,8 +125,11 @@ const getDateBoundsForChecklistType = (checklistType, referenceDate = new Date()
   const frequency = (checklistType.frequency || '').toLowerCase().trim();
   const isWeeklyFrequency = frequency === 'weekly' || frequency === 'semanal';
 
-  const isWeeklyCategory =
-    checklistType.type_category === 'family' || checklistType.type_category === 'static';
+  // 'specific' is also eligible for weekly cadence (e.g. Premios weekly counter check)
+  // when frequency is weekly/semanal. The pivot table ChecklistTypeInspectables binds
+  // a 'specific' type to a set of inspectables, and each inspectable gets its own
+  // weekly Checklist row linked by the same week_identifier.
+  const isWeeklyCategory = ['family', 'static', 'specific'].includes(checklistType.type_category);
 
   if (isWeeklyCategory && isWeeklyFrequency) {
     const { startOfWeek, endOfWeek } = getWeekBounds(referenceDate);

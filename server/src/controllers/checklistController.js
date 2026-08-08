@@ -55,39 +55,7 @@ const createChecklist = async (req, res) => {
       return res.status(404).json({ error: 'Tipo de checklist no encontrado' });
     }
 
-    const { startDate, endDate, identifier, isWeekly } =
-      weekUtils.getDateBoundsForChecklistType(checklistType);
-
-    const existingWhere = {
-      checklist_type_id: Number.parseInt(checklistTypeId),
-      ...(inspectableId && { inspectable_id: Number.parseInt(inspectableId) }),
-    };
-
-    if (isWeekly && identifier) {
-      existingWhere.week_identifier = identifier;
-    } else {
-      existingWhere.createdAt = {
-        [require('sequelize').Op.between]: [startDate, endDate],
-      };
-    }
-
-    const existingChecklist = await Checklist.findOne({
-      where: existingWhere,
-      include: [
-        { model: require('../models').ChecklistType, as: 'type' },
-        { model: require('../models').ChecklistSignature, as: 'signatures' },
-        { model: require('../models').ChecklistResponse, as: 'responses' }
-      ],
-      order: [['createdAt', 'DESC']]
-    });
-
-    if (existingChecklist) {
-      console.log(`📋 Checklist existente encontrado (ID: ${existingChecklist.checklist_id}), retornando`);
-      return res.status(200).json(existingChecklist);
-    }
-
-    // Si no existe, crear uno nuevo usando ensureChecklistInstance
-    console.log(`🆕 Creando nueva instancia de checklist para tipo ${checklistTypeId}`);
+    // 1. Asegurar que las instancias base existan (esto no duplica si ya existen)
     const checklistResult = await checklistService.ensureChecklistInstance({
       inspectableId: inspectableId ? Number.parseInt(inspectableId) : null,
       created_by: user_id,
@@ -96,16 +64,19 @@ const createChecklist = async (req, res) => {
     });
 
     if (!checklistResult || !checklistResult.checklist) {
-      return res.status(400).json({ error: "No se pudo crear el checklist" });
+      return res.status(400).json({ error: "No se pudo crear o recuperar el checklist" });
     }
 
-    console.log(`✅ Nueva instancia creada: ${checklistResult.message}`);
+    // 2. Usar el servicio que sabe agregar y formatear todos los tipos correctamente
+    const processedChecklist = await checklistService.getLatestChecklistByType({
+      checklistTypeId: Number.parseInt(checklistTypeId),
+      user_id,
+      role_id,
+      createIfMissing: false
+    });
 
-    // Para checklists de tipo (sin inspectable específico), necesitamos el formato especial
-    // Usar la lógica original de getChecklistByType para procesar correctamente
-    const processedChecklist = await getChecklistByTypeHelper(checklistTypeId, checklistResult.checklist);
-
-    res.status(201).json({
+    const statusCode = checklistResult.isNew ? 201 : 200;
+    res.status(statusCode).json({
       ...processedChecklist,
       notification: checklistResult.message
     });
