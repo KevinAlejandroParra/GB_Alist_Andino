@@ -107,19 +107,25 @@ const processSpecificChecklistItems = async (checklistTypeId, checklists = [], a
     responseMap.set(key, responseData);
   });
 
-  const items = specificInspectables.map((inspectable, index) => {
-    const correspondingParent = parentItems.find(p => p.question_text.toLowerCase() === inspectable.name.toLowerCase());
-    if (!correspondingParent) {
-      console.warn(`No matching parent item found for inspectable: ${inspectable.name}`);
+  const items = parentItems.map((parent, index) => {
+    let inspectable = null;
+    if (parent.question_text.toUpperCase().startsWith('TOY BOX - SECCION')) {
+      inspectable = specificInspectables.find(i => i.name === 'TOY BOX 4P MINI');
+    } else {
+      inspectable = specificInspectables.find(i => i.name.toLowerCase() === parent.question_text.toLowerCase());
+    }
+
+    if (!inspectable) {
+      console.warn(`No matching inspectable found for parent item: ${parent.question_text}`);
       return null;
     }
 
-    const subItemsForParent = childItems.filter(child => child.parent_item_id === correspondingParent.checklist_item_id);
+    const subItemsForParent = childItems.filter(child => child.parent_item_id === parent.checklist_item_id);
 
     return {
-      checklist_item_id: `inspectable-${inspectable.ins_id}`,
-      item_number: `${index + 1}`,
-      question_text: inspectable.name,
+      checklist_item_id: `parent-${parent.checklist_item_id}`,
+      item_number: parent.item_number || `${index + 1}`,
+      question_text: parent.question_text,
       input_type: "section",
       subItems: subItemsForParent.map(subItem => {
         const key = `${inspectable.ins_id}-${subItem.checklist_item_id}`;
@@ -1542,16 +1548,21 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id, cre
       const parentItems = templateItems.filter(item => item.parent_item_id === null);
       const childItems = templateItems.filter(item => item.parent_item_id !== null);
 
-      const items = specificInspectables.map((inspectable, inspectableIndex) => {
-        const correspondingParent = parentItems.find(p => p.question_text.toLowerCase() === inspectable.name.toLowerCase());
-        if (!correspondingParent) return null;
+      const items = parentItems.map((parent, index) => {
+        let inspectable = null;
+        if (parent.question_text.toUpperCase().startsWith('TOY BOX - SECCION')) {
+          inspectable = specificInspectables.find(i => i.name === 'TOY BOX 4P MINI');
+        } else {
+          inspectable = specificInspectables.find(i => i.name.toLowerCase() === parent.question_text.toLowerCase());
+        }
+        if (!inspectable) return null;
 
-        const subItemsForParent = childItems.filter(child => child.parent_item_id === correspondingParent.checklist_item_id);
+        const subItemsForParent = childItems.filter(child => child.parent_item_id === parent.checklist_item_id);
 
         return {
-          checklist_item_id: `inspectable-${inspectable.ins_id}`,
-          item_number: `${inspectableIndex + 1}`,
-          question_text: inspectable.name,
+          checklist_item_id: `parent-${parent.checklist_item_id}`,
+          item_number: parent.item_number || `${index + 1}`,
+          question_text: parent.question_text,
           input_type: "section",
           subItems: subItemsForParent.map(subItem => ({
             ...subItem.toJSON(),
@@ -1591,19 +1602,25 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id, cre
     const parentItems = templateItems.filter(item => item.parent_item_id === null);
     const childItems = templateItems.filter(item => item.parent_item_id !== null);
 
-    const items = specificInspectables.map((inspectable, inspectableIndex) => {
-      const correspondingParent = parentItems.find(p => p.question_text.toLowerCase() === inspectable.name.toLowerCase());
-      if (!correspondingParent) {
-        console.warn(`No matching parent item found for inspectable: ${inspectable.name}`);
+    const items = parentItems.map((parent, index) => {
+      let inspectable = null;
+      if (parent.question_text.toUpperCase().startsWith('TOY BOX - SECCION')) {
+        inspectable = specificInspectables.find(i => i.name === 'TOY BOX 4P MINI');
+      } else {
+        inspectable = specificInspectables.find(i => i.name.toLowerCase() === parent.question_text.toLowerCase());
+      }
+      
+      if (!inspectable) {
+        console.warn(`No matching inspectable found for parent item: ${parent.question_text}`);
         return null;
       }
 
-      const subItemsForParent = childItems.filter(child => child.parent_item_id === correspondingParent.checklist_item_id);
+      const subItemsForParent = childItems.filter(child => child.parent_item_id === parent.checklist_item_id);
 
       const deviceSection = {
-        checklist_item_id: `inspectable-${inspectable.ins_id}`,
-        item_number: `${inspectableIndex + 1}`,
-        question_text: inspectable.name,
+        checklist_item_id: `parent-${parent.checklist_item_id}`,
+        item_number: parent.item_number || `${index + 1}`,
+        question_text: parent.question_text,
         input_type: "section",
         subItems: subItemsForParent.map(subItem => {
           const key = `${inspectable.ins_id}-${subItem.checklist_item_id}`;
