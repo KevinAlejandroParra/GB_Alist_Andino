@@ -64,8 +64,8 @@ const PARENT_BLOCKS = [
 ];
 
 const CHILD_ITEMS = [
-  { name: 'JUGADAS',                      input_type: 'number',  allow_comment: false },
-  { name: 'PREMIOS',                      input_type: 'number',  allow_comment: false },
+  { name: 'JUGADAS',                      input_type: 'numeric', allow_comment: false },
+  { name: 'PREMIOS',                      input_type: 'numeric', allow_comment: false },
   { name: 'CONFIGURACION DE LA MAQUINA',  input_type: 'text',    allow_comment: true  },
 ];
 
