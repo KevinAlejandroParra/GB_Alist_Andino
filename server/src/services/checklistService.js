@@ -108,8 +108,15 @@ const processSpecificChecklistItems = async (checklistTypeId, checklists = [], a
   });
 
   const items = parentItems.map((parent, index) => {
+    const textUp = parent.question_text.toUpperCase();
+    // Atrapar TODAS las variantes de secciones del TOY BOX 4P MINI:
+    // "TOY BOX - SECCION N" (nuevo) y "TOY BOX N" (legado sin guion)
+    const isToyBoxSection =
+      textUp.startsWith('TOY BOX - SECCION') ||
+      /^TOY BOX \d/.test(textUp);
+
     let inspectable = null;
-    if (parent.question_text.toUpperCase().startsWith('TOY BOX - SECCION')) {
+    if (isToyBoxSection) {
       inspectable = specificInspectables.find(i => i.name === 'TOY BOX 4P MINI');
     } else {
       inspectable = specificInspectables.find(i => i.name.toLowerCase() === parent.question_text.toLowerCase());
@@ -2275,7 +2282,7 @@ const getChecklistDataForPDF = async (checklistId) => {
     // Obtener órdenes de falla
     let failuresData = { failures_by_item: {}, total_failures: 0 };
     try {
-      failuresData = await getChecklistFailures(checklistId, isFamilyChecklist);
+      failuresData = await getChecklistFailures(checklistId, typeCategory === 'family');
     } catch (failureError) {
       console.error('Error obteniendo fallas para PDF:', failureError);
     }
@@ -2314,7 +2321,7 @@ const getChecklistDataForPDF = async (checklistId) => {
 
     // Obtener información de semana para checklists de familia
     let weekInfo = null;
-    if (isFamilyChecklist && checklist.week_identifier) {
+    if ((typeCategory === 'family' || typeCategory === 'specific') && checklist.week_identifier) {
       try {
         const { getWeekDates } = require('../utils/weekUtils');
         weekInfo = getWeekDates(checklist.week_identifier);
