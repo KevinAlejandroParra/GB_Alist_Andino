@@ -23,6 +23,7 @@ const {
   User,
   PremiosConfig,
   PremiosAnalisis,
+  ChecklistSignature
 } = require('../models');
 
 const round2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
@@ -267,6 +268,16 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
       { model: Inspectable, as: 'inspectable', attributes: ['ins_id', 'name'] },
       { model: User, as: 'creator', attributes: ['user_id', 'user_name'] },
       { model: User, as: 'reviewer', attributes: ['user_id', 'user_name'] },
+      {
+        model: Checklist,
+        as: 'checklist',
+        attributes: ['checklist_id'],
+        include: [{
+          model: ChecklistSignature,
+          as: 'signatures',
+          attributes: ['role_id']
+        }]
+      }
     ],
     order: [
       ['week_identifier', 'DESC'],
@@ -282,17 +293,16 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
     return json;
   });
 
-  // Rollup por (semana, máquina): suma las secciones de TOY BOX 4P MINI
+  // Rollup por (semana), porque los contadores de premios son generales
   const rollupMap = new Map();
   for (const r of serializedRows) {
-    if (!r.inspectable_id) continue;
-    const key = `${r.week_identifier}|${r.inspectable_id}`;
+    const key = `${r.week_identifier}`;
     if (!rollupMap.has(key)) {
       rollupMap.set(key, {
         week_identifier: r.week_identifier,
         fecha: r.fecha,
-        inspectable_id: r.inspectable_id,
-        machine_name: r.inspectable?.name ?? null,
+        inspectable_id: null,
+        machine_name: 'Contadores de Premios',
         sections: 0,
         jugadas_desde_ultima: 0,
         premios_desde_ultima: 0,
@@ -309,7 +319,9 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
     acc.premios_esperados += Number(r.premios_esperados || 0);
     if (r.premios_lectura != null) acc.premios_lectura = r.premios_lectura;
     if (r.contador_reseteado) acc.contador_reseteado = true;
-    if (r.revisado_por != null) acc.revisado = true;
+    
+    const hasAdminSignature = r.checklist?.signatures?.some(sig => sig.role_id === 4) || false;
+    if (r.revisado_por != null || hasAdminSignature) acc.revisado = true;
   }
 
   const rollup = Array.from(rollupMap.values())
@@ -335,7 +347,9 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
     }
     const w = weekMap.get(r.week_identifier);
     w.rows += 1;
-    if (r.revisado_por != null) w.revisado = true;
+    
+    const hasAdminSignature = r.checklist?.signatures?.some(sig => sig.role_id === 4) || false;
+    if (r.revisado_por != null || hasAdminSignature) w.revisado = true;
   }
 
   return {

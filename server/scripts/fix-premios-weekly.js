@@ -1,19 +1,19 @@
 /**
- * fix-premios-weekly.js
- *
- * Corrige la cadencia del checklist de Premios:
- *  - Pone frequency='semanal' en checklist_types (el seed lo define como semanal,
- *    pero la BD quedó con 'diario', por lo que los checklists se creaban sin
- *    week_identifier y el análisis semanal no encontraba datos).
- *  - Asigna week_identifier a los checklists existentes según su createdAt.
- *  - Deduplica si por la cadencia diaria se crearon varias filas por máquina en
- *    la misma semana (conserva la más reciente y reasigna sus respuestas).
- *  - Recalcula el análisis de premios.
- *
- * Modos de uso:
- *   node scripts/fix-premios-weekly.js                 # Solo diagnóstico
- *   node scripts/fix-premios-weekly.js --fix           # Aplica los cambios
- */
+* fix-premios-weekly.js
+*
+* Corrige la cadencia del checklist de Premios:
+*  - Pone frequency='semanal' en checklist_types (el seed lo define como semanal,
+*    pero la BD quedó con 'diario', por lo que los checklists se creaban sin
+*    week_identifier y el análisis semanal no encontraba datos).
+*  - Asigna week_identifier a los checklists existentes según su createdAt.
+*  - Deduplica si por la cadencia diaria se crearon varias filas por máquina en
+*    la misma semana (conserva la más reciente y reasigna sus respuestas).
+*  - Recalcula el análisis de premios.
+*
+* Modos de uso:
+*   node scripts/fix-premios-weekly.js                 # Solo diagnóstico
+*   node scripts/fix-premios-weekly.js --fix           # Aplica los cambios
+*/
 
 const { connection } = require('../src/models');
 const weekUtils = require('../src/utils/weekUtils');
@@ -24,11 +24,11 @@ const CHECKLIST_TYPE_ID = 2;
 const APPLY_FIX = process.argv.includes('--fix');
 
 const log = {
-  info: (msg)    => console.log(`ℹ️  ${msg}`),
-  ok:   (msg)    => console.log(`✅ ${msg}`),
-  warn: (msg)    => console.log(`⚠️  ${msg}`),
-  err:  (msg)    => console.log(`❌ ${msg}`),
-  head: (msg)    => console.log(`\n${'='.repeat(60)}\n${msg}\n${'='.repeat(60)}`),
+  info: (msg) => console.log(`ℹ️  ${msg}`),
+  ok: (msg) => console.log(`✅ ${msg}`),
+  warn: (msg) => console.log(`⚠️  ${msg}`),
+  err: (msg) => console.log(`❌ ${msg}`),
+  head: (msg) => console.log(`\n${'='.repeat(60)}\n${msg}\n${'='.repeat(60)}`),
 };
 
 async function diagnose() {
