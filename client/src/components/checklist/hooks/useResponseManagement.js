@@ -189,6 +189,8 @@ export function useResponseManagement(checklist) {
           default:
             newResponse.response_type = null;
         }
+      } else if (field === 'response_numeric' || field === 'response_text' || field === 'value') {
+        newResponse.value = value;
       }
 
       return {
