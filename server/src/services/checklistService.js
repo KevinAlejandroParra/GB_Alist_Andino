@@ -3139,8 +3139,26 @@ const deleteChecklist = async (checklistId) => {
       throw new Error('Checklist no encontrado');
     }
 
+    let checklistsToDelete = [checklist];
+    
+    // Si tiene week_identifier, buscar todos los de esa semana y tipo para eliminarlos en bloque
+    if (checklist.week_identifier) {
+      const relatedChecklists = await Checklist.findAll({
+        where: {
+          checklist_type_id: checklist.checklist_type_id,
+          week_identifier: checklist.week_identifier
+        },
+        transaction
+      });
+      if (relatedChecklists.length > 0) {
+        checklistsToDelete = relatedChecklists;
+      }
+    }
+
+    const checklistIdsToDelete = checklistsToDelete.map(c => c.checklist_id);
+
     const signatureCount = await ChecklistSignature.count({
-      where: { checklist_id: checklistId },
+      where: { checklist_id: checklistIdsToDelete },
       transaction
     });
 
@@ -3149,29 +3167,45 @@ const deleteChecklist = async (checklistId) => {
     }
 
     await ChecklistResponse.destroy({
-      where: { checklist_id: checklistId },
+      where: { checklist_id: checklistIdsToDelete },
       transaction
     });
 
     await ChecklistQrScan.destroy({
-      where: { checklist_id: checklistId },
+      where: { checklist_id: checklistIdsToDelete },
       transaction
     });
 
     await Requisition.destroy({
-      where: { checklist_id: checklistId },
+      where: { checklist_id: checklistIdsToDelete },
       transaction
     });
 
     await ChecklistSignature.destroy({
-      where: { checklist_id: checklistId },
+      where: { checklist_id: checklistIdsToDelete },
       transaction
     });
 
-    await checklist.destroy({ transaction });
+    // También eliminar registros de análisis si existen
+    try {
+      const { PremiosAnalisis } = require('../models');
+      if (PremiosAnalisis) {
+        await PremiosAnalisis.destroy({
+          where: { checklist_id: checklistIdsToDelete },
+          transaction
+        });
+      }
+    } catch (e) {
+      console.warn('PremiosAnalisis no se pudo eliminar o no existe:', e.message);
+    }
+
+    await Checklist.destroy({
+      where: { checklist_id: checklistIdsToDelete },
+      transaction
+    });
 
     await transaction.commit();
-    return { success: true, message: 'Checklist eliminado exitosamente' };
+    return { success: true, message: `Checklist(s) eliminado(s) exitosamente (${checklistIdsToDelete.length})` };
   } catch (error) {
     await transaction.rollback();
     throw error;
