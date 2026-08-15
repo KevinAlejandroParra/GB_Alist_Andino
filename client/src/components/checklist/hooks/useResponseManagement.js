@@ -123,6 +123,8 @@ export function useResponseManagement(checklist) {
             response_id: existingResponse?.response_id || null,
             value: value,
             response_compliance: item.input_type === 'radio' ? value : undefined,
+            response_numeric: item.input_type === 'numeric' ? value : undefined,
+            response_text: (item.input_type === 'text' || item.input_type === 'textarea') ? value : undefined,
             checklist_item_id: item.checklist_item_id,
             inspectable_id: item.inspectable_id_for_response,
             response_type: response_type,
