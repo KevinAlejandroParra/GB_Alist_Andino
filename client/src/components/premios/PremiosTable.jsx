@@ -49,7 +49,7 @@ const DetailRow = ({ section, machineName }) => {
   )
 }
 
-export default function PremiosTable({ rows, rollup, checklistTypeId, onViewSignature, onApprove, isAdmin }) {
+export default function PremiosTable({ rows, rollup, checklistTypeId, onViewSignature, isAdmin }) {
   const [expanded, setExpanded] = useState(null)
   const toggle = (key) => setExpanded((prev) => (prev === key ? null : key))
 
@@ -117,22 +117,12 @@ export default function PremiosTable({ rows, rollup, checklistTypeId, onViewSign
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => toggle(key)}
-                          className="px-2 py-1 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-md hover:bg-indigo-50"
-                        >
-                          {isOpen ? 'Ocultar' : 'Detalle'}
-                        </button>
-                        {isAdmin && !reviewed && (
-                          <button
-                            onClick={() => onApprove && onApprove(r.week_identifier)}
-                            className="px-2 py-1 text-xs font-medium text-green-700 border border-green-200 rounded-md hover:bg-green-50"
-                          >
-                            Aprobar
-                          </button>
-                        )}
-                      </div>
+                      <button
+                        onClick={() => toggle(key)}
+                        className="px-2 py-1 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-md hover:bg-indigo-50"
+                      >
+                        {isOpen ? 'Ocultar' : 'Detalle'}
+                      </button>
                     </td>
                   </tr>
                   {isOpen && <DetailRow section={r.sections[0] || {}} machineName={r.machine_name} />}

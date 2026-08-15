@@ -275,7 +275,10 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
         include: [{
           model: ChecklistSignature,
           as: 'signatures',
-          attributes: ['role_id']
+          attributes: ['role_id', 'signed_by_name', 'signed_at'],
+          where: { role_id: 4 }, // Admin (role_id 4)
+          required: false,
+          order: [['signed_at', 'DESC']]
         }]
       }
     ],
@@ -298,6 +301,15 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
   for (const r of serializedRows) {
     const key = `${r.week_identifier}`;
     if (!rollupMap.has(key)) {
+      // Obtener firma admin más reciente para esta semana
+      let revisado_por_nombre = null;
+      let revisado_en = null;
+      const adminSig = r.checklist?.signatures?.[0]; // Já ordenadas por signed_at DESC
+      if (adminSig) {
+        revisado_por_nombre = adminSig.signed_by_name;
+        revisado_en = adminSig.signed_at;
+      }
+
       rollupMap.set(key, {
         week_identifier: r.week_identifier,
         fecha: r.fecha,
@@ -310,6 +322,8 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
         premios_lectura: r.premios_lectura,
         contador_reseteado: false,
         revisado: false,
+        revisado_por_nombre,
+        revisado_en,
       });
     }
     const acc = rollupMap.get(key);
@@ -321,7 +335,15 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
     if (r.contador_reseteado) acc.contador_reseteado = true;
     
     const hasAdminSignature = r.checklist?.signatures?.some(sig => sig.role_id === 4) || false;
-    if (r.revisado_por != null || hasAdminSignature) acc.revisado = true;
+    if (r.revisado_por != null || hasAdminSignature) {
+      acc.revisado = true;
+      // Si aún no hay info del firmante, obtenerla de la firma admin
+      if (!acc.revisado_por_nombre && r.checklist?.signatures?.length > 0) {
+        const adminSig = r.checklist.signatures[0];
+        acc.revisado_por_nombre = adminSig.signed_by_name;
+        acc.revisado_en = adminSig.signed_at;
+      }
+    }
   }
 
   const rollup = Array.from(rollupMap.values())
@@ -343,13 +365,21 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
   const weekMap = new Map();
   for (const r of serializedRows) {
     if (!weekMap.has(r.week_identifier)) {
-      weekMap.set(r.week_identifier, { week_identifier: r.week_identifier, rows: 0, revisado: false });
+      weekMap.set(r.week_identifier, { week_identifier: r.week_identifier, rows: 0, revisado: false, revisado_por_nombre: null, revisado_en: null });
     }
     const w = weekMap.get(r.week_identifier);
     w.rows += 1;
     
     const hasAdminSignature = r.checklist?.signatures?.some(sig => sig.role_id === 4) || false;
-    if (r.revisado_por != null || hasAdminSignature) w.revisado = true;
+    if (r.revisado_por != null || hasAdminSignature) {
+      w.revisado = true;
+      // Obtener info del firmante si aún no la tenemos
+      if (!w.revisado_por_nombre && r.checklist?.signatures?.length > 0) {
+        const adminSig = r.checklist.signatures[0];
+        w.revisado_por_nombre = adminSig.signed_by_name;
+        w.revisado_en = adminSig.signed_at;
+      }
+    }
   }
 
   return {

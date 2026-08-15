@@ -1395,6 +1395,48 @@ const signChecklist = async ({ checklist_id, user_id, role_id, digital_token }) 
       console.log(`Nueva firma creada para usuario ${user.user_name} en checklist ${checklist.checklist_id}`);
     }
 
+    // === CASO ESPECIAL: Propagar firma a todos los checklists del grupo semanal (solo tipo 2 - Premios) ===
+    if (Number(checklist.checklist_type_id) === 2 && checklist.week_identifier) {
+      const siblingChecklists = await Checklist.findAll({
+        where: {
+          checklist_type_id: 2,
+          week_identifier: checklist.week_identifier,
+          checklist_id: { [Op.ne]: checklist.checklist_id } // Excluir el actual (ya firmado arriba)
+        },
+        transaction
+      });
+
+      console.log(`[signChecklist] Propagando firma a ${siblingChecklists.length} checklists hermanos (semana ${checklist.week_identifier})`);
+
+      for (const sibling of siblingChecklists) {
+        const existingSiblingSignature = await ChecklistSignature.findOne({
+          where: {
+            checklist_id: sibling.checklist_id,
+            user_id: user_id
+          },
+          transaction
+        });
+
+        if (existingSiblingSignature) {
+          await existingSiblingSignature.update({
+            digital_token: digital_token,
+            signed_at: new Date(),
+            signature_type: signatureType,
+          }, { transaction });
+        } else {
+          await ChecklistSignature.create({
+            checklist_id: sibling.checklist_id,
+            user_id: user_id,
+            role_id: role_id,
+            digital_token: digital_token,
+            signed_at: new Date(),
+            signed_by_name: user.user_name,
+          }, { transaction });
+        }
+      }
+      console.log(`[signChecklist] Firma propagada exitosamente a ${siblingChecklists.length} checklists hermanos`);
+    }
+
     await transaction.commit();
     return { success: true, message: "Checklist firmado exitosamente" };
   } catch (error) {

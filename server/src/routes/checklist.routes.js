@@ -28,8 +28,6 @@ const {
   savePremiosConfig,
   getPremiosConfig,
   getPremiosAnalytics,
-  approvePremiosWeek,
-  getPremiosWeekReview,
   exportPremiosAnalytics
 } = require("../controllers/checklistController")
 
@@ -63,9 +61,7 @@ router.delete("/:id", verifyToken, deleteChecklist)
 
 // Rutas de análisis de premios
 router.get("/type/:checklistTypeId/analytics/premios", verifyToken, getPremiosAnalytics)
-router.get("/type/:checklistTypeId/analytics/premios/revision", verifyToken, getPremiosWeekReview)
 router.get("/type/:checklistTypeId/analytics/premios/export", verifyToken, exportPremiosAnalytics)
-router.post("/type/:checklistTypeId/analytics/premios/aprobar", verifyToken, approvePremiosWeek)
 router.get("/type/:checklistTypeId/premios-config", verifyToken, getPremiosConfig)
 router.post("/type/:checklistTypeId/premios-config", verifyToken, savePremiosConfig)
 

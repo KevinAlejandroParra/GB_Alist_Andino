@@ -133,7 +133,6 @@ export const CHECKLIST_TYPES = {
       responses: '/api/checklists/{checklistId}/responses',
       download: '/api/checklists/{checklistId}/download-pdf',
       analytics: '/api/checklists/type/{checklistTypeId}/analytics/premios',
-      analyticsApprove: '/api/checklists/type/{checklistTypeId}/analytics/premios/aprobar',
       analyticsExport: '/api/checklists/type/{checklistTypeId}/analytics/premios/export',
       premiosConfig: '/api/checklists/type/{checklistTypeId}/premios-config',
     },

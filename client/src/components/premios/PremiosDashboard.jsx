@@ -6,7 +6,6 @@ import { useAuth } from '../AuthContext'
 import PremiosCharts from './PremiosCharts'
 import PremiosTable from './PremiosTable'
 import PremiosConfigModal from './PremiosConfigModal'
-import PremiosApproveModal from './PremiosApproveModal'
 import PremiosSignatureModal from './PremiosSignatureModal'
 import PremiosExcelButton from './PremiosExcelButton'
 import { formatNum, formatPct, enrichRollup } from './premiosUtils'
@@ -23,7 +22,6 @@ export default function PremiosDashboard({ checklistTypeId }) {
   const [selectedMachine, setSelectedMachine] = useState('all')
 
   const [showConfig, setShowConfig] = useState(false)
-  const [approveWeek, setApproveWeek] = useState(null)
   const [signatureWeek, setSignatureWeek] = useState(null)
 
   const loadAnalytics = useCallback(async () => {
@@ -77,9 +75,9 @@ export default function PremiosDashboard({ checklistTypeId }) {
 
   const selectedWeekReviewed = useMemo(() => {
     if (selectedWeek === 'all') return null
-    const rows = (analytics?.rows || []).filter((r) => r.week_identifier === selectedWeek)
-    return rows.some((r) => r.revisado_por != null)
-  }, [analytics, selectedWeek])
+    const rollupWeek = rollup.find((r) => r.week_identifier === selectedWeek)
+    return rollupWeek ? rollupWeek.revisado : null
+  }, [rollup, selectedWeek])
 
   if (loading) {
     return (
@@ -127,14 +125,6 @@ export default function PremiosDashboard({ checklistTypeId }) {
               className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
             >
               Configuración de máquinas
-            </button>
-          )}
-          {isAdmin && selectedWeek !== 'all' && (
-            <button
-              onClick={() => setApproveWeek(selectedWeek)}
-              className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors"
-            >
-              {selectedWeekReviewed ? 'Firmar revisión' : 'Aprobar semana'}
             </button>
           )}
         </div>
@@ -239,7 +229,6 @@ export default function PremiosDashboard({ checklistTypeId }) {
             rollup={filteredRollup}
             checklistTypeId={checklistTypeId}
             onViewSignature={(week) => setSignatureWeek(week)}
-            onApprove={(week) => setApproveWeek(week)}
             isAdmin={isAdmin}
           />
         </>
@@ -249,17 +238,6 @@ export default function PremiosDashboard({ checklistTypeId }) {
         <PremiosConfigModal
           checklistTypeId={checklistTypeId}
           onClose={() => setShowConfig(false)}
-        />
-      )}
-      {approveWeek && (
-        <PremiosApproveModal
-          checklistTypeId={checklistTypeId}
-          weekIdentifier={approveWeek}
-          onClose={() => setApproveWeek(null)}
-          onSuccess={() => {
-            setApproveWeek(null)
-            loadAnalytics()
-          }}
         />
       )}
       {signatureWeek && (

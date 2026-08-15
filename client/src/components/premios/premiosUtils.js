@@ -59,19 +59,21 @@ export const groupRowsByMachineWeek = (rows) => {
   return groups
 }
 
-// Agrega estado derivado y revisado_por a las filas del rollup usando las secciones
+// Agrega estado derivado y enriquece con información de firmas usando las secciones
 export const enrichRollup = (rollup, rows) => {
   const groups = groupRowsByMachineWeek(rows)
   return rollup.map((r) => {
     const key = `${r.week_identifier}|${r.inspectable_id}`
     const sections = groups[key] || []
+    // Usar revisado_por_nombre del rollup (que viene del backend con info de ChecklistSignature)
+    // Fallback a búsqueda en revisado_por de PremiosAnalisis si existe
     const reviewed = sections.find((s) => s.revisado_por != null)
     return {
       ...r,
       sections,
       estado: deriveRollupEstado(sections),
-      reviewer_name: reviewed?.reviewer?.user_name ?? null,
-      revisado_en: reviewed?.revisado_en ?? null,
+      reviewer_name: r.revisado_por_nombre ?? reviewed?.reviewer?.user_name ?? null,
+      revisado_en: r.revisado_en ?? reviewed?.revisado_en ?? null,
       creado_por: sections[0]?.creator?.user_name ?? null,
     }
   })
