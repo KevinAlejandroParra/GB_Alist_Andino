@@ -321,6 +321,7 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
         premios_esperados: 0,
         premios_lectura: r.premios_lectura,
         contador_reseteado: false,
+        es_primer_registro: false,
         revisado: false,
         revisado_por_nombre,
         revisado_en,
@@ -328,11 +329,13 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
     }
     const acc = rollupMap.get(key);
     acc.sections += 1;
-    acc.jugadas_desde_ultima += Number(r.jugadas_desde_ultima || 0);
-    acc.premios_desde_ultima += Number(r.premios_desde_ultima || 0);
+    // Para primer_registro, jugadas_desde_ultima es NULL → usar jugadas_lectura como indicador
+    acc.jugadas_desde_ultima += Number(r.jugadas_desde_ultima ?? r.jugadas_lectura ?? 0);
+    acc.premios_desde_ultima += Number(r.premios_desde_ultima ?? r.premios_lectura ?? 0);
     acc.premios_esperados += Number(r.premios_esperados || 0);
     if (r.premios_lectura != null) acc.premios_lectura = r.premios_lectura;
     if (r.contador_reseteado) acc.contador_reseteado = true;
+    if (r.estado === 'primer_registro') acc.es_primer_registro = true;
     
     const hasAdminSignature = r.checklist?.signatures?.some(sig => sig.role_id === 4) || false;
     if (r.revisado_por != null || hasAdminSignature) {
@@ -347,14 +350,24 @@ const getPremiosAnalytics = async (checklistTypeId, { week_identifier } = {}) =>
   }
 
   const rollup = Array.from(rollupMap.values())
-    .map((r) => ({
-      ...r,
-      jugadas_desde_ultima: round2(r.jugadas_desde_ultima),
-      premios_desde_ultima: round2(r.premios_desde_ultima),
-      premios_esperados: round2(r.premios_esperados),
-      eficiencia_pct:
-        r.premios_esperados > 0 ? round2((r.premios_desde_ultima / r.premios_esperados) * 100) : null,
-    }))
+    .map((r) => {
+      // Derivar estado del rollup: si alguna sección es primer_registro y no hay datos desde_ultima reales,
+      // marcar como primer_registro; si hay config pero los deltas son 0, sin_movimiento
+      let estado = null;
+      if (r.contador_reseteado) estado = 'contador_reseteado';
+      else if (r.es_primer_registro) estado = 'primer_registro';
+      // El frontend derivará el estado final a partir de las secciones individuales
+
+      return {
+        ...r,
+        estado,
+        jugadas_desde_ultima: round2(r.jugadas_desde_ultima),
+        premios_desde_ultima: round2(r.premios_desde_ultima),
+        premios_esperados: round2(r.premios_esperados),
+        eficiencia_pct:
+          r.premios_esperados > 0 ? round2((r.premios_desde_ultima / r.premios_esperados) * 100) : null,
+      };
+    })
     .sort((a, b) => {
       const wk = b.week_identifier.localeCompare(a.week_identifier);
       if (wk !== 0) return wk;

@@ -59,19 +59,38 @@ export const groupRowsByMachineWeek = (rows) => {
   return groups
 }
 
+// Agrupa rows solo por semana (para el rollup de premios, que no tiene inspectable_id)
+export const groupRowsByWeek = (rows) => {
+  const groups = {}
+  for (const r of rows) {
+    const key = r.week_identifier
+    if (!groups[key]) groups[key] = []
+    groups[key].push(r)
+  }
+  return groups
+}
+
 // Agrega estado derivado y enriquece con información de firmas usando las secciones
 export const enrichRollup = (rollup, rows) => {
-  const groups = groupRowsByMachineWeek(rows)
+  const groupsByMachineWeek = groupRowsByMachineWeek(rows)
+  const groupsByWeek = groupRowsByWeek(rows)
   return rollup.map((r) => {
+    // Para el rollup de premios, inspectable_id es null → agrupar por semana solamente
     const key = `${r.week_identifier}|${r.inspectable_id}`
-    const sections = groups[key] || []
+    const sections = r.inspectable_id != null
+      ? (groupsByMachineWeek[key] || [])
+      : (groupsByWeek[r.week_identifier] || [])
     // Usar revisado_por_nombre del rollup (que viene del backend con info de ChecklistSignature)
     // Fallback a búsqueda en revisado_por de PremiosAnalisis si existe
     const reviewed = sections.find((s) => s.revisado_por != null)
+
+    // Usar el estado del backend si está disponible, sino derivarlo de las secciones
+    const estado = r.estado != null ? r.estado : deriveRollupEstado(sections)
+
     return {
       ...r,
       sections,
-      estado: deriveRollupEstado(sections),
+      estado,
       reviewer_name: r.revisado_por_nombre ?? reviewed?.reviewer?.user_name ?? null,
       revisado_en: r.revisado_en ?? reviewed?.revisado_en ?? null,
       creado_por: sections[0]?.creator?.user_name ?? null,
