@@ -2,7 +2,7 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    // Primero insertamos los inspectables
+    // Primero insertamos los inspectables originales (ignorar si ya existen)
     const inspectables = [
       {
         ins_id: 2,
@@ -56,7 +56,6 @@ module.exports = {
       }
     ];
 
-    // Luego insertamos las atracciones
     const attractions = [
       {
         ins_id: 2,
@@ -95,14 +94,31 @@ module.exports = {
       }
     ];
 
-    // Insertamos los datos usando bulkInsert
-    await queryInterface.bulkInsert('inspectables', inspectables, {});
-    await queryInterface.bulkInsert('attractions', attractions, {});
+    // Insertar solo los registros que no existan aún (upsert por ins_id)
+    for (const ins of inspectables) {
+      const [existing] = await queryInterface.sequelize.query(
+        'SELECT ins_id FROM inspectables WHERE ins_id = :id LIMIT 1',
+        { replacements: { id: ins.ins_id }, type: Sequelize.QueryTypes.SELECT }
+      );
+      if (!existing) {
+        await queryInterface.bulkInsert('inspectables', [ins], {});
+      }
+    }
+
+    for (const attr of attractions) {
+      const [existing] = await queryInterface.sequelize.query(
+        'SELECT ins_id FROM attractions WHERE ins_id = :id LIMIT 1',
+        { replacements: { id: attr.ins_id }, type: Sequelize.QueryTypes.SELECT }
+      );
+      if (!existing) {
+        await queryInterface.bulkInsert('attractions', [attr], {});
+      }
+    }
   },
 
   async down(queryInterface, Sequelize) {
-    // Eliminamos primero las atracciones debido a la restricción de clave foránea
-    await queryInterface.bulkDelete('attractions', null, {});
-    await queryInterface.bulkDelete('inspectables', null, {});
+    // Solo elimina el registro nuevo de VR Paraglider
+    await queryInterface.bulkDelete('attractions', { ins_id: 6 }, {});
+    await queryInterface.bulkDelete('inspectables', { ins_id: 6 }, {});
   }
 };
