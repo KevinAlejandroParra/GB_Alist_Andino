@@ -43,6 +43,16 @@ module.exports = {
         premise_id: 2,
         createdAt: new Date("2025-08-28T16:51:23.000Z"),
         updatedAt: new Date("2025-08-28T17:25:51.000Z")
+      },
+      {
+        ins_id: 6,
+        name: "VR Paraglider",
+        description: "Atracción de realidad virtual con simulador de vuelo en parapente para 2 jugadores",
+        photo_url: null,
+        type_code: "attraction",
+        premise_id: 2,
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     ];
 
@@ -75,6 +85,13 @@ module.exports = {
         capacity: 3,
         createdAt: new Date("2025-08-28T16:51:23.000Z"),
         updatedAt: new Date("2025-08-28T17:25:51.000Z")
+      },
+      {
+        ins_id: 6,
+        public_flag: "Sí",
+        capacity: 2,
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     ];
 
