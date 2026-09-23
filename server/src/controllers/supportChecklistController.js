@@ -1,4 +1,8 @@
-const { ChecklistType, Checklist, User, Premise, Inspectable, ChecklistResponse, ChecklistSignature, Role } = require("../models");
+const {
+  ChecklistType, Checklist, User, Premise, Inspectable,
+  ChecklistResponse, ChecklistSignature, ChecklistQrCode,
+  ChecklistQrScan, ChecklistQrItemAssociation, ChecklistItem, Role
+} = require("../models");
 const checklistService = require("../services/checklistService");
 const { Op } = require("sequelize");
 
@@ -14,13 +18,6 @@ const { Op } = require("sequelize");
 const getAvailableChecklistTypes = async (req, res) => {
   try {
     const { type_category, role_id, premise_id } = req.query;
-
-    // Verificar que el usuario sea Soporte (role_id: 2)
-    if (req.user.role_id !== 2) {
-      return res.status(403).json({ 
-        error: "Solo usuarios con rol de Soporte pueden acceder a esta funcionalidad" 
-      });
-    }
 
     const whereClause = {};
     
@@ -81,13 +78,6 @@ const getChecklistsWithFilters = async (req, res) => {
       has_signatures,
       created_by
     } = req.query;
-
-    // Verificar que el usuario sea Soporte
-    if (req.user.role_id !== 2) {
-      return res.status(403).json({ 
-        error: "Solo usuarios con rol de Soporte pueden acceder a esta funcionalidad" 
-      });
-    }
 
     const whereClause = {};
     
@@ -224,13 +214,6 @@ const getAvailableUsers = async (req, res) => {
       user_role: req.user.role_id
     });
 
-    // Verificar que el usuario sea Soporte
-    if (req.user.role_id !== 2) {
-      return res.status(403).json({ 
-        error: "Solo usuarios con rol de Soporte pueden acceder a esta funcionalidad" 
-      });
-    }
-
     const whereClause = {
       user_state: 'activo'
     };
@@ -295,13 +278,6 @@ const accessChecklistAsUser = async (req, res) => {
     const { checklist_id } = req.params;
     const { impersonate_user_id } = req.body;
 
-    // Verificar que el usuario sea Soporte
-    if (req.user.role_id !== 2) {
-      return res.status(403).json({ 
-        error: "Solo usuarios con rol de Soporte pueden acceder a esta funcionalidad" 
-      });
-    }
-
     // Verificar que el usuario a impersonar existe
     const impersonateUser = await User.findByPk(impersonate_user_id, {
       include: [
@@ -356,13 +332,6 @@ const createChecklistAsUser = async (req, res) => {
   try {
     const { checklistTypeId } = req.params;
     const { inspectableId, impersonate_user_id, checklist_date, week_identifier } = req.body;
-
-    // Verificar que el usuario sea Soporte
-    if (req.user.role_id !== 2) {
-      return res.status(403).json({ 
-        error: "Solo usuarios con rol de Soporte pueden acceder a esta funcionalidad" 
-      });
-    }
 
     // Verificar que el usuario a impersonar existe
     const impersonateUser = await User.findByPk(impersonate_user_id, {
@@ -437,13 +406,6 @@ const submitResponsesAsUser = async (req, res) => {
     const { id: checklist_id } = req.params;
     const { responses, impersonate_user_id } = req.body;
 
-    // Verificar que el usuario sea Soporte
-    if (req.user.role_id !== 2) {
-      return res.status(403).json({ 
-        error: "Solo usuarios con rol de Soporte pueden acceder a esta funcionalidad" 
-      });
-    }
-
     // Verificar que el usuario a impersonar existe
     const impersonateUser = await User.findByPk(impersonate_user_id);
     if (!impersonateUser) {
@@ -491,13 +453,6 @@ const signChecklistAsUser = async (req, res) => {
     const { id: checklist_id } = req.params;
     const { digital_token, impersonate_user_id, signed_at } = req.body;
 
-    // Verificar que el usuario sea Soporte
-    if (req.user.role_id !== 2) {
-      return res.status(403).json({ 
-        error: "Solo usuarios con rol de Soporte pueden acceder a esta funcionalidad" 
-      });
-    }
-
     // Verificar que el usuario a impersonar existe
     const impersonateUser = await User.findByPk(impersonate_user_id);
     if (!impersonateUser) {
@@ -509,8 +464,6 @@ const signChecklistAsUser = async (req, res) => {
     // Usar la fecha proporcionada o la fecha actual
     const signatureDate = signed_at ? new Date(signed_at) : new Date();
 
-    const { ChecklistSignature } = require('../models');
-    
     // Verificar que no tenga ya firma de este rol
     const existingSignature = await ChecklistSignature.findOne({
       where: {
@@ -563,27 +516,17 @@ const scanQrCodeAsUser = async (req, res) => {
   try {
     const { checklist_id, qr_code, impersonate_user_id, scanned_at } = req.body;
 
-    // Verificar que el usuario sea Soporte
-    if (req.user.role_id !== 2) {
-      return res.status(403).json({ 
-        error: "Solo usuarios con rol de Soporte pueden acceder a esta funcionalidad" 
-      });
-    }
-
     // Verificar que el usuario a impersonar existe
     const impersonateUser = await User.findByPk(impersonate_user_id);
     if (!impersonateUser) {
       return res.status(404).json({ error: "Usuario a impersonar no encontrado" });
     }
 
-    if (!checklist_id || !qr_code) {
-      return res.status(400).json({ 
+    if (!checklist_id || !qr_code) {      return res.status(400).json({ 
         success: false, 
         message: 'Faltan campos requeridos: checklist_id y qr_code' 
       });
     }
-
-    const { ChecklistQrCode, ChecklistQrScan, Checklist, ChecklistType, ChecklistQrItemAssociation, ChecklistItem } = require('../models');
 
     const qrCode = await ChecklistQrCode.findOne({
       where: { qr_code },
@@ -698,10 +641,6 @@ const scanQrCodeAsUser = async (req, res) => {
 const getChecklistByIdForSupport = async (req, res) => {
   try {
     const { checklist_id } = req.params;
-
-    if (req.user.role_id !== 2) {
-      return res.status(403).json({ error: 'Solo usuarios con rol de Soporte pueden acceder a esta funcionalidad' });
-    }
 
     const checklist = await checklistService.getChecklistById(checklist_id);
 

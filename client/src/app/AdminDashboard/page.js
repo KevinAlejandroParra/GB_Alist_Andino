@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
 import Swal from 'sweetalert2';
 import PremiseManagement from '../../components/admin/PremiseManagement';
@@ -15,12 +15,27 @@ import InventoryManagement from '../../components/admin/InventoryManagement';
 import RequisitionManagement from '../../components/admin/RequisitionManagement';
 import RetroactiveSignatureManagement from '../../components/admin/RetroactiveSignatureManagement';
 import SupportChecklistManagement from '../../components/admin/SupportChecklistManagement';
+import RetroactiveAccessPage from './retroactive-access/page';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('users');
   const [userRoleId, setUserRoleId] = useState(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    // Leer tab y token retroactivo desde la URL (llega desde el correo de aprobación)
+    const tabParam = searchParams.get('tab');
+    const retroToken = searchParams.get('token');
+    if (tabParam) setActiveTab(tabParam);
+
+    // Si viene con token retroactivo, guardarlo en sessionStorage para que
+    // RetroactiveAccessPage lo procese al montar
+    if (retroToken) {
+      sessionStorage.setItem('retroactive_access_token', retroToken);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -90,6 +105,8 @@ export default function AdminDashboard() {
         return <RetroactiveSignatureManagement />;
       case 'support-checklists':
         return <SupportChecklistManagement />;
+      case 'retroactive-access':
+        return <RetroactiveAccessPage />;
       default:
         return <UserManagement />;
     }
@@ -102,7 +119,12 @@ export default function AdminDashboard() {
       'devices', 'attractions', 'qr-codes', 'inventory', 'requisitions'
     ];
 
-    // Solo agregar pestañas especiales si el usuario es Soporte (role_id: 2)
+    // Tab exclusivo para Administradores (role_id: 1)
+    if (userRoleId === 1) {
+      return [...baseTabs, 'retroactive-access'];
+    }
+
+    // Tabs especiales para Soporte (role_id: 2)
     if (userRoleId === 2) {
       return [...baseTabs, 'retroactive-signatures', 'support-checklists'];
     }
@@ -231,8 +253,19 @@ export default function AdminDashboard() {
                     </span>
                   </>
                 )}
-              </button>
-            </li>
+                {tab === 'retroactive-access' && (
+                  <>
+                    <i className="fa fa-clock-rotate-left mr-2"></i>
+                    <span className="relative">
+                      Acceso Retroactivo
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+                      </span>
+                    </span>
+                  </>
+                )}
+              </button>            </li>
           ))}
         </ul>
       </nav>

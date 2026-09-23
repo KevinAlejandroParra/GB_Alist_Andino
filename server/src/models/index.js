@@ -44,6 +44,7 @@ const ChecklistQrScanModel = require("./checklistQrScan.js");
 const ChecklistQrItemAssociationModel = require("./checklistQrItemAssociation.js");
 const PremiosConfigModel = require("./premiosConfig.js");
 const PremiosAnalisisModel = require("./premiosAnalisis.js");
+const RetroactiveAccessRequestModel = require("./retroactiveAccessRequest.js");
 
 // Inicializar modelos
 const User = UserModel(connection, DataTypes);
@@ -72,6 +73,7 @@ const ChecklistQrScan = ChecklistQrScanModel(connection, DataTypes);
 const ChecklistQrItemAssociation = ChecklistQrItemAssociationModel(connection, DataTypes);
 const PremiosConfig = PremiosConfigModel(connection, DataTypes);
 const PremiosAnalisis = PremiosAnalisisModel(connection, DataTypes);
+const RetroactiveAccessRequest = RetroactiveAccessRequestModel(connection, DataTypes);
 
 const models = {
       User, Role, Premise, ChecklistType, Checklist, ChecklistItem, ChecklistResponse,
@@ -79,7 +81,7 @@ const models = {
       Inventory, Inspectable, Device, Attraction, Family, Entity, Audit,
       FailureOrder, RepairExecution, WorkOrder, WorkOrderPart, 
       ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation,
-      PremiosConfig, PremiosAnalisis
+      PremiosConfig, PremiosAnalisis, RetroactiveAccessRequest
   };
 
 
@@ -95,6 +97,6 @@ module.exports = {
       Inventory, Inspectable, Device, Attraction, Family, Entity, Audit,
       FailureOrder, RepairExecution, WorkOrder, WorkOrderPart, 
       ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation,
-      PremiosConfig, PremiosAnalisis,
+      PremiosConfig, PremiosAnalisis, RetroactiveAccessRequest,
       connection, Sequelize,
   };
