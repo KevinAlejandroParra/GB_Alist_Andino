@@ -5,17 +5,20 @@ const supportChecklistController = require('../controllers/supportChecklistContr
 
 /**
  * Rutas para funcionalidad de Soporte de Checklists
- * Solo accesible para usuarios con rol de Soporte (role_id: 2)
+ * La mayoría solo accesible para Soporte (role_id: 2).
+ * Las rutas marcadas con adminOrSupport también permiten Administrador (role_id: 1)
+ * para el flujo de acceso retroactivo aprobado.
  */
 
-// Middleware para verificar que el usuario sea Soporte
-const verifySupportRole = checkRole([2]);
+const verifySupportRole  = checkRole([2]);
+const adminOrSupport     = checkRole([1, 2]); // Admin usa estas en el flujo retroactivo
 
 // Obtener tipos de checklist disponibles con filtros
+// Admin también lo necesita para poblar el formulario de solicitud retroactiva
 router.get(
   '/types',
   verifyToken,
-  verifySupportRole,
+  adminOrSupport,
   supportChecklistController.getAvailableChecklistTypes
 );
 
@@ -31,7 +34,7 @@ router.get(
 router.get(
   '/checklists/:checklist_id',
   verifyToken,
-  verifySupportRole,
+  adminOrSupport,
   supportChecklistController.getChecklistByIdForSupport
 );
 
@@ -44,18 +47,20 @@ router.get(
 );
 
 // Acceder a un checklist específico como otro usuario
+// Admin lo usa cuando action_type = 'access_existing'
 router.post(
   '/checklists/:checklist_id/access',
   verifyToken,
-  verifySupportRole,
+  adminOrSupport,
   supportChecklistController.accessChecklistAsUser
 );
 
-// Crear o acceder a un checklist como otro usuario
+// Crear checklist como otro usuario
+// Admin lo usa cuando action_type = 'create_new'
 router.post(
   '/checklists/type/:checklistTypeId/create',
   verifyToken,
-  verifySupportRole,
+  adminOrSupport,
   supportChecklistController.createChecklistAsUser
 );
 
@@ -63,7 +68,7 @@ router.post(
 router.post(
   '/checklists/:id/responses',
   verifyToken,
-  verifySupportRole,
+  adminOrSupport,
   supportChecklistController.submitResponsesAsUser
 );
 
@@ -71,7 +76,7 @@ router.post(
 router.post(
   '/checklists/:id/sign',
   verifyToken,
-  verifySupportRole,
+  adminOrSupport,
   supportChecklistController.signChecklistAsUser
 );
 
@@ -79,7 +84,7 @@ router.post(
 router.post(
   '/checklists/qr/scan',
   verifyToken,
-  verifySupportRole,
+  adminOrSupport,
   supportChecklistController.scanQrCodeAsUser
 );
 
