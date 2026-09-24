@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const {
   RetroactiveAccessRequest, User, ChecklistType, Checklist,
-  ChecklistSignature, ChecklistResponse, Op
+  ChecklistSignature, ChecklistResponse, Op, connection: sequelizeConn, Sequelize
 } = require('../models');
 const emailService = require('../services/retroactiveAccessEmailService');
 
@@ -360,18 +360,20 @@ const getExistingChecklists = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Se requieren checklist_type_id y target_date' });
     }
 
+    // Usar CONVERT_TZ para comparar en hora Colombia (UTC-5), ignorando problemas de timezone
     const checklists = await Checklist.findAll({
       where: {
         checklist_type_id,
-        created_by: admin_user_id,
-        createdAt: {
-          [Op.gte]: new Date(`${target_date}T00:00:00`),
-          [Op.lte]: new Date(`${target_date}T23:59:59`),
-        }
+        [Op.and]: [
+          sequelizeConn.literal(
+            `DATE(CONVERT_TZ(\`Checklist\`.\`createdAt\`, '+00:00', '-05:00')) = '${target_date}'`
+          ),
+        ]
       },
       include: [
         { model: ChecklistSignature, as: 'signatures', required: false, attributes: ['signature_id', 'role_id'] },
         { model: ChecklistResponse, as: 'responses', required: false, attributes: ['response_id'] },
+        { model: User, as: 'creator', attributes: ['user_id', 'user_name'] },
       ],
       order: [['createdAt', 'DESC']]
     });
@@ -384,14 +386,16 @@ const getExistingChecklists = async (req, res) => {
       return {
         checklist_id: plain.checklist_id,
         created_at: plain.createdAt,
+        created_by_name: plain.creator?.user_name || 'Desconocido',
         response_count: responseCount,
         signature_count: signatureCount,
         is_complete: isComplete,
         week_identifier: plain.week_identifier,
+        created_by_support: plain.created_by_support,
       };
     });
 
-    // Incompletos primero
+    // Incompletos primero, luego por fecha descendente
     formatted.sort((a, b) => Number(a.is_complete) - Number(b.is_complete));
 
     return res.status(200).json({ success: true, count: formatted.length, data: formatted });

@@ -253,6 +253,9 @@ export default function RetroactiveAccessRequestForm({ onRequestSent }) {
                         <span className="ml-2 text-xs text-gray-500">
                           {new Date(c.created_at).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
                         </span>
+                        {c.created_by_name && (
+                          <span className="ml-2 text-xs text-gray-400">— {c.created_by_name}</span>
+                        )}
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
                         ${c.is_complete ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
