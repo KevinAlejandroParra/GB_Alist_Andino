@@ -1,7 +1,9 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { Op } = require('sequelize');
 const {
   RetroactiveAccessRequest, User, ChecklistType, Checklist,
-  ChecklistSignature, ChecklistResponse, Op, connection: sequelizeConn, Sequelize
+  ChecklistSignature, ChecklistResponse, connection: sequelizeConn
 } = require('../models');
 const emailService = require('../services/retroactiveAccessEmailService');
 

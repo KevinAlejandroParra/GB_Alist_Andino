@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Esta funcionalidad permite a los administradores de la plataforma Alist Andino completar el proceso de checklists (respuestas, firma y escaneo QR) con fecha retroactiva, cuando por algún motivo no pudieron hacerlo en el día correspondiente. El flujo requiere aprobación previa del técnico de sistemas antes de conceder el acceso, garantizando trazabilidad completa de cada operación.
+Esta funcionalidad permite a los administradores de la plataforma Alist Andino completar el proceso de checklists (respuestas, firma y escaneo QR) con fecha retroactiva, cuando por algún motivo no pudieron hacerlo en el día correspondiente. El flujo requiere aprobación previa del asistente de tecnología antes de conceder el acceso, garantizando trazabilidad completa de cada operación.
 
 La feature aprovecha el sistema de soporte existente (`supportChecklistController`, `retroactiveSignatureController`) y la infraestructura de correo con Nodemailer + Outlook SMTP (`emailConfig.js`) ya configurada en el servidor.
 
@@ -43,7 +43,7 @@ La feature aprovecha el sistema de soporte existente (`supportChecklistControlle
 
 ### Requisito 2: Notificación de Solicitud al Técnico de Sistemas
 
-**User Story:** Como Técnico de Sistemas, quiero recibir un correo de notificación cada vez que un Administrador solicita acceso retroactivo, para poder revisar y decidir si lo apruebo o rechazo.
+**User Story:** Como asistente de tecnología, quiero recibir un correo de notificación cada vez que un Administrador solicita acceso retroactivo, para poder revisar y decidir si lo apruebo o rechazo.
 
 #### Criterios de Aceptación
 
