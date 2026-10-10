@@ -1,7 +1,6 @@
 const { createTransporter } = require('../config/emailConfig');
 
-const SERVER_URL = (process.env.SERVER_URL || 'https://192.168.57.96:8080').replace(/\/$/, '');
-const CLIENT_URL = (process.env.CLIENT_URL || 'https://192.168.57.96').replace(/\/$/, '');
+const CLIENT_URL = (process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://192.168.57.96').replace(/\/$/, '');
 const FROM_ALIAS = `"Alist GBX" <${process.env.EMAIL_USER}>`;
 const TECH_EMAIL = 'sistemas2@recreatec.co';
 
@@ -86,8 +85,8 @@ const ctaButton = (href, bgColor, label) => `
  * Envía el correo al técnico de sistemas con botones aprobar/rechazar.
  */
 const sendRequestNotification = async (request, admin, checklistType) => {
-  const approveUrl = `${SERVER_URL}/api/retroactive-access/review?token=${request.request_token}&action=approve`;
-  const rejectUrl  = `${SERVER_URL}/api/retroactive-access/review?token=${request.request_token}&action=reject`;
+  const approveUrl = `${CLIENT_URL}/review-request?token=${request.request_token}&action=approve`;
+  const rejectUrl  = `${CLIENT_URL}/review-request?token=${request.request_token}&action=reject`;
 
   const existingChecklistInfo = request.action_type === 'access_existing' && request.target_checklist_id
     ? infoRow('Checklist a retomar', `#${request.target_checklist_id}`)

@@ -1,7 +1,10 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
+const { Op } = require('sequelize');
 const {
   RetroactiveAccessRequest, User, ChecklistType, Checklist,
-  ChecklistSignature, ChecklistResponse, Op, connection: sequelizeConn, Sequelize
+  ChecklistSignature, ChecklistResponse, connection: sequelizeConn
 } = require('../models');
 const emailService = require('../services/retroactiveAccessEmailService');
 
@@ -514,9 +517,127 @@ const resendApprovalEmail = async (req, res) => {
   }
 };
 
+// ─── 8. Revisar solicitud con autenticación por contraseña (desde UI cliente) ─
+
+/**
+ * Valida el token de revisión + contraseña del técnico y ejecuta approve/reject.
+ * Sin middleware de auth JWT — la autenticación es por contraseña en el body.
+ */
+const reviewRequestWithAuth = async (req, res) => {
+  try {
+    const { token, action, email, password } = req.body;
+
+    if (!token || !action || !email || !password) {
+      return res.status(400).json({ success: false, error: 'Se requieren token, action, email y password' });
+    }
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'action debe ser "approve" o "reject"' });
+    }
+
+    // Buscar la solicitud por token
+    const request = await RetroactiveAccessRequest.findOne({
+      where: { request_token: token },
+      include: [
+        { model: User, as: 'admin', attributes: ['user_id', 'user_name', 'user_email'] },
+        { model: ChecklistType, as: 'checklistType', attributes: ['checklist_type_id', 'name'] },
+      ]
+    });
+
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Token de revisión inválido o no encontrado' });
+    }
+    if (request.status !== 'pending') {
+      const statusLabel = request.status === 'approved' ? 'aprobada' : 'rechazada';
+      return res.status(410).json({
+        success: false,
+        error: `Esta solicitud ya fue ${statusLabel} anteriormente`,
+        status: request.status,
+      });
+    }
+
+    // Verificar que la contraseña corresponde al usuario que intenta aprobar
+    const techUser = await User.findOne({
+      where: { user_email: email, user_state: 'activo' }
+    });
+
+    if (!techUser) {
+      return res.status(403).json({ success: false, error: 'Usuario no encontrado o inactivo' });
+    }
+    
+    if (![1, 2].includes(techUser.role_id)) {
+      return res.status(403).json({ success: false, error: 'No tienes permisos para aprobar solicitudes (se requiere rol de Soporte o Admin)' });
+    }
+
+    const passwordValid = await techUser.comparePassword(password);
+    if (!passwordValid) {
+      return res.status(401).json({ success: false, error: 'Contraseña incorrecta' });
+    }
+
+    const reviewerIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+
+    if (action === 'approve') {
+      await request.update({
+        status: 'approved',
+        approved_at: new Date(),
+        reviewer_ip: reviewerIp,
+      });
+
+      const accessToken = jwt.sign(
+        {
+          type: 'retroactive-access',
+          request_id: request.request_id,
+          admin_user_id: request.admin_user_id,
+          checklist_type_id: request.checklist_type_id,
+          target_date: request.target_date,
+          action_type: request.action_type,
+          target_checklist_id: request.target_checklist_id,
+        },
+        process.env.JWT_KEY,
+        { expiresIn: '24h' }
+      );
+
+      try {
+        await emailService.sendApprovalToAdmin(request.admin, request, request.checklistType, accessToken);
+      } catch (emailErr) {
+        console.error('[RetroactiveAccess] Error enviando correo de aprobación:', emailErr.message);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Solicitud de ${request.admin.user_name} aprobada. Se envió el enlace de acceso a su correo.`,
+        status: 'approved',
+      });
+    }
+
+    if (action === 'reject') {
+      await request.update({
+        status: 'rejected',
+        rejected_at: new Date(),
+        reviewer_ip: reviewerIp,
+      });
+
+      try {
+        await emailService.sendRejectionToAdmin(request.admin, request, request.checklistType);
+      } catch (emailErr) {
+        console.error('[RetroactiveAccess] Error enviando correo de rechazo:', emailErr.message);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Solicitud de ${request.admin.user_name} rechazada. Se notificó al administrador.`,
+        status: 'rejected',
+      });
+    }
+  } catch (error) {
+    console.error('[RetroactiveAccess] Error en reviewRequestWithAuth:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   createRequest,
   reviewRequest,
+  reviewRequestWithAuth,
   validateToken,
   getExistingChecklists,
   getRequests,

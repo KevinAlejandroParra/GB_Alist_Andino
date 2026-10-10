@@ -24,8 +24,16 @@ router.get('/requests', verifyToken, adminOrSupport, ctrl.getRequests);
  * GET /api/retroactive-access/review
  * Aprobar o rechazar una solicitud desde el correo (sin autenticación)
  * Query params: token=<UUID>&action=approve|reject
+ * LEGACY — mantenido por compatibilidad
  */
 router.get('/review', ctrl.reviewRequest);
+
+/**
+ * POST /api/retroactive-access/review-auth
+ * Aprobar o rechazar con verificación de contraseña (desde UI cliente)
+ * Sin JWT — autenticación por password en el body
+ */
+router.post('/review-auth', ctrl.reviewRequestWithAuth);
 
 /**
  * POST /api/retroactive-access/validate-token
