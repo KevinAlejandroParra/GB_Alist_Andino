@@ -216,15 +216,21 @@ const reviewRequest = async (req, res) => {
 
     const reviewerIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
 
+    // Obtener información del técnico que aprueba (hardcodeado como usuario de sistemas)
+    const techUser = await User.findOne({
+      where: { user_email: 'sistemas2@recreatec.co', user_state: 'activo' }
+    });
+
     if (action === 'approve') {
       // Actualizar a aprobado
       await request.update({
         status: 'approved',
         approved_at: new Date(),
         reviewer_ip: reviewerIp,
+        reviewer_user_id: techUser ? techUser.user_id : null,
       });
 
-      // Generar JWT retroactivo (24h)
+      // Generar JWT retroactivo (24h) incluyendo info del técnico que aprueba
       const accessToken = jwt.sign(
         {
           type: 'retroactive-access',
@@ -234,6 +240,9 @@ const reviewRequest = async (req, res) => {
           target_date: request.target_date,
           action_type: request.action_type,
           target_checklist_id: request.target_checklist_id,
+          // Información del técnico que aprueba (para mostrar siempre como "Personal de Soporte")
+          reviewer_user_id: techUser ? techUser.user_id : null,
+          reviewer_name: techUser ? techUser.user_name : 'Soporte',
         },
         process.env.JWT_KEY,
         { expiresIn: '24h' }
@@ -338,6 +347,9 @@ const validateToken = async (req, res) => {
         target_date: decoded.target_date,
         action_type: decoded.action_type,
         target_checklist_id: decoded.target_checklist_id || null,
+        // Información del técnico que aprueba (siempre sistemas2@recreatec.co)
+        reviewer_user_id: decoded.reviewer_user_id || null,
+        reviewer_name: decoded.reviewer_name || 'Soporte',
         checklistType: {
           checklist_type_id: request.checklistType.checklist_type_id,
           name: request.checklistType.name,
@@ -494,6 +506,10 @@ const resendApprovalEmail = async (req, res) => {
     }
 
     // Generar nuevo JWT
+    const techUser = await User.findOne({
+      where: { user_email: 'sistemas2@recreatec.co', user_state: 'activo' }
+    });
+
     const accessToken = jwt.sign(
       {
         type: 'retroactive-access',
@@ -503,6 +519,8 @@ const resendApprovalEmail = async (req, res) => {
         target_date: request.target_date,
         action_type: request.action_type,
         target_checklist_id: request.target_checklist_id,
+        reviewer_user_id: techUser ? techUser.user_id : null,
+        reviewer_name: techUser ? techUser.user_name : 'Soporte',
       },
       process.env.JWT_KEY,
       { expiresIn: '24h' }
@@ -574,14 +592,20 @@ const reviewRequestWithAuth = async (req, res) => {
     }
 
     const reviewerIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
-
+    
+    // El reviewer (técnico que aprueba) es techUser - we'll use sistemas2@recreatec.co como fijo
+    const techUserForApproval = await User.findOne({
+      where: { user_email: 'sistemas2@recreatec.co', user_state: 'activo' }
+    });
+    
     if (action === 'approve') {
       await request.update({
         status: 'approved',
         approved_at: new Date(),
         reviewer_ip: reviewerIp,
+        reviewer_user_id: techUserForApproval ? techUserForApproval.user_id : null,
       });
-
+    
       const accessToken = jwt.sign(
         {
           type: 'retroactive-access',
@@ -591,6 +615,9 @@ const reviewRequestWithAuth = async (req, res) => {
           target_date: request.target_date,
           action_type: request.action_type,
           target_checklist_id: request.target_checklist_id,
+          // Información del técnico que aprueba (para mostrar siempre como "Personal de Soporte")
+          reviewer_user_id: techUserForApproval ? techUserForApproval.user_id : null,
+          reviewer_name: techUserForApproval ? techUserForApproval.user_name : 'Soporte',
         },
         process.env.JWT_KEY,
         { expiresIn: '24h' }

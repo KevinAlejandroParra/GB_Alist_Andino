@@ -331,7 +331,7 @@ const accessChecklistAsUser = async (req, res) => {
 const createChecklistAsUser = async (req, res) => {
   try {
     const { checklistTypeId } = req.params;
-    const { inspectableId, impersonate_user_id, checklist_date, week_identifier } = req.body;
+    const { inspectableId, impersonate_user_id, checklist_date, week_identifier, support_user_id } = req.body;
 
     // Verificar que el usuario a impersonar existe
     const impersonateUser = await User.findByPk(impersonate_user_id, {
@@ -342,7 +342,16 @@ const createChecklistAsUser = async (req, res) => {
       return res.status(404).json({ error: "Usuario a impersonar no encontrado" });
     }
 
-    console.log(`🔍 [Soporte] Creando checklist tipo ${checklistTypeId} como usuario ${impersonateUser.user_name}`);
+    // Si se proporciona support_user_id, usar ese usuario de soporte; si no, usar el actual
+    let supportUser = null;
+    if (support_user_id) {
+      supportUser = await User.findByPk(support_user_id);
+    }
+    if (!supportUser) {
+      supportUser = req.user;
+    }
+
+    console.log(`🔍 [Soporte] Creando checklist tipo ${checklistTypeId} como usuario ${impersonateUser.user_name}, soporte: ${supportUser.user_name}`);
 
     // Obtener el tipo de checklist para información adicional
     const checklistType = await ChecklistType.findByPk(checklistTypeId);
@@ -359,8 +368,8 @@ const createChecklistAsUser = async (req, res) => {
       updatedAt: checklist_date ? new Date(checklist_date) : new Date(),
       week_identifier: week_identifier || null,
       created_by_support: true, // Marcar como creado por soporte
-      support_user_id: req.user.user_id, // ID del usuario de soporte
-      support_notes: `Checklist creado por ${req.user.user_name} (Soporte) impersonando a ${impersonateUser.user_name}. Autorizado por: ${authorizationData.fullName || 'N/A'} (${authorizationData.document || 'N/A'}) el ${new Date(authorizationData.timestamp || new Date()).toLocaleString('es-CO')}`,
+      support_user_id: supportUser.user_id, // ID del usuario de soporte (puede ser diferente para retroactivo)
+      support_notes: `Checklist creado por ${supportUser.user_name} (Soporte) impersonando a ${impersonateUser.user_name}. Autorizado por: ${authorizationData.fullName || 'N/A'} (${authorizationData.document || 'N/A'}) el ${new Date(authorizationData.timestamp || new Date()).toLocaleString('es-CO')}`,
       version_label: checklistType?.version_label || null
     };
 
@@ -376,8 +385,8 @@ const createChecklistAsUser = async (req, res) => {
       ...fullChecklist,
       support_context: {
         is_support_mode: true,
-        support_user_id: req.user.user_id,
-        support_user_name: req.user.user_name,
+        support_user_id: supportUser.user_id,
+        support_user_name: supportUser.user_name,
         impersonated_user_id: impersonateUser.user_id,
         impersonated_user_name: impersonateUser.user_name,
         impersonated_user_role: impersonateUser.role.role_name,

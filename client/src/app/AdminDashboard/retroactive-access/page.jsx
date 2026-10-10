@@ -99,9 +99,14 @@ export default function RetroactiveAccessPage() {
   };
 
   const executeAccessExisting = async (ctx, _token) => {
+    // Para acceso retroactivo, usar siempre el usuario de sistemas como soporte
     const res = await axiosInstance.post(
       `/api/support/checklists/${ctx.target_checklist_id}/access`,
-      { impersonate_user_id: ctx.admin_user_id }
+      { 
+        impersonate_user_id: ctx.admin_user_id,
+        support_user_id: ctx.reviewer_user_id, // Enviar el ID del técnico que aprobó
+        support_user_name: ctx.reviewer_name   // Enviar el nombre del técnico
+      }
     );
 
     if (res.data.success) {
@@ -130,6 +135,9 @@ export default function RetroactiveAccessPage() {
         impersonate_user_id: ctx.admin_user_id,
         checklist_date: `${ctx.target_date}T12:00:00`,
         authorization_data: authData,
+        // Para acceso retroactivo, usar siempre el usuario de sistemas como soporte
+        support_user_id: ctx.reviewer_user_id,
+        support_user_name: ctx.reviewer_name,
       }
     );
 
