@@ -106,7 +106,7 @@ export default function RetroactiveAccessRequestForm({ onRequestSent }) {
       Swal.fire({
         title: '¡Solicitud enviada!',
         html: `
-          <p>Tu solicitud fue enviada al técnico de sistemas.</p>
+          <p>Tu solicitud fue enviada al asistente de tecnología.</p>
           <p class="text-sm text-gray-500 mt-2">Recibirás un correo con el enlace de acceso una vez sea aprobada.</p>
         `,
         icon: 'success',
@@ -349,7 +349,7 @@ export default function RetroactiveAccessRequestForm({ onRequestSent }) {
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
-            ℹ️ Tu solicitud será revisada por el técnico de sistemas. Recibirás un correo con el resultado.
+            ℹ️ Tu solicitud será revisada por el asistente de tecnología de Recreatec SAS. Recibirás un correo con el resultado.
             El enlace de acceso expira a las 24 horas de ser emitido.
           </div>
 

@@ -162,7 +162,7 @@ const sendApprovalToAdmin = async (admin, request, checklistType, accessToken) =
                   border-radius:50%;line-height:64px;font-size:32px;">✅</div>
       <h2 style="margin:12px 0 4px;color:#166534;font-size:20px;">¡Solicitud aprobada!</h2>
       <p style="margin:0;color:#6b7280;font-size:14px;">
-        Tu solicitud de acceso retroactivo fue autorizada por el técnico de sistemas.
+        Tu solicitud de acceso retroactivo fue autorizada por el asistente de tecnología.
       </p>
     </div>
 
@@ -214,7 +214,7 @@ const sendRejectionToAdmin = async (admin, request, checklistType) => {
                   border-radius:50%;line-height:64px;font-size:32px;">❌</div>
       <h2 style="margin:12px 0 4px;color:#991b1b;font-size:20px;">Solicitud rechazada</h2>
       <p style="margin:0;color:#6b7280;font-size:14px;">
-        Tu solicitud de acceso retroactivo no fue aprobada por el técnico de sistemas.
+        Tu solicitud de acceso retroactivo no fue aprobada por el asistente de tecnología.
       </p>
     </div>
 

@@ -202,7 +202,7 @@ export default function RetroactiveAccessPage() {
           ⏪ Acceso Retroactivo
         </h2>
         <p className="mt-1 text-purple-100 text-sm">
-          Solicita permiso para completar un checklist de una fecha pasada. El técnico de sistemas revisará tu solicitud.
+          Solicita permiso para completar un checklist de una fecha pasada. El asistente de tecnología revisará tu solicitud.
         </p>
       </div>
 
@@ -287,7 +287,7 @@ export default function RetroactiveAccessPage() {
                   </div>
                   {r.status === 'pending' && (
                     <p className="mt-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
-                      ⏳ Pendiente de revisión por el técnico de sistemas.
+                      ⏳ Pendiente de revisión por el asistente de tecnología.
                     </p>
                   )}
                   {r.status === 'approved' && !r.used_at && (
