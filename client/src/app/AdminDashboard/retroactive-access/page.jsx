@@ -207,7 +207,7 @@ export default function RetroactiveAccessPage() {
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-xl shadow-lg">
         <h2 className="text-2xl font-bold flex items-center gap-3">
-          ⏪ Acceso Retroactivo
+          Acceso Retroactivo
         </h2>
         <p className="mt-1 text-purple-100 text-sm">
           Solicita permiso para completar un checklist de una fecha pasada. El asistente de tecnología revisará tu solicitud.

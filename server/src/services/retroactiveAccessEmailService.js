@@ -42,7 +42,7 @@ const htmlWrapper = (title, accentColor, bodyContent) => `
           <tr>
             <td style="background:${accentColor};padding:28px 32px;">
               <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">
-                ⏪ Alist Andino — Acceso Retroactivo
+                Alist Andino — Acceso Retroactivo
               </h1>
             </td>
           </tr>
@@ -186,7 +186,7 @@ const sendApprovalToAdmin = async (admin, request, checklistType, accessToken) =
     </div>
 
     <div style="text-align:center;margin-bottom:16px;">
-      ${ctaButton(accessUrl, '#7c3aed', '⏪ Acceder al checklist retroactivo')}
+      ${ctaButton(accessUrl, '#7c3aed', 'Acceder al checklist retroactivo')}
     </div>
 
     <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
