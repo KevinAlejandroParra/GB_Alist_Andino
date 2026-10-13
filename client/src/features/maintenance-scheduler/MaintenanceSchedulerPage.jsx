@@ -17,7 +17,8 @@ export default function MaintenanceSchedulerPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('calendar'); // 'calendar', 'configs', 'settings', 'qrs'
 
-  const calendar = useMaintenanceCalendar(1);
+    const calendar = useMaintenanceCalendar(user?.premise_id || 2);
+
   const isAdminOrSupport = user?.role_id === 1 || user?.role_id === 2;
 
   const tabs = [
