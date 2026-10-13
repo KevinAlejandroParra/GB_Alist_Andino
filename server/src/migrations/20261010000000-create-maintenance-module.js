@@ -39,12 +39,6 @@ module.exports = {
 
     await queryInterface.createTable("maintenance_schedule_plans", {
       id: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true, allowNull: false },
-      premise_id: { 
-        type: Sequelize.INTEGER, 
-        allowNull: true, 
-        references: { model: 'premises', key: 'premise_id' },
-        onUpdate: 'CASCADE', onDelete: 'CASCADE' 
-      },
       year_month: { type: Sequelize.STRING, allowNull: false }, // YYYY-MM
       status: { type: Sequelize.ENUM('DRAFT', 'PUBLISHED'), defaultValue: 'DRAFT' },
       generated_at: { type: Sequelize.DATE, allowNull: true },

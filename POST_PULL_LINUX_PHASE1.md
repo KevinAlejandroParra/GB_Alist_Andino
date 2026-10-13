@@ -20,7 +20,10 @@ npm run build
 cd ../server
 npm run db:migrate
 ```
-> **Nota de seguridad:** La migración `20261010000000-create-maintenance-module.js` es 100% aditiva. Crea las 8 tablas nuevas del módulo y agrega la columna `maintenance_session_id` nullable a `requisitions`. **No modifica datos existentes de checklists, fallas ni órdenes de trabajo.**
+> **Nota de migraciones:**
+> - `20261010000000-create-maintenance-module.js`: Crea las 8 tablas nuevas del módulo y agrega `maintenance_session_id` a `requisitions`.
+> - `20261013140000-add-premise-id-to-maintenance-schedule-plans.js`: Agrega la columna `premise_id` a `maintenance_schedule_plans`.
+> Ambas son 100% aditivas y seguras sin tocar datos históricos.
 
 ## 3. Configuración de Entorno (.env)
 Asegurarse de tener la variable en el `.env` del backend (o añadirla si aún no existe):

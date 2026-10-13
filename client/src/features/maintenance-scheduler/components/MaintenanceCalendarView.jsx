@@ -15,6 +15,7 @@ export default function MaintenanceCalendarView({
   const [yearStr, monthStr] = (currentMonth || '').split('-');
   const year = parseInt(yearStr, 10) || new Date().getFullYear();
   const month = parseInt(monthStr, 10) || new Date().getMonth() + 1;
+  const yearMonth = currentMonth || `${year}-${String(month).padStart(2, '0')}`;
 
   // Compute calendar days for the month
   const daysInMonth = new Date(year, month, 0).getDate();
