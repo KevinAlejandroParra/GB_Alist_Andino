@@ -4,19 +4,19 @@ overview: Nuevo módulo de cronograma de mantenimiento (preventivo semanal + pre
 todos:
   - id: db-schema
     content: Diseñar y crear migraciones aditivas (configs, plans, slots, sessions, evidences, QR) + requisitions.maintenance_session_id nullable
-    status: pending
+    status: completed
   - id: backend-services
     content: Implementar MaintenanceConfigService, MaintenanceScheduleService (generador + overrides), MaintenanceSessionService, rutas /api/maintenance-scheduler
-    status: pending
+    status: completed
   - id: admin-config-ui
     content: "UI admin: tabla dispositivos con weekly_enabled, weekday, scheduled_exempt, last_scheduled_at; settings de estrategia y capacidad diaria"
-    status: pending
+    status: completed
   - id: calendar-ui
     content: Calendario mensual con chips, colores display_status, publicar plan, drawer del día
-    status: pending
+    status: completed
   - id: session-flow
     content: Flujo técnico QR + wizard 4 evidencias + descripción + completar sesión
-    status: pending
+    status: completed
   - id: failure-integration
     content: Cierre de fallas el mismo día; bonificación verde solo si affected_id ≠ máquinas con preventivo planificado ese día
     status: pending

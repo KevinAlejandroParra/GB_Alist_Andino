@@ -36,6 +36,27 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'attractionData',
                 constraints: false,
             });
+
+            if (models.MaintenanceMachineConfig) {
+                Inspectable.hasOne(models.MaintenanceMachineConfig, {
+                    foreignKey: 'ins_id',
+                    as: 'maintenanceConfig'
+                });
+            }
+
+            if (models.MaintenanceMachineQrCode) {
+                Inspectable.hasOne(models.MaintenanceMachineQrCode, {
+                    foreignKey: 'ins_id',
+                    as: 'maintenanceQr'
+                });
+            }
+
+            if (models.MaintenanceScheduleSlot) {
+                Inspectable.hasMany(models.MaintenanceScheduleSlot, {
+                    foreignKey: 'ins_id',
+                    as: 'maintenanceSlots'
+                });
+            }
         }
     }
     Inspectable.init(

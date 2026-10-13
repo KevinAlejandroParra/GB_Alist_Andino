@@ -15,7 +15,8 @@ module.exports = (sequelize, DataTypes) => {
         }
     }
     MaintenanceMachineQrCode.init({
-        ins_id: { type: DataTypes.INTEGER, primaryKey: true, allowNull: false },
+        id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        ins_id: { type: DataTypes.INTEGER, unique: true, allowNull: false },
         qr_code: { type: DataTypes.STRING, unique: true, allowNull: false },
         is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
         created_by: { type: DataTypes.INTEGER, allowNull: true },

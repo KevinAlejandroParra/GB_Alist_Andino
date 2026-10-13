@@ -16,6 +16,14 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'assigned_user_id',
                 as: 'assignedUser'
             });
+            MaintenanceScheduleSlot.hasMany(models.MaintenanceSession, {
+                foreignKey: 'slot_id',
+                as: 'sessions'
+            });
+            MaintenanceScheduleSlot.hasOne(models.MaintenanceSession, {
+                foreignKey: 'slot_id',
+                as: 'session'
+            });
         }
     }
     MaintenanceScheduleSlot.init({

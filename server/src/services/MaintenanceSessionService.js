@@ -3,49 +3,114 @@ const {
     MaintenanceSessionEvidence, 
     MaintenanceSessionPart, 
     MaintenanceScheduleSlot, 
+    MaintenanceMachineConfig,
     MaintenanceMachineQrCode, 
-    MaintenanceQrScan 
+    MaintenanceQrScan,
+    Inspectable,
+    User
 } = require("../models");
 
+const VALID_PHASES = ['INICIO', 'PROCESO_1', 'PROCESO_2', 'FIN'];
+
 class MaintenanceSessionService {
+    /**
+     * Start or resume a maintenance session with mandatory QR validation
+     */
     async startSession(slotId, qrCode, technicianId) {
-        const slot = await MaintenanceScheduleSlot.findByPk(slotId);
-        if (!slot) throw new Error("Slot not found");
+        const slot = await MaintenanceScheduleSlot.findByPk(slotId, {
+            include: [{ model: Inspectable, as: 'inspectable' }]
+        });
+        if (!slot) throw new Error("Slot no encontrado en el cronograma");
+
+        if (!qrCode) throw new Error("El código QR es obligatorio para iniciar la sesión");
 
         const qr = await MaintenanceMachineQrCode.findOne({ 
             where: { qr_code: qrCode, is_active: true } 
         });
-        if (!qr) throw new Error("Invalid or inactive QR code");
-        if (qr.ins_id !== slot.ins_id) throw new Error("QR code does not match the machine assigned to this slot");
+        if (!qr) throw new Error("Código QR no reconocido o inactivo en el sistema");
+        
+        if (qr.ins_id !== slot.ins_id) {
+            throw new Error(`El código QR escaneado no corresponde a la máquina planificada (${slot.inspectable?.name || 'ID ' + slot.ins_id})`);
+        }
 
-        // Record scan
+        // Record scan audit log
         await MaintenanceQrScan.create({
             qr_code: qrCode,
             ins_id: qr.ins_id,
-            technician_id: technicianId
+            technician_id: technicianId,
+            scanned_at: new Date()
         });
 
-        // Start session
-        const session = await MaintenanceSession.create({
-            slot_id: slot.id,
-            ins_id: slot.ins_id,
-            type: slot.slot_type,
-            status: 'DRAFT',
-            technician_id: technicianId,
-            started_at: new Date()
+        // Reuse existing DRAFT session if available for this slot
+        let session = await MaintenanceSession.findOne({
+            where: {
+                slot_id: slot.id,
+                status: 'DRAFT'
+            },
+            include: [{ model: MaintenanceSessionEvidence, as: 'evidences' }]
         });
+
+        if (!session) {
+            session = await MaintenanceSession.create({
+                slot_id: slot.id,
+                ins_id: slot.ins_id,
+                type: slot.slot_type,
+                status: 'DRAFT',
+                technician_id: technicianId,
+                started_at: new Date()
+            });
+
+            session = await MaintenanceSession.findByPk(session.id, {
+                include: [{ model: MaintenanceSessionEvidence, as: 'evidences' }]
+            });
+        }
 
         return session;
     }
 
-    async uploadEvidence(sessionId, phase, fileUrl) {
-        const session = await MaintenanceSession.findByPk(sessionId);
-        if (!session) throw new Error("Session not found");
-
-        // Check if phase evidence already exists
-        const existing = await MaintenanceSessionEvidence.findOne({
-            where: { session_id: sessionId, phase: phase }
+    /**
+     * Get session by slotId
+     */
+    async getSessionBySlot(slotId) {
+        return await MaintenanceSession.findOne({
+            where: { slot_id: slotId },
+            include: [
+                { model: MaintenanceSessionEvidence, as: 'evidences' },
+                { model: Inspectable, as: 'inspectable' },
+                { model: User, as: 'technician', attributes: ['user_id', 'username', 'name'] }
+            ],
+            order: [['createdAt', 'DESC']]
         });
+    }
+
+    /**
+     * Get session by sessionId
+     */
+    async getSessionById(sessionId) {
+        return await MaintenanceSession.findByPk(sessionId, {
+            include: [
+                { model: MaintenanceSessionEvidence, as: 'evidences' },
+                { model: Inspectable, as: 'inspectable' },
+                { model: User, as: 'technician', attributes: ['user_id', 'username', 'name'] }
+            ]
+        });
+    }
+
+    /**
+     * Upload or update evidence photo for a specific phase
+     */
+    async uploadEvidence(sessionId, phase, fileUrl) {
+        if (!VALID_PHASES.includes(phase)) {
+            throw new Error(`Fase de evidencia inválida: ${phase}. Debe ser una de: ${VALID_PHASES.join(', ')}`);
+        }
+
+        const session = await MaintenanceSession.findByPk(sessionId);
+        if (!session) throw new Error("Sesión de mantenimiento no encontrada");
+
+        const existing = await MaintenanceSessionEvidence.findOne({
+            where: { session_id: sessionId, phase }
+        });
+
         if (existing) {
             await existing.update({ file_url: fileUrl });
             return existing;
@@ -53,38 +118,58 @@ class MaintenanceSessionService {
 
         return await MaintenanceSessionEvidence.create({
             session_id: sessionId,
-            phase: phase,
+            phase,
             file_url: fileUrl
         });
     }
 
+    /**
+     * Complete maintenance session after validating all 4 mandatory photos
+     */
     async completeSession(sessionId, description) {
-        const session = await MaintenanceSession.findByPk(sessionId);
-        if (!session) throw new Error("Session not found");
-
-        const evidencesCount = await MaintenanceSessionEvidence.count({ 
-            where: { session_id: sessionId } 
+        const session = await MaintenanceSession.findByPk(sessionId, {
+            include: [{ model: MaintenanceSessionEvidence, as: 'evidences' }]
         });
-        if (evidencesCount < 4) throw new Error("All 4 mandatory evidence photos are required to complete the session");
+        if (!session) throw new Error("Sesión no encontrada");
+
+        // Verify all 4 required evidence phases are uploaded
+        const uploadedPhases = new Set((session.evidences || []).map(e => e.phase));
+        const missingPhases = VALID_PHASES.filter(p => !uploadedPhases.has(p));
+
+        if (missingPhases.length > 0) {
+            throw new Error(`Faltan evidencias obligatorias: ${missingPhases.join(', ')}. Deben cargarse las 4 fotos.`);
+        }
 
         const completedAt = new Date();
-        const duration = Math.floor((completedAt - new Date(session.started_at)) / (1000 * 60));
+        const startedAt = session.started_at ? new Date(session.started_at) : completedAt;
+        const duration = Math.max(1, Math.floor((completedAt - startedAt) / (1000 * 60)));
 
         await session.update({
             status: 'COMPLETED',
-            description: description,
+            description: description || '',
             completed_at: completedAt,
             duration_minutes: duration
         });
 
-        return session;
+        // Update last_scheduled_at on machine config if this was a SCHEDULED session (Regla 7)
+        if (session.type === 'SCHEDULED') {
+            await MaintenanceMachineConfig.upsert({
+                ins_id: session.ins_id,
+                last_scheduled_at: completedAt
+            });
+        }
+
+        return await this.getSessionById(sessionId);
     }
 
+    /**
+     * Register spare part consumption
+     */
     async addPart(sessionId, inventoryId, quantity) {
         return await MaintenanceSessionPart.create({
             session_id: sessionId,
             inventory_id: inventoryId,
-            quantity: quantity
+            quantity: Number(quantity) || 1
         });
     }
 }

@@ -33,6 +33,7 @@ const deviceStorage = makeStorage(['dispositivos']);
 const attractionStorage = makeStorage(['atracciones']);
 const requisitionStorage = makeStorage(['requisiciones']);
 const userStorage = makeStorage(['usuarios']);
+const maintenanceEvidenceStorage = makeStorage(['mantenimiento', 'evidencias']);
 
 const uploadFailureEvidence = multer({ storage: failureEvidenceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadRepairEvidence = multer({ storage: repairEvidenceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
@@ -40,6 +41,7 @@ const uploadDevice = multer({ storage: deviceStorage, limits: { fileSize: FILE_S
 const uploadAttraction = multer({ storage: attractionStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadRequisition = multer({ storage: requisitionStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadUser = multer({ storage: userStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
+const uploadMaintenanceEvidence = multer({ storage: maintenanceEvidenceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 
 function toRelativePath(absoluteFilePath) {
   const normalized = absoluteFilePath.replace(/\\/g, '/');
@@ -88,6 +90,7 @@ module.exports = {
   uploadAttraction,
   uploadRequisition,
   uploadUser,
+  uploadMaintenanceEvidence,
   toRelativePath,
   resolveLocalEvidencePath,
   deleteLocalFile,

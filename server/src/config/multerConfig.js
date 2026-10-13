@@ -6,6 +6,7 @@ const {
   uploadDevice,
   uploadAttraction,
   uploadRequisition,
+  uploadMaintenanceEvidence,
   toRelativePath,
   resolveLocalEvidencePath,
   deleteLocalFile
@@ -18,6 +19,7 @@ module.exports.uploadRepairEvidence = uploadRepairEvidence;
 module.exports.uploadDevice = uploadDevice;
 module.exports.uploadAttraction = uploadAttraction;
 module.exports.uploadRequisition = uploadRequisition;
+module.exports.uploadMaintenanceEvidence = uploadMaintenanceEvidence;
 module.exports.toRelativePath = toRelativePath;
 module.exports.resolveLocalEvidencePath = resolveLocalEvidencePath;
 module.exports.deleteLocalFile = deleteLocalFile;

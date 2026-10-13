@@ -12,9 +12,14 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'published_by',
                 as: 'publisher'
             });
+            MaintenanceSchedulePlan.belongsTo(models.Premise, {
+                foreignKey: 'premise_id',
+                as: 'premise'
+            });
         }
     }
     MaintenanceSchedulePlan.init({
+        premise_id: { type: DataTypes.INTEGER, allowNull: true },
         year_month: { type: DataTypes.STRING, allowNull: false },
         status: { type: DataTypes.ENUM('DRAFT', 'PUBLISHED'), defaultValue: 'DRAFT' },
         generated_at: { type: DataTypes.DATE, allowNull: true },

@@ -27,6 +27,13 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'checklist_id',
         as: 'checklist'
       });
+
+      if (models.MaintenanceSession) {
+        Requisition.belongsTo(models.MaintenanceSession, {
+          foreignKey: 'maintenance_session_id',
+          as: 'maintenanceSession'
+        });
+      }
     }
   }
 
@@ -96,6 +103,13 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: true,
       comment: 'ID del checklist asociado a la requisición'
+    },
+
+    // Relación con sesión de mantenimiento
+    maintenance_session_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'ID de la sesión de mantenimiento asociada a la requisición'
     }
   }, {
     sequelize,

@@ -15,6 +15,7 @@ module.exports = (sequelize, DataTypes) => {
         }
     }
     MaintenanceQrScan.init({
+        id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
         qr_code: { type: DataTypes.STRING, allowNull: false },
         ins_id: { type: DataTypes.INTEGER, allowNull: false },
         technician_id: { type: DataTypes.INTEGER, allowNull: true },

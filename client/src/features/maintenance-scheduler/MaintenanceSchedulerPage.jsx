@@ -1,251 +1,135 @@
-"use client";
-import React, { useState, useEffect } from 'react';
-import { 
-    Grid, Typography, Paper, Box, Button, 
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Switch, Select, MenuItem, FormControl, InputLabel, Dialog
-} from '@mui/material';
-import { 
-    CalendarMonth, 
-    Settings as SettingsIcon, 
-    PlayArrow as PlayIcon, 
-    CheckCircle as CheckIcon 
-} from '@mui/icons-material';
-import axiosInstance from '../../utils/axiosConfig';
+'use client';
+
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../../components/AuthContext';
+import ProtectedRoute from '../../components/ProtectedRoute';
+import { useMaintenanceCalendar } from './hooks/useMaintenanceCalendar';
+import MaintenanceCalendarView from './components/MaintenanceCalendarView';
+import MaintenanceDayDrawer from './components/MaintenanceDayDrawer';
+import MaintenanceConfigPanel from './components/MaintenanceConfigPanel';
+import MaintenanceSettingsPanel from './components/MaintenanceSettingsPanel';
+import MaintenanceQrPanel from './components/MaintenanceQrPanel';
 import MaintenanceSessionWizard from './MaintenanceSessionWizard';
 
-const API_BASE = '/api/maintenance-scheduler';
+export default function MaintenanceSchedulerPage() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('calendar'); // 'calendar', 'configs', 'settings', 'qrs'
 
-const MaintenanceSchedulerPage = () => {
-    const [view, setView] = useState('calendar');
-    const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7));
-    const [plan, setPlan] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [configs, setConfigs] = useState([]);
-    const [premiseId, setPremiseId] = useState(1); 
-    const [selectedSlot, setSelectedSlot] = useState(null);
+  const calendar = useMaintenanceCalendar(1);
+  const isAdminOrSupport = user?.role_id === 1 || user?.role_id === 2;
 
-    useEffect(() => {
-        if (view === 'calendar') {
-            loadPlan();
-        } else if (view === 'config') {
-            loadConfigs();
-        }
-    }, [view, currentMonth]);
+  const tabs = [
+    { id: 'calendar', label: 'Calendario Operativo', icon: 'fa-calendar-alt' },
+    ...(isAdminOrSupport
+      ? [
+          { id: 'configs', label: 'Configuración Máquinas', icon: 'fa-cogs' },
+          { id: 'settings', label: 'Estrategia y Capacidad', icon: 'fa-sliders-h' },
+          { id: 'qrs', label: 'Códigos QR', icon: 'fa-qrcode' }
+        ]
+      : [])
+  ];
 
-    const loadPlan = async () => {
-        setLoading(true);
-        try {
-            const res = await axiosInstance.get(`${API_BASE}/plans/month?premiseId=${premiseId}&month=${currentMonth}`);
-            setPlan(res.data);
-        } catch (e) {
-            console.error("Error loading plan", e);
-        } finally {
-            setLoading(false);
-        }
-    };
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen bg-slate-100 text-slate-800 font-sans pb-16">
+        {/* Top Navbar Header */}
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => router.push('/dashboard')}
+                  className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+                  title="Volver al Dashboard"
+                >
+                  <i className="fas fa-arrow-left text-lg" />
+                </button>
+                <div>
+                  <h1 className="text-lg font-bold text-slate-900 leading-tight">
+                    Cronograma de Mantenimiento Preventivo
+                  </h1>
+                  <p className="text-xs text-slate-500">
+                    Sede Andino • Preventivo Semanal y Programado (PP)
+                  </p>
+                </div>
+              </div>
 
-    const loadConfigs = async () => {
-        setLoading(true);
-        try {
-            const res = await axiosInstance.get(`${API_BASE}/config/machines?premiseId=${premiseId}`);
-            setConfigs(res.data);
-        } catch (e) {
-            console.error("Error loading configs", e);
-        } finally {
-            setLoading(false);
-        }
-    };
+              {/* Navigation Tabs */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      activeTab === tab.id
+                        ? 'bg-white text-indigo-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <i className={`fas ${tab.icon}`} />
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </header>
 
-    const generatePlan = async () => {
-        setLoading(true);
-        try {
-            await axiosInstance.post(`${API_BASE}/plans/generate?premiseId=${premiseId}&month=${currentMonth}`);
-            await loadPlan();
-        } catch (e) {
-            alert("Error generating plan: " + e.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+        {/* Main Content Area */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+          {activeTab === 'calendar' && (
+            <MaintenanceCalendarView
+              planData={calendar.planData}
+              currentMonth={calendar.currentMonth}
+              onMonthChange={calendar.setCurrentMonth}
+              onGeneratePlan={calendar.generatePlan}
+              onPublishPlan={calendar.publishPlan}
+              loading={calendar.loading}
+              onSelectSlot={(slot) => calendar.setSelectedSlot(slot)}
+              onSelectDay={(dayInfo) => calendar.setSelectedDay(dayInfo)}
+            />
+          )}
 
-    const publishPlan = async () => {
-        if (!plan) return;
-        try {
-            await axiosInstance.post(`${API_BASE}/plans/${plan.id}/publish`);
-            await loadPlan();
-            alert("Plan published successfully");
-        } catch (e) {
-            alert("Error publishing plan: " + e.message);
-        }
-    };
+          {activeTab === 'configs' && isAdminOrSupport && (
+            <MaintenanceConfigPanel premiseId={calendar.premiseId} />
+          )}
 
-    const updateMachineConfig = async (insId, updatedData) => {
-        try {
-            await axiosInstance.post(`${API_BASE}/config/machine`, { ins_id: insId, ...updatedData });
-            await loadConfigs();
-        } catch (e) {
-            console.error("Error updating config", e);
-        }
-    };
+          {activeTab === 'settings' && isAdminOrSupport && (
+            <MaintenanceSettingsPanel premiseId={calendar.premiseId} />
+          )}
 
-    const getSlotColor = (slot) => {
-        if (slot.status === 'COMPLETED') return '#4caf50';
-        if (slot.status === 'DRAFT') return '#ffeb3b';
-        return '#f44336';
-    };
+          {activeTab === 'qrs' && isAdminOrSupport && (
+            <MaintenanceQrPanel premiseId={calendar.premiseId} />
+          )}
+        </main>
 
-    return (
-        <Box sx={{ p: 3 }}>
-            <Paper sx={{ p: 2, mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                    <Typography variant="h5">Cronograma de Mantenimiento</Typography>
-                    <Button 
-                        startIcon={<CalendarMonth />} 
-                        onClick={() => setView('calendar')}
-                        variant={view === 'calendar' ? 'contained' : 'outlined'}
-                    >
-                        Calendario
-                    </Button>
-                    <Button 
-                        startIcon={<SettingsIcon />} 
-                        onClick={() => setView('config')}
-                        variant={view === 'config' ? 'contained' : 'outlined'}
-                    >
-                        Configuración
-                    </Button>
-                </Box>
-                
-                {view === 'calendar' && (
-                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                        <input 
-                            type="month" 
-                            value={currentMonth} 
-                            onChange={(e) => setCurrentMonth(e.target.value)} 
-                        />
-                        <Button 
-                            startIcon={<PlayIcon />} 
-                            onClick={generatePlan} 
-                            disabled={loading}
-                            variant="contained" 
-                            color="secondary"
-                        >
-                            Generar Plan
-                        </Button>
-                        <Button 
-                            startIcon={<CheckIcon />} 
-                            onClick={publishPlan} 
-                            disabled={loading || !plan}
-                            variant="contained" 
-                            color="primary"
-                        >
-                            Publicar
-                        </Button>
-                    </Box>
-                )}
-            </Paper>
+        {/* Day Detail Drawer */}
+        {calendar.selectedDay && (
+          <MaintenanceDayDrawer
+            dayData={calendar.selectedDay}
+            onClose={() => calendar.setSelectedDay(null)}
+            onOpenSlotWizard={(slot) => {
+              calendar.setSelectedDay(null);
+              calendar.setSelectedSlot(slot);
+            }}
+          />
+        )}
 
-            {view === 'calendar' ? (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {loading ? <Typography>Cargando plan...</Typography> : plan ? (
-                        <Grid container spacing={2}>
-                            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                                <Grid item xs={12} md={4} key={day}>
-                                    <Paper sx={{ p: 2, mb: 2 }}>
-                                        <Typography variant="subtitle1" fontWeight="bold">
-                                            Día {day} ({currentMonth})
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-                                            {plan.slots.filter(s => new Date(s.scheduled_date).getDate() === day).map(slot => (
-                                                <Box 
-                                                    key={slot.id} 
-                                                    onClick={() => setSelectedSlot(slot)}
-                                                    sx={{ 
-                                                        p: 1, 
-                                                        borderRadius: 1, 
-                                                        bgcolor: getSlotColor(slot),
-                                                        display: 'flex', 
-                                                        justifyContent: 'space-between',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    <Typography variant="body2">{slot.inspectable?.name} ({slot.slot_type})</Typography>
-                                                    <Typography variant="caption">{slot.status || 'PENDIENTE'}</Typography>
-                                                </Box>
-                                            ))}
-                                        </Box>
-                                    </Paper>
-                                </Grid>
-                            ))}
-                        </Grid>
-                    ) : <Typography>No hay plan generado para este mes.</Typography>}
-                </Box>
-            ) : (
-                <TableContainer component={Paper}>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Máquina</TableCell>
-                                <TableCell>Semanal</TableCell>
-                                <TableCell>Día Semanal</TableCell>
-                                <TableCell>Exento Programado</TableCell>
-                                <TableCell>Acciones</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {configs.map((config) => (
-                                <TableRow key={config.ins_id}>
-                                    <TableCell>{config.inspectable?.name}</TableCell>
-                                    <TableCell>
-                                        <Switch 
-                                            checked={config.weekly_enabled} 
-                                            onChange={(e) => updateMachineConfig(config.ins_id, { weekly_enabled: e.target.checked })} 
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Select 
-                                            size="small"
-                                            value={config.weekly_weekday || ''} 
-                                            onChange={(e) => updateMachineConfig(config.ins_id, { weekly_weekday: parseInt(e.target.value) })}
-                                        >
-                                            <MenuItem value={0}>Domingo</MenuItem>
-                                            <MenuItem value={1}>Lunes</MenuItem>
-                                            <MenuItem value={2}>Martes</MenuItem>
-                                            <MenuItem value={3}>Miércoles</MenuItem>
-                                            <MenuItem value={4}>Jueves</MenuItem>
-                                            <MenuItem value={5}>Viernes</MenuItem>
-                                            <MenuItem value={6}>Sábado</MenuItem>
-                                        </Select>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Switch 
-                                            checked={config.scheduled_exempt} 
-                                            onChange={(e) => updateMachineConfig(config.ins_id, { scheduled_exempt: e.target.checked })} 
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="caption">Auto-guardado</Typography>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            )}
-
-            <Dialog open={!!selectedSlot} onClose={() => setSelectedSlot(null)} maxWidth="sm" fullWidth>
-                {selectedSlot && (
-                    <MaintenanceSessionWizard 
-                        slot={selectedSlot} 
-                        onComplete={() => {
-                            setSelectedSlot(null);
-                            loadPlan();
-                        }} 
-                    />
-                )}
-            </Dialog>
-        </Box>
-    );
-};
-
-export default MaintenanceSchedulerPage;
+        {/* Slot Maintenance Wizard Modal */}
+        {calendar.selectedSlot && (
+          <MaintenanceSessionWizard
+            slot={calendar.selectedSlot}
+            onClose={() => calendar.setSelectedSlot(null)}
+            onComplete={() => {
+              calendar.setSelectedSlot(null);
+              calendar.refreshPlan();
+            }}
+          />
+        )}
+      </div>
+    </ProtectedRoute>
+  );
+}

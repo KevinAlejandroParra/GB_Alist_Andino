@@ -147,7 +147,7 @@ export default function AdminDashboard() {
         Panel de Administración
       </h1>
 
-      <div className="mb-6 flex justify-center">
+      <div className="mb-6 flex justify-center gap-3">
         <button
           type="button"
           onClick={() => router.push('/fallas')}
@@ -155,6 +155,14 @@ export default function AdminDashboard() {
         >
           <i className="fa fa-book-medical" />
           Libro de Fallas
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push('/mantenimiento/cronograma')}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 text-white text-sm font-semibold shadow-md hover:from-blue-700 hover:to-indigo-800 transition-all"
+        >
+          <i className="fa fa-calendar-alt" />
+          Cronograma Mantenimiento
         </button>
       </div>
 
