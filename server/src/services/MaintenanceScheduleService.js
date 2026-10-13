@@ -285,7 +285,7 @@ class MaintenanceScheduleService {
                 {
                     model: User,
                     as: 'publisher',
-                    attributes: ['user_id', 'username', 'email']
+                    attributes: ['user_id', 'user_name', 'user_email']
                 }
             ]
         });
@@ -298,7 +298,7 @@ class MaintenanceScheduleService {
                     {
                         model: User,
                         as: 'publisher',
-                        attributes: ['user_id', 'username', 'email']
+                        attributes: ['user_id', 'user_name', 'user_email']
                     }
                 ]
             });
@@ -333,7 +333,7 @@ class MaintenanceScheduleService {
                 {
                     model: User,
                     as: 'assignedUser',
-                    attributes: ['user_id', 'username', 'name']
+                    attributes: ['user_id', 'user_name', 'user_email']
                 },
                 {
                     model: MaintenanceSession,
@@ -346,7 +346,7 @@ class MaintenanceScheduleService {
                         {
                             model: User,
                             as: 'technician',
-                            attributes: ['user_id', 'username', 'name']
+                            attributes: ['user_id', 'user_name', 'user_email']
                         }
                     ]
                 }

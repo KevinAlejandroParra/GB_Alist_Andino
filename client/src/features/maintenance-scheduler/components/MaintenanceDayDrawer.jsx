@@ -134,7 +134,7 @@ export default function MaintenanceDayDrawer({
                         {slot.latest_session.technician && (
                           <p>
                             <i className="fas fa-user-cog mr-1 text-gray-400" />
-                            Técnico: <span className="font-semibold">{slot.latest_session.technician.name || slot.latest_session.technician.username}</span>
+                            Técnico: <span className="font-semibold">{slot.latest_session.technician.user_name || slot.latest_session.technician.name || slot.latest_session.technician.username}</span>
                           </p>
                         )}
                         {slot.latest_session.duration_minutes && (

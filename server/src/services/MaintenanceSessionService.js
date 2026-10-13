@@ -77,7 +77,7 @@ class MaintenanceSessionService {
             include: [
                 { model: MaintenanceSessionEvidence, as: 'evidences' },
                 { model: Inspectable, as: 'inspectable' },
-                { model: User, as: 'technician', attributes: ['user_id', 'username', 'name'] }
+                { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
             ],
             order: [['createdAt', 'DESC']]
         });
@@ -91,7 +91,7 @@ class MaintenanceSessionService {
             include: [
                 { model: MaintenanceSessionEvidence, as: 'evidences' },
                 { model: Inspectable, as: 'inspectable' },
-                { model: User, as: 'technician', attributes: ['user_id', 'username', 'name'] }
+                { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
             ]
         });
     }
