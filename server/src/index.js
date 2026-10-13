@@ -22,7 +22,9 @@ const qrCodeRoutes = require("./routes/qrCodeRoutes");
 const retroactiveSignatureRoutes = require("./routes/retroactiveSignatureRoutes");
 const supportChecklistRoutes = require("./routes/supportChecklistRoutes");
 const retroactiveAccessRoutes = require("./routes/retroactiveAccessRoutes");
+const maintenanceSchedulerRoutes = require("./routes/maintenanceScheduler");
 const swaggerUi = require('swagger-ui-express');
+
 const swaggerFile = require('./swagger-output.json');
 const path = require("path");
 const cors = require('cors');
@@ -75,6 +77,8 @@ app.use("/api", qrCodeRoutes);
 app.use("/api/retroactive-signatures", retroactiveSignatureRoutes);
 app.use("/api/support", supportChecklistRoutes);
 app.use("/api/retroactive-access", retroactiveAccessRoutes);
+app.use("/api/maintenance-scheduler", maintenanceSchedulerRoutes);
+
 
 // app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 

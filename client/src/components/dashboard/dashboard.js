@@ -69,6 +69,18 @@ export default function Dashboard() {
     });
   }
 
+  // Agregar Cronograma de Mantenimiento para Admin y Técnicos
+  if ([1, 2, 3, 7].includes(user?.role_id)) {
+    quickActions.push({
+      title: "Cronograma Mantenimiento",
+      description: "Planificación y ejecución de preventivos",
+      icon: "fas fa-calendar-alt",
+      href: "/mantenimiento/cronograma",
+      color: "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+    });
+  }
+
+
   const handlePremiosAnalytics = async () => {
     try {
       const token = localStorage.getItem('authToken')
