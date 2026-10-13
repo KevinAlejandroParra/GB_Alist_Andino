@@ -11,7 +11,7 @@ import {
     PlayArrow as PlayIcon, 
     CheckCircle as CheckIcon 
 } from '@mui/icons-material';
-import axiosInstance from '@/utils/axiosConfig';
+import axiosInstance from '../../utils/axiosConfig';
 import MaintenanceSessionWizard from './MaintenanceSessionWizard';
 
 const API_BASE = '/api/maintenance-scheduler';

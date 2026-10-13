@@ -9,7 +9,7 @@ import {
     CheckCircle as CompleteIcon,
     QrCodeScanner as QrIcon
 } from '@mui/icons-material';
-import axiosInstance from '@/utils/axiosConfig';
+import axiosInstance from '../../utils/axiosConfig';
 
 const API_BASE = '/api/maintenance-scheduler';
 
