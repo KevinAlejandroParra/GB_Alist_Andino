@@ -19,7 +19,8 @@ export function AuthProvider({ children }) {
           user_id: decodedToken.user_id,
           role_id: decodedToken.role_id,
           user_name: decodedToken.user_name,
-          role_name: decodedToken.role_name
+          role_name: decodedToken.role_name,
+          premise_id: decodedToken.premise_id || null
         });
       } catch (error) {
         console.error("Error decoding token:", error);
@@ -55,7 +56,8 @@ export function AuthProvider({ children }) {
         user_id: decodedToken.user_id,
         role_id: decodedToken.role_id,
         user_name: decodedToken.user_name,
-        role_name: decodedToken.role_name
+        role_name: decodedToken.role_name,
+        premise_id: decodedToken.premise_id || null
       });
       return { success: true };
     } catch (error) {

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { maintenanceApi } from '../utils/maintenanceSchedulerApi';
 import Swal from 'sweetalert2';
 
-export function useMaintenanceCalendar(initialPremiseId = 1) {
+export function useMaintenanceCalendar(initialPremiseId = 2) {
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     const y = now.getFullYear();
@@ -15,6 +15,12 @@ export function useMaintenanceCalendar(initialPremiseId = 1) {
   const [loading, setLoading] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
+
+  useEffect(() => {
+    if (initialPremiseId && initialPremiseId !== premiseId) {
+      setPremiseId(initialPremiseId);
+    }
+  }, [initialPremiseId]);
 
   const fetchPlan = useCallback(async () => {
     setLoading(true);

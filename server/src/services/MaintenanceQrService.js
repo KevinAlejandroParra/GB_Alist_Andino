@@ -53,8 +53,8 @@ class MaintenanceQrService {
      * Generate missing QR codes in bulk for an entire premise
      */
     async bulkGenerateMissingQrs(premiseId, userId) {
-        const whereClause = { type_code: 'device' };
-        if (premiseId) whereClause.premise_id = premiseId;
+        const whereClause = {};
+        if (premiseId) whereClause.premise_id = Number(premiseId);
 
         const machines = await Inspectable.findAll({ where: whereClause });
         let generatedCount = 0;
@@ -102,8 +102,8 @@ class MaintenanceQrService {
      * List all machines with their QR status for badge printing
      */
     async listMachineQrs(premiseId) {
-        const whereClause = { type_code: 'device' };
-        if (premiseId) whereClause.premise_id = premiseId;
+        const whereClause = {};
+        if (premiseId) whereClause.premise_id = Number(premiseId);
 
         const machines = await Inspectable.findAll({
             where: whereClause,

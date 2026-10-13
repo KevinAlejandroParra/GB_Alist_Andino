@@ -24,11 +24,9 @@ class MaintenanceConfigService {
     }
 
     async getAllMachineConfigs(premiseId) {
-        const whereClause = {
-            type_code: 'device'
-        };
+        const whereClause = {};
         if (premiseId) {
-            whereClause.premise_id = premiseId;
+            whereClause.premise_id = Number(premiseId);
         }
 
         const inspectables = await Inspectable.findAll({

@@ -454,12 +454,13 @@ class UserController {
                 });
             }
 
-            // Incluir user_name y role_name en el JWT
+            // Incluir user_name, role_name y premise_id en el JWT
             const token = jwt.sign({
                 user_id: user.user_id,
                 role_id: user.role_id,
                 user_name: user.user_name,
-                role_name: user.role?.role_name || null
+                role_name: user.role?.role_name || null,
+                premise_id: user.premise_id || null
             }, process.env.JWT_KEY);
 
             res.status(200).json({
