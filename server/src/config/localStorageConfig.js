@@ -35,13 +35,27 @@ const requisitionStorage = makeStorage(['requisiciones']);
 const userStorage = makeStorage(['usuarios']);
 const maintenanceEvidenceStorage = makeStorage(['mantenimiento', 'evidencias']);
 
+// Storage con nombre único para evidencias de mantenimiento (evita colisiones
+// y URLs con espacios/acentos provenientes del nombre original del archivo)
+const maintenanceEvidenceUniqueStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(UPLOADS_ROOT, 'mantenimiento', 'evidencias');
+    ensureDir(dir);
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '') || '.jpg';
+    cb(null, `maint-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext.toLowerCase()}`);
+  }
+});
+
 const uploadFailureEvidence = multer({ storage: failureEvidenceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadRepairEvidence = multer({ storage: repairEvidenceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadDevice = multer({ storage: deviceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadAttraction = multer({ storage: attractionStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadRequisition = multer({ storage: requisitionStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadUser = multer({ storage: userStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
-const uploadMaintenanceEvidence = multer({ storage: maintenanceEvidenceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
+const uploadMaintenanceEvidence = multer({ storage: maintenanceEvidenceUniqueStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 
 function toRelativePath(absoluteFilePath) {
   const normalized = absoluteFilePath.replace(/\\/g, '/');

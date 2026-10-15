@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { maintenanceApi } from './utils/maintenanceSchedulerApi';
+import { getImageSrc } from '../../utils/imageUrl';
 import QrScannerModal from '../../components/checklist/QrScannerModal';
 import Swal from 'sweetalert2';
 
@@ -324,7 +325,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                         {currentUrl ? (
                           <div className="relative rounded-xl overflow-hidden border border-emerald-200 bg-black aspect-video flex items-center justify-center">
                             <img
-                              src={`/${currentUrl.replace(/^\/?/, '')}`}
+                              src={getImageSrc(currentUrl)}
                               alt={ph.label}
                               className="w-full h-full object-cover"
                             />
@@ -455,7 +456,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                     <div key={ph.key} className="rounded-xl overflow-hidden border border-gray-200 aspect-square bg-black relative">
                       {evidences[ph.key] ? (
                         <img
-                          src={`/${evidences[ph.key].replace(/^\/?/, '')}`}
+                          src={getImageSrc(evidences[ph.key])}
                           alt={ph.label}
                           className="w-full h-full object-cover"
                         />

@@ -99,8 +99,17 @@ export default function QrScannerModal({
            </div>
          </div>
          <div className="p-4 border-t bg-gray-50 rounded-b-lg">
-           <div className="text-xs text-gray-500 text-center">
-             🔒 Se necesita acceso a la cámara para escanear.
+           <div className="flex flex-col items-center gap-3">
+             <button
+               type="button"
+               onClick={onClose}
+               className="w-full px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition-colors"
+             >
+               ✕ Cerrar Escáner
+             </button>
+             <div className="text-xs text-gray-500 text-center">
+               🔒 Se necesita acceso a la cámara para escanear.
+             </div>
            </div>
          </div>
        </div>
