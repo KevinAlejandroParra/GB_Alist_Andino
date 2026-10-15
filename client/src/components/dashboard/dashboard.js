@@ -2,6 +2,7 @@
 import ProtectedRoute from '../ProtectedRoute';
 import { useAuth } from '../AuthContext';
 import InspectablesList from './InspectablesList';
+import PilotAnnouncementModal from '../home/PilotAnnouncementModal';
 import { useRouter } from 'next/navigation';
 import axiosInstance from '../../utils/axiosConfig';
 import Swal from 'sweetalert2';
@@ -144,7 +145,7 @@ export default function Dashboard() {
         </header>
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            
+
             <div className="mb-8">
               <h2 className="text-2xl font-semibold mb-6 text-gray-800">Acceso Rápido</h2>
               <div className="grid grid-cols-1 md:grid-cols-1 gap-6 max-w-md">
@@ -167,6 +168,7 @@ export default function Dashboard() {
             <InspectablesList />
           </div>
         </main>
+        <PilotAnnouncementModal />
       </div>
     </ProtectedRoute>
   );

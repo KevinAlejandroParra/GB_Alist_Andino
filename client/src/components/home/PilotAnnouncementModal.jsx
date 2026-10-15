@@ -1,21 +1,53 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axiosInstance from '../../utils/axiosConfig';
 
 const API_URL = process.env.NEXT_PUBLIC_API || 'http://localhost:5000';
+const DISMISS_KEY = 'pilot_announcement_dismissed';
+const ANNOUNCEMENT_ID = 'v1'; // Cambiar este ID para volver a mostrar el anuncio a todos
 
 /**
- * Anuncio de salida de la etapa piloto + Buzón de peticiones,
- * quejas y reclamos (PQR). Se muestra en el inicio de la app.
+ * Anuncio modal flotante de salida de la etapa piloto + Buzón de
+ * peticiones, quejas y reclamos (PQR). Aparece al iniciar sesión
+ * (en el Dashboard) y puede cerrarse con el botón o la tecla ESC.
  */
-export default function PilotAnnouncement() {
+export default function PilotAnnouncementModal() {
+  const [open, setOpen] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    // No reabrir si el usuario ya lo cerró con esta versión del anuncio
+    if (typeof window !== 'undefined' && sessionStorage.getItem(DISMISS_KEY) === ANNOUNCEMENT_ID) {
+      return;
+    }
+    const timer = setTimeout(() => setOpen(true), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Cerrar con tecla ESC
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  const handleClose = () => {
+    setOpen(false);
+    try {
+      sessionStorage.setItem(DISMISS_KEY, ANNOUNCEMENT_ID);
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,8 +65,6 @@ export default function PilotAnnouncement() {
         message: message.trim()
       });
       setSent(true);
-      setName('');
-      setMessage('');
     } catch (err) {
       setError(err.response?.data?.error || 'No se pudo enviar el mensaje. Intenta de nuevo.');
     } finally {
@@ -42,11 +72,25 @@ export default function PilotAnnouncement() {
     }
   };
 
+  if (!open) return null;
+
   return (
-    <div className="w-full max-w-3xl mx-auto px-4 pt-6">
-      <div className="bg-white rounded-2xl shadow-lg border border-indigo-100 overflow-hidden">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="absolute inset-0" onClick={handleClose} aria-label="Cerrar anuncio" />
+
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+        {/* Botón de cierre */}
+        <button
+          type="button"
+          onClick={handleClose}
+          aria-label="Cerrar"
+          className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center transition-colors"
+        >
+          <i className="fas fa-times text-lg" />
+        </button>
+
         {/* Encabezado del anuncio */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-7 pr-14 rounded-t-3xl">
           <div className="flex items-center gap-3">
             <span className="text-3xl">🎉</span>
             <h2 className="text-xl font-bold">¡Hola Alist!</h2>
@@ -63,19 +107,15 @@ export default function PilotAnnouncement() {
           </p>
         </div>
 
-        {/* Acciones */}
-        <div className="p-5">
-          {!showForm && !sent && (
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm shadow-sm transition-all flex items-center justify-center gap-2"
-            >
-              📬 Abrir buzón de sugerencias
-            </button>
+        {/* Contenido */}
+        <div className="p-6">
+          {!sent && (
+            <p className="text-xs text-gray-500 mb-4">
+              📬 ¿Tienes alguna petición, queja o reclamo? Déjanosla aquí — la leeremos personalmente.
+            </p>
           )}
 
-          {sent && (
+          {sent ? (
             <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3">
               <span className="text-xl">✅</span>
               <div>
@@ -83,9 +123,7 @@ export default function PilotAnnouncement() {
                 <p className="text-xs text-emerald-700">Gracias por tu opinión — la tendremos en cuenta para los próximos cambios.</p>
               </div>
             </div>
-          )}
-
-          {showForm && !sent && (
+          ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
                 <label htmlFor="feedback-name" className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">
@@ -130,19 +168,11 @@ export default function PilotAnnouncement() {
                   {sending && <i className="fas fa-spinner fa-spin" />}
                   {sending ? 'Enviando...' : 'Enviar mensaje'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowForm(false); setError(''); }}
-                  disabled={sending}
-                  className="px-4 py-2.5 text-gray-600 hover:text-gray-900 text-sm font-semibold"
-                >
-                  Cancelar
-                </button>
               </div>
             </form>
           )}
 
-          <p className="mt-4 text-xs text-gray-400 text-right">
+          <p className="mt-5 text-xs text-gray-400 text-right">
             Atentamente, <span className="font-semibold text-gray-500">Alejandro Parra — Asistente de Tecnología</span>
           </p>
         </div>
