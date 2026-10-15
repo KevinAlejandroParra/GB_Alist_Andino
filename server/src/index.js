@@ -23,6 +23,7 @@ const retroactiveSignatureRoutes = require("./routes/retroactiveSignatureRoutes"
 const supportChecklistRoutes = require("./routes/supportChecklistRoutes");
 const retroactiveAccessRoutes = require("./routes/retroactiveAccessRoutes");
 const maintenanceSchedulerRoutes = require("./routes/maintenanceScheduler");
+const feedbackRoutes = require("./routes/feedbackRoutes");
 const swaggerUi = require('swagger-ui-express');
 
 const swaggerFile = require('./swagger-output.json');
@@ -78,6 +79,7 @@ app.use("/api/retroactive-signatures", retroactiveSignatureRoutes);
 app.use("/api/support", supportChecklistRoutes);
 app.use("/api/retroactive-access", retroactiveAccessRoutes);
 app.use("/api/maintenance-scheduler", maintenanceSchedulerRoutes);
+app.use("/api/feedback", feedbackRoutes);
 
 
 // app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
