@@ -1,11 +1,11 @@
 'use client'
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import BaseChecklistPage from '../../../../components/checklist/BaseChecklistPage';
 import { CHECKLIST_TYPES, getUiConfig } from '../../../../components/checklist/config/checklistTypes.config';
 
-export default function FamilyChecklistPage() {
+function FamilyChecklistContent() {
   const params = useParams();
   const { checklistTypeId } = params;
   const searchParams = useSearchParams();
@@ -35,5 +35,21 @@ export default function FamilyChecklistPage() {
       preselectedEntity={preselectedEntity}
       icon={uiConfig.icon}
     />
+  );
+}
+
+// useSearchParams() requiere un límite de Suspense para el prerender estático (Next 15)
+export default function FamilyChecklistPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <svg className="animate-spin h-10 w-10 text-indigo-600" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+      </div>
+    }>
+      <FamilyChecklistContent />
+    </Suspense>
   );
 }

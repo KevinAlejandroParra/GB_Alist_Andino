@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
 import Swal from 'sweetalert2';
@@ -17,7 +17,7 @@ import RetroactiveSignatureManagement from '../../components/admin/RetroactiveSi
 import SupportChecklistManagement from '../../components/admin/SupportChecklistManagement';
 import RetroactiveAccessPage from './retroactive-access/page';
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
   const [activeTab, setActiveTab] = useState('users');
   const [userRoleId, setUserRoleId] = useState(null);
   const router = useRouter();
@@ -282,5 +282,20 @@ export default function AdminDashboard() {
         {renderContent()}
       </div>
     </div>
+  );
+}
+// useSearchParams() requiere un límite de Suspense para el prerender estático (Next 15)
+export default function AdminDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-64">
+        <svg className="animate-spin h-10 w-10 text-indigo-600" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+      </div>
+    }>
+      <AdminDashboardContent />
+    </Suspense>
   );
 }

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import axiosInstance from '../../utils/axiosConfig';
 
@@ -8,7 +8,7 @@ import axiosInstance from '../../utils/axiosConfig';
  * Accesible sin login — el técnico llega aquí desde el correo.
  * Pide contraseña para confirmar identidad antes de aprobar/rechazar.
  */
-export default function ReviewRequestPage() {
+function ReviewRequestContent() {
   const searchParams = useSearchParams();
   const token  = searchParams.get('token');
   const action = searchParams.get('action'); // 'approve' | 'reject'
@@ -247,5 +247,21 @@ export default function ReviewRequestPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+// useSearchParams() requiere un límite de Suspense para el prerender estático (Next 15)
+export default function ReviewRequestPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <svg className="animate-spin h-10 w-10 text-purple-600" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+      </div>
+    }>
+      <ReviewRequestContent />
+    </Suspense>
   );
 }
