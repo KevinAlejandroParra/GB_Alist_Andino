@@ -103,9 +103,39 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
     }
   };
 
-  // Upload single photo evidence
+  // Lee la duración de un video local usando un <video> temporal
+  const getVideoDuration = (file) =>
+    new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        resolve(video.duration || 0);
+      };
+      video.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(0);
+      };
+      video.src = url;
+    });
+
+  // Upload single photo or short video evidence (max 15s for videos)
   const handleUploadEvidence = async (phase, file) => {
     if (!file || !sessionId) return;
+
+    const isVideo = file.type.startsWith('video/');
+    if (isVideo) {
+      const duration = await getVideoDuration(file);
+      if (duration > 15) {
+        return Swal.fire({
+          icon: 'warning',
+          title: 'Video demasiado largo',
+          text: `El video dura ${Math.round(duration)} segundos. El límite es de 15 segundos.`,
+          confirmButtonColor: '#3b82f6'
+        });
+      }
+    }
 
     setUploadingPhase(phase);
     try {
@@ -114,7 +144,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
     } catch (err) {
       Swal.fire({
         icon: 'error',
-        title: 'Error subiendo fotografía',
+        title: 'Error subiendo evidencia',
         text: err.response?.data?.error || err.message
       });
     } finally {
@@ -278,9 +308,9 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-base font-bold text-gray-900">4 Evidencias Fotográficas Obligatorias</h4>
+                  <h4 className="text-base font-bold text-gray-900">4 Evidencias Obligatorias (Foto o Video)</h4>
                   <p className="text-xs text-gray-500">
-                    Todas las fotos son obligatorias para cumplir la condición azul.
+                    Todas son obligatorias. Videos: máximo 15 segundos.
                   </p>
                 </div>
                 <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
@@ -324,17 +354,24 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                       <div className="mt-3">
                         {currentUrl ? (
                           <div className="relative rounded-xl overflow-hidden border border-emerald-200 bg-black aspect-video flex items-center justify-center">
-                            <img
-                              src={getImageSrc(currentUrl)}
-                              alt={ph.label}
-                              className="w-full h-full object-cover"
-                            />
+                            {currentUrl.match(/\.(mp4|webm|mov|m4v|avi|mkv)(\?|$)/i) ? (
+                              <video
+                                src={getImageSrc(currentUrl)}
+                                controls
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <img
+                                src={getImageSrc(currentUrl)}
+                                alt={ph.label}
+                                className="w-full h-full object-cover"
+                              />
+                            )}
                             <label className="absolute bottom-2 right-2 bg-black/70 hover:bg-black text-white px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer shadow-md transition-colors flex items-center gap-1">
-                              <i className="fas fa-camera" /> Cambiar
+                              <i className="fas fa-sync-alt" /> Cambiar
                               <input
                                 type="file"
-                                accept="image/*"
-                                capture="environment"
+                                accept="image/*,video/*"
                                 className="hidden"
                                 onChange={(e) => handleUploadEvidence(ph.key, e.target.files[0])}
                               />
@@ -349,13 +386,13 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                             ) : (
                               <>
                                 <i className="fas fa-camera text-2xl text-indigo-500 mb-1" />
-                                <span className="text-xs font-bold text-indigo-700">Tomar o Seleccionar Foto</span>
+                                <span className="text-xs font-bold text-indigo-700">Tomar Foto / Video o Seleccionar Archivo</span>
+                                <span className="text-[10px] text-gray-500 mt-0.5">Videos: máximo 15 segundos</span>
                               </>
                             )}
                             <input
                               type="file"
-                              accept="image/*"
-                              capture="environment"
+                              accept="image/*,video/*"
                               className="hidden"
                               disabled={isUploading}
                               onChange={(e) => handleUploadEvidence(ph.key, e.target.files[0])}
@@ -455,11 +492,19 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                   {PHASES.map((ph) => (
                     <div key={ph.key} className="rounded-xl overflow-hidden border border-gray-200 aspect-square bg-black relative">
                       {evidences[ph.key] ? (
-                        <img
-                          src={getImageSrc(evidences[ph.key])}
-                          alt={ph.label}
-                          className="w-full h-full object-cover"
-                        />
+                        evidences[ph.key].match(/\.(mp4|webm|mov|m4v|avi|mkv)(\?|$)/i) ? (
+                          <video
+                            src={getImageSrc(evidences[ph.key])}
+                            controls
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <img
+                            src={getImageSrc(evidences[ph.key])}
+                            alt={ph.label}
+                            className="w-full h-full object-cover"
+                          />
+                        )
                       ) : (
                         <div className="flex items-center justify-center h-full text-gray-400 text-xs">Sin foto</div>
                       )}

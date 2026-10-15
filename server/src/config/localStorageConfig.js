@@ -26,6 +26,8 @@ function makeStorage(subDir) {
 }
 
 const FILE_SIZE_LIMIT = 10 * 1024 * 1024; // 10 MB
+// Límite mayor para evidencias de mantenimiento (pueden ser videos cortos)
+const MAINTENANCE_FILE_SIZE_LIMIT = 30 * 1024 * 1024; // 30 MB
 
 const failureEvidenceStorage = makeStorage(['fallas', 'evidencias']);
 const repairEvidenceStorage = makeStorage(['fallas', 'reparaciones']);
@@ -49,13 +51,25 @@ const maintenanceEvidenceUniqueStorage = multer.diskStorage({
   }
 });
 
+// Filtro: solo imágenes y videos (para evidencias de mantenimiento)
+const maintenanceEvidenceFileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
+    return cb(null, true);
+  }
+  cb(new Error('Solo se permiten imágenes o videos como evidencia'));
+};
+
 const uploadFailureEvidence = multer({ storage: failureEvidenceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadRepairEvidence = multer({ storage: repairEvidenceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadDevice = multer({ storage: deviceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadAttraction = multer({ storage: attractionStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadRequisition = multer({ storage: requisitionStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadUser = multer({ storage: userStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
-const uploadMaintenanceEvidence = multer({ storage: maintenanceEvidenceUniqueStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
+const uploadMaintenanceEvidence = multer({
+  storage: maintenanceEvidenceUniqueStorage,
+  limits: { fileSize: MAINTENANCE_FILE_SIZE_LIMIT },
+  fileFilter: maintenanceEvidenceFileFilter
+});
 
 function toRelativePath(absoluteFilePath) {
   const normalized = absoluteFilePath.replace(/\\/g, '/');
