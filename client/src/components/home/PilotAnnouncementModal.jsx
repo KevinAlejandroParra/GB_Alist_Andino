@@ -93,17 +93,17 @@ export default function PilotAnnouncementModal() {
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-7 pr-14 rounded-t-3xl">
           <div className="flex items-center gap-3">
             <span className="text-3xl">🎉</span>
-            <h2 className="text-xl font-bold">¡Hola Alist!</h2>
+            <h2 className="text-xl font-bold">¡Holaa!</h2>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-indigo-50">
-            Se está preparando por fin para salir oficialmente de la etapa piloto. Agradecemos
+            Alist se está preparando por fin para salir oficialmente de la etapa piloto. Agradecemos
             muchísimo la paciencia que han tenido para hacer checklists físicos y digitales —{' '}
             <strong className="text-white">nos queda un último esfuerzo</strong>.
           </p>
           <p className="mt-2 text-sm leading-relaxed text-indigo-50">
             Se vendrán algunos cambios; por eso implementamos un{' '}
             <strong className="text-white">buzón de peticiones, quejas o reclamos</strong>. Si tienes
-            alguna sugerencia, será muy bienvenida.
+            alguna sugerencia o observación, será muy bienvenida.
           </p>
         </div>
 

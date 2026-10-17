@@ -6,9 +6,11 @@ import { faEnvelope, faLock, faHome, faUser, faIdCard, faPhone, faMapMarkerAlt, 
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
 
 export default function AuthPage() {
+  const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [direction, setDirection] = useState(1);
@@ -110,9 +112,10 @@ export default function AuthPage() {
         showCancelButton: false,
         timerProgressBar: false,
         grow: 'row'
-      });
-      // Redirigir al dashboard o página principal
-      window.location.href = '/';
+       });
+       // Redirigir al dashboard o página principal
+       router.push('/');
+
 
     } catch (error) {
       await Swal.fire({
