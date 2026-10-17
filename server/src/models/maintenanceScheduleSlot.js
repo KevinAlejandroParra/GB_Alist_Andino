@@ -30,7 +30,7 @@ module.exports = (sequelize, DataTypes) => {
         plan_id: { type: DataTypes.INTEGER, allowNull: false },
         scheduled_date: { type: DataTypes.DATEONLY, allowNull: false },
         ins_id: { type: DataTypes.INTEGER, allowNull: false },
-        slot_type: { type: DataTypes.ENUM('WEEKLY', 'SCHEDULED', 'BIWEEKLY'), allowNull: false },
+        slot_type: { type: DataTypes.ENUM('WEEKLY', 'SCHEDULED', 'BIWEEKLY', 'QUARTERLY'), allowNull: false },
         sort_priority: { type: DataTypes.INTEGER, defaultValue: 0 },
         is_manual_override: { type: DataTypes.BOOLEAN, defaultValue: false },
         assigned_user_id: { type: DataTypes.INTEGER, allowNull: true },

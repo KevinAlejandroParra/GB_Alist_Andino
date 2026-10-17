@@ -13,6 +13,7 @@ const {
     RepairExecution
 } = require("../models");
 const MaintenanceConfigService = require("./MaintenanceConfigService");
+const MaintenanceFailureClosureService = require("./MaintenanceFailureClosureService");
 const { Op, Sequelize } = require("sequelize");
 
 class MaintenanceScheduleService {
@@ -193,8 +194,37 @@ class MaintenanceScheduleService {
             }
         });
 
+        // 1c. GENERATE QUARTERLY SLOTS (cada 4 meses: mes de inicio + cada 4 meses)
+        const quarterlyConfigs = activeConfigs.filter(c => c.quarterly_enabled);
+        quarterlyConfigs.forEach(cfg => {
+            const startMonth = cfg.quarterly_start_month;
+            const dayOfMonth = cfg.quarterly_day_of_month;
+            if (!startMonth || !dayOfMonth) return; // sin config completa, no genera
+
+            // (month - startMonth) mod 4 === 0 → mes de ejecución (ej.: inicio enero → enero, mayo, septiembre)
+            const monthOffset = ((month - startMonth) % 4 + 4) % 4;
+            if (monthOffset !== 0) return;
+
+            const lastDay = new Date(year, month, 0).getDate();
+            const targetDay = Math.min(dayOfMonth, lastDay); // ajusta a fin de mes si el día no existe
+            const dateStr = `${yearMonth}-${String(targetDay).padStart(2, '0')}`;
+
+            const key = `${cfg.ins_id}_${dateStr}`;
+            if (!occupiedDatesByMachine.has(key)) {
+                newSlots.push({
+                    plan_id: plan.id,
+                    scheduled_date: dateStr,
+                    ins_id: cfg.ins_id,
+                    slot_type: 'QUARTERLY',
+                    sort_priority: 0,
+                    is_manual_override: false
+                });
+                occupiedDatesByMachine.add(key);
+            }
+        });
+
         // 2. GENERATE SCHEDULED SLOTS (PP)
-        const nonWeeklyConfigs = activeConfigs.filter(c => !c.weekly_enabled && !c.biweekly_enabled);
+        const nonWeeklyConfigs = activeConfigs.filter(c => !c.weekly_enabled && !c.biweekly_enabled && !c.quarterly_enabled);
         const regularPool = nonWeeklyConfigs.filter(c => !c.scheduled_exempt);
         const exemptPool = nonWeeklyConfigs.filter(c => c.scheduled_exempt);
 
@@ -396,7 +426,7 @@ class MaintenanceScheduleService {
             order: [
                 ['scheduled_date', 'ASC'],
                 // Orden: WEEKLY, luego BIWEEKLY, luego SCHEDULED (orden lexicográfico del ENUM)
-                [Sequelize.literal("FIELD(slot_type, 'WEEKLY', 'BIWEEKLY', 'SCHEDULED')"), 'ASC'],
+                [Sequelize.literal("FIELD(slot_type, 'WEEKLY', 'BIWEEKLY', 'QUARTERLY', 'SCHEDULED')"), 'ASC'],
                 ['sort_priority', 'ASC']
             ]
         });
@@ -452,6 +482,20 @@ class MaintenanceScheduleService {
                 dayDisplayStatuses[dateStr] = 'AMARILLO';
             } else {
                 dayDisplayStatuses[dateStr] = 'ROJO';
+            }
+        }
+
+        // Regla 6B (Fase 2): bonificación VERDE — día AZUL + cierre de falla ese día
+        // en una máquina DISTINTA de las planificadas ese día.
+        let greenBonusDays = {};
+        try {
+            greenBonusDays = await MaintenanceFailureClosureService.getGreenBonusDays(plan.id, slotsByDate);
+        } catch (e) {
+            console.error("Error calculando días VERDE (bonificación):", e);
+        }
+        for (const dateStr of Object.keys(greenBonusDays)) {
+            if (dayDisplayStatuses[dateStr] === 'AZUL') {
+                dayDisplayStatuses[dateStr] = 'VERDE';
             }
         }
 

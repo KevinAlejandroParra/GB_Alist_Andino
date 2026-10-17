@@ -4,6 +4,7 @@ const MaintenanceConfigService = require('../services/MaintenanceConfigService')
 const MaintenanceScheduleService = require('../services/MaintenanceScheduleService');
 const MaintenanceSessionService = require('../services/MaintenanceSessionService');
 const MaintenanceQrService = require('../services/MaintenanceQrService');
+const MaintenanceFailureClosureService = require('../services/MaintenanceFailureClosureService');
 const { verifyToken, checkRole } = require('../middleware/authMiddleware');
 const { uploadMaintenanceEvidence, toRelativePath } = require('../config/multerConfig');
 
@@ -277,6 +278,70 @@ router.get('/qr/validate', async (req, res) => {
         res.json(result);
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────
+// DAY FAILURE CLOSURES (Fase 2 — bonificación VERDE)
+// ─────────────────────────────────────────────────────────────
+
+router.get('/days/:date/failures', async (req, res) => {
+    try {
+        const { date } = req.params;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ error: "Formato de fecha inválido (YYYY-MM-DD)" });
+        }
+        const failures = await MaintenanceFailureClosureService.getActiveFailuresForDay(date, req.query.insId);
+        res.json(failures);
+    } catch (e) {
+        console.error("Error fetching active failures for day:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+router.get('/days/:date/closures', async (req, res) => {
+    try {
+        const { date } = req.params;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ error: "Formato de fecha inválido (YYYY-MM-DD)" });
+        }
+        const closures = await MaintenanceFailureClosureService.getClosuresForDate(date);
+        res.json(closures);
+    } catch (e) {
+        console.error("Error fetching closures for day:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+router.post('/days/:date/link-failure-closure', async (req, res) => {
+    try {
+        const { date } = req.params;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ error: "Formato de fecha inválido (YYYY-MM-DD)" });
+        }
+        const { failureOrderId, technicianId } = req.body || {};
+        if (!failureOrderId) return res.status(400).json({ error: "failureOrderId es requerido" });
+
+        const closure = await MaintenanceFailureClosureService.linkFailureClosure(
+            date,
+            technicianId || req.user.user_id,
+            failureOrderId,
+            req.user.user_id
+        );
+        res.json(closure);
+    } catch (e) {
+        console.error("Error linking failure closure:", e);
+        res.status(400).json({ error: e.message });
+    }
+});
+
+router.delete('/days/:date/closures/:closureId', checkRole([1, 2, 3, 7]), async (req, res) => {
+    try {
+        const result = await MaintenanceFailureClosureService.unlinkFailureClosure(req.params.closureId);
+        res.json(result);
+    } catch (e) {
+        console.error("Error unlinking failure closure:", e);
+        res.status(400).json({ error: e.message });
     }
 });
 

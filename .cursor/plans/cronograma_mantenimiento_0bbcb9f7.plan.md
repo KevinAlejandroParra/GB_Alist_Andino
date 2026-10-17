@@ -1,6 +1,6 @@
 ---
 name: Cronograma mantenimiento
-overview: Nuevo módulo de cronograma de mantenimiento (preventivo semanal + preventivo quincenal + preventivo programado) con flujo QR independiente de los checklists familiares actuales. El administrador marca qué máquinas son semanales, qué máquinas son quincenales (1ª+3ª o 2ª+4ª semana) y el resto del parque entra al ciclo programado. Implementación 100% aditiva en BD y APIs para no tocar ni migrar datos históricos de fallas, checklists u OT existentes.
+overview: Nuevo módulo de cronograma de mantenimiento (preventivo semanal + quincenal + cuatrimestral (cada 4 meses) + preventivo programado) con flujo QR independiente de los checklists familiares actuales. El administrador marca qué máquinas son semanales, qué máquinas son quincenales (1ª+3ª o 2ª+4ª semana), qué máquinas son cuatrimestrales (cada 4 meses desde un mes/día de inicio) y el resto del parque entra al ciclo programado. Implementación 100% aditiva en BD y APIs para no tocar ni migrar datos históricos de fallas, checklists u OT existentes.
 todos:
   - id: db-schema
     content: Diseñar y crear migraciones aditivas (configs, plans, slots, sessions, evidences, QR) + requisitions.maintenance_session_id nullable
@@ -19,7 +19,7 @@ todos:
     status: completed
   - id: failure-integration
     content: Cierre de fallas el mismo día; bonificación verde solo si affected_id ≠ máquinas con preventivo planificado ese día
-    status: pending
+    status: completed
   - id: pdf-requisitions
     content: PDF por sesión (Puppeteer) y requisiciones ligadas a maintenance_session_id
     status: pending
@@ -79,6 +79,7 @@ flowchart LR
 1. **Clasificación de máquinas (admin)**
    - Por cada dispositivo (`inspectables` + `devices`): el admin activa **preventivo semanal** (`weekly_enabled`).
    - Si no es semanal, el admin puede activar **preventivo quincenal** (`biweekly_enabled`) con día fijo (`biweekly_weekday`) y patrón de semanas (`biweekly_pattern`: `FIRST_THIRD` = 1ª+3ª, `SECOND_FOURTH` = 2ª+4ª del mes).
+   - Si no es semanal/quincenal, el admin puede activar **preventivo cuatrimestral** (`quarterly_enabled`, cada 4 meses) con mes de inicio (`quarterly_start_month`, 1-12) y día del mes (`quarterly_day_of_month`, 1-28). Ej.: inicio enero, día 15 → se ejecuta 15-ene, 15-may, 15-sep.
    - Las máquinas **sin** marca semanal/quincenal entran al pool de **preventivo programado** (ciclo mensual/ configurable).
    - Opcional en configuración: **“sin preventivo programado”** (`scheduled_exempt`) → solo correctivos; en ordenamiento van **al final del ciclo** (como pediste).
 
@@ -95,6 +96,12 @@ flowchart LR
    - Misma UX/flujo que la semanal: QR obligatorio + 4 fotos + descripción (+ inventario/requisiciones).
    - Las máquinas quincenales quedan **fuera** del pool de programados (igual que las semanales).
    - Al completarse una sesión BIWEEKLY se actualiza `last_scheduled_at` (como los SCHEDULED).
+
+3c. **Cuatrimestral (flujo nuevo)**
+   - Genera **1 slot QUARTERLY** solo en los meses donde `(mes - mes_inicio) mod 4 === 0`, en el día del mes configurado (ajustado al último día del mes si el día no existe, ej. 30 en febrero → 28).
+   - Misma UX/flujo que la semanal: QR obligatorio + 4 fotos + descripción (+ inventario/requisiciones).
+   - Las máquinas cuatrimestrales quedan **fuera** del pool de programados (igual que semanales/quincenales).
+   - Al completarse una sesión QUARTERLY se actualiza `last_scheduled_at` (como los SCHEDULED).
 
 4. **Programado (preventivo programado — PP)**
    - **QR obligatorio** igual que el semanal: no se puede iniciar ni completar sesión `SCHEDULED` sin escaneo válido del QR de la máquina (`maintenance_machine_qr_codes`).
@@ -144,10 +151,10 @@ Archivo sugerido: prefijo `20261010000000-*` en [`server/src/migrations/`](serve
 | Tabla | Propósito |
 |-------|-----------|
 | `maintenance_settings` | `premise_id`, estrategia, `max_scheduled_per_day`, días laborables, pesos híbrido |
-| `maintenance_machine_configs` | `ins_id` (unique), `weekly_enabled`, `weekly_weekday`, `biweekly_enabled`, `biweekly_weekday`, `biweekly_pattern` (FIRST_THIRD/SECOND_FOURTH), `scheduled_exempt`, `last_scheduled_at` (nullable, carga inicial manual), `is_active` |
+| `maintenance_machine_configs` | `ins_id` (unique), `weekly_enabled`, `weekly_weekday`, `biweekly_enabled`, `biweekly_weekday`, `biweekly_pattern` (FIRST_THIRD/SECOND_FOURTH), `quarterly_enabled`, `quarterly_start_month` (1-12), `quarterly_day_of_month` (1-28), `scheduled_exempt`, `last_scheduled_at` (nullable), `is_active` |
 | `maintenance_schedule_plans` | `year_month` (2026-10), `status` DRAFT/PUBLISHED, `generated_at`, `published_by` |
-| `maintenance_schedule_slots` | `plan_id`, `scheduled_date`, `ins_id`, `slot_type` WEEKLY/BIWEEKLY/SCHEDULED, `sort_priority`, `is_manual_override`, `assigned_user_id` nullable |
-| `maintenance_sessions` | `slot_id`, `ins_id`, `type` WEEKLY/BIWEEKLY/SCHEDULED, `status` DRAFT/COMPLETED, `technician_id`, `description`, `started_at`, `completed_at`, `duration_minutes` |
+| `maintenance_schedule_slots` | `plan_id`, `scheduled_date`, `ins_id`, `slot_type` WEEKLY/BIWEEKLY/QUARTERLY/SCHEDULED, `sort_priority`, `is_manual_override`, `assigned_user_id` nullable |
+| `maintenance_sessions` | `slot_id`, `ins_id`, `type` WEEKLY/BIWEEKLY/QUARTERLY/SCHEDULED, `status` DRAFT/COMPLETED, `technician_id`, `description`, `started_at`, `completed_at`, `duration_minutes` |
 | `maintenance_session_evidences` | `session_id`, `phase` enum 4 fases, `file_url` |
 | `maintenance_session_parts` | `session_id`, `inventory_id`, `quantity` (consumo directo) |
 | `maintenance_day_failure_closures` | `closure_date`, `technician_id`, `failure_order_id`, `affected_ins_id` (para bonificación verde: distinto de `ins_id` con slot ese día) |
@@ -156,7 +163,8 @@ Archivo sugerido: prefijo `20261010000000-*` en [`server/src/migrations/`](serve
 
 **Alteración mínima existente (segura):**
 - `requisitions.maintenance_session_id` NULLable + índice. **No** modificar columnas NOT NULL actuales.
-- Migración adicional aditiva [`20261016000000-add-biweekly-to-maintenance-module.js`](server/src/migrations/20261016000000-add-biweekly-to-maintenance-module.js): columnas `biweekly_enabled`/`biweekly_weekday`/`biweekly_pattern` en configs + extiende ENUMs `slot_type`/`type` con `BIWEEKLY`.
+- Migración adicional aditiva [`20261016000000-add-biweekly-to-maintenance-module.js`](server/src/migrations/20261016000000-add-biweekly-to-maintenance-module.js): columnas `biweekly_*` en configs + extiende ENUMs `slot_type`/`type` con `BIWEEKLY`.
+- Migración adicional aditiva [`20261017000000-add-quarterly-to-maintenance-module.js`](server/src/migrations/20261017000000-add-quarterly-to-maintenance-module.js): columnas `quarterly_*` en configs + extiende ENUMs `slot_type`/`type` con `QUARTERLY`.
 
 **No usar** [`maintenance_actions`](server/src/models/maintenance_action.js) (tabla huérfana ligada solo a `work_orders`); evita confusión semántica.
 
@@ -215,7 +223,8 @@ flowchart TD
   start[Inicio mes M] --> loadCfg[Cargar maintenance_machine_configs]
   loadCfg --> weekly[Colocar slots WEEKLY en weekday configurado]
   loadCfg --> biweekly[Colocar slots BIWEEKLY en 1ª+3ª o 2ª+4ª semana]
-  loadCfg --> pool[Máquinas weekly_enabled=false y biweekly_enabled=false y no scheduled_exempt]
+  loadCfg --> quarterly[Colocar slot QUARTERLY en mes inicio + cada 4 meses]
+  loadCfg --> pool[Máquinas weekly=false y biweekly=false y quarterly=false y no scheduled_exempt]
   pool --> rank[Ordenar por estrategia elegida]
   rank --> distribute[Distribuir SCHEDULED en días laborables respetando max_per_day]
   distribute --> exempt[scheduled_exempt al final del mes o sin slot]

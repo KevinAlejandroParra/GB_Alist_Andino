@@ -10,14 +10,21 @@ const newQuestions = [
 // Combinar todas las preguntas aplicables
 const allQuestions = [...newQuestions];
 
-const machines = ['TOY BOX 1', 'TOY BOX 2', 'TOY BOX 3', 'TOY BOX 4', 'TOY BOX XL', 'WORK ZONE'];
+const machines = [
+  'TOY BOX - SECCION 1',
+  'TOY BOX - SECCION 2',
+  'TOY BOX - SECCION 3',
+  'TOY BOX - SECCION 4',
+  'TOY BOX XL',
+  'TOY FAMILY',
+  'WORK ZONE'
+];
 
 // Generar la estructura de items estáticos
 const items = machines.map((machine, index) => ({
   item_number: `${index + 1}`,
   question_text: machine,
   children: allQuestions.map((q, childIndex) => { 
-    const originalQuestionNumber = q.item_number;
     return {
       ...q,
       item_number: `${index + 1}.${childIndex + 1}`,
@@ -31,7 +38,7 @@ module.exports = {
   frequency: 'semanal',
   version_label: 'V1 Static Premios SEP 2025 BY: Alejandro Parra',
   role_id: 3, // Corresponde a "Técnico de mantenimiento"
-  specific_inspectable_names: ["Toy Box 1", "Toy Box 2", "Toy Box 3", "Toy Box 4", "Toy Box XL", "work zone"],
+  specific_inspectable_names: ["TOY BOX 4P MINI", "TOY BOX XL", "TOY FAMILY", "WORK ZONE"],
   dynamic_items: false, 
   items: items,
 };

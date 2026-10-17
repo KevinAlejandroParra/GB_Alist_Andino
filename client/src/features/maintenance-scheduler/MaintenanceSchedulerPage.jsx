@@ -116,6 +116,7 @@ export default function MaintenanceSchedulerPage() {
               calendar.setSelectedDay(null);
               calendar.setSelectedSlot(slot);
             }}
+            onDayStatusChange={calendar.refreshPlan}
           />
         )}
 

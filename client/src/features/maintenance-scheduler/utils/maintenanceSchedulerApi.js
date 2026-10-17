@@ -124,5 +124,31 @@ export const maintenanceApi = {
       params: { qrCode }
     });
     return res.data;
+  },
+
+  // Day failure closures (Fase 2 — bonificación VERDE)
+  getActiveFailuresForDay: async (date, insId = null) => {
+    const res = await axiosInstance.get(`${API_BASE}/days/${date}/failures`, {
+      params: insId ? { insId } : undefined
+    });
+    return res.data;
+  },
+
+  getClosuresForDay: async (date) => {
+    const res = await axiosInstance.get(`${API_BASE}/days/${date}/closures`);
+    return res.data;
+  },
+
+  linkFailureClosure: async (date, failureOrderId, technicianId = null) => {
+    const res = await axiosInstance.post(`${API_BASE}/days/${date}/link-failure-closure`, {
+      failureOrderId,
+      ...(technicianId ? { technicianId } : {})
+    });
+    return res.data;
+  },
+
+  unlinkFailureClosure: async (date, closureId) => {
+    const res = await axiosInstance.delete(`${API_BASE}/days/${date}/closures/${closureId}`);
+    return res.data;
   }
 };

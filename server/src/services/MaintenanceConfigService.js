@@ -76,6 +76,9 @@ class MaintenanceConfigService {
                 biweekly_enabled: cfg ? Boolean(cfg.biweekly_enabled) : false,
                 biweekly_weekday: cfg?.biweekly_weekday ?? 1, // default 1 = Lunes
                 biweekly_pattern: cfg?.biweekly_pattern || 'FIRST_THIRD',
+                quarterly_enabled: cfg ? Boolean(cfg.quarterly_enabled) : false,
+                quarterly_start_month: cfg?.quarterly_start_month ?? null, // 1-12
+                quarterly_day_of_month: cfg?.quarterly_day_of_month ?? null, // 1-28
                 scheduled_exempt: cfg ? Boolean(cfg.scheduled_exempt) : false,
                 last_scheduled_at: cfg?.last_scheduled_at || null,
                 is_active: cfg ? Boolean(cfg.is_active) : true,
@@ -93,6 +96,9 @@ class MaintenanceConfigService {
             ...(data.biweekly_enabled !== undefined && { biweekly_enabled: Boolean(data.biweekly_enabled) }),
             ...(data.biweekly_weekday !== undefined && { biweekly_weekday: data.biweekly_weekday !== null ? Number(data.biweekly_weekday) : null }),
             ...(data.biweekly_pattern !== undefined && ['FIRST_THIRD', 'SECOND_FOURTH'].includes(data.biweekly_pattern) && { biweekly_pattern: data.biweekly_pattern }),
+            ...(data.quarterly_enabled !== undefined && { quarterly_enabled: Boolean(data.quarterly_enabled) }),
+            ...(data.quarterly_start_month !== undefined && { quarterly_start_month: data.quarterly_start_month !== null ? Number(data.quarterly_start_month) : null }),
+            ...(data.quarterly_day_of_month !== undefined && { quarterly_day_of_month: data.quarterly_day_of_month !== null ? Number(data.quarterly_day_of_month) : null }),
             ...(data.scheduled_exempt !== undefined && { scheduled_exempt: Boolean(data.scheduled_exempt) }),
             ...(data.last_scheduled_at !== undefined && { last_scheduled_at: data.last_scheduled_at ? new Date(data.last_scheduled_at) : null }),
             ...(data.is_active !== undefined && { is_active: Boolean(data.is_active) })

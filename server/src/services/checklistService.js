@@ -81,10 +81,68 @@ const naturalSort = (a, b) => {
   return 0
 }
 
+const ensureSpecificInspectables = async (checklistTypeId, currentSpecificInspectables, transaction = null) => {
+  const specific = [...(currentSpecificInspectables || [])];
+  const hasToyBox4P = specific.some(i => /TOY BOX.*4P/i.test(i.name) || (i.name || '').toUpperCase().trim() === 'TOY BOX 4P MINI');
+  const hasToyFamily = specific.some(i => /TOY FAMILY/i.test(i.name));
+
+  if (!hasToyBox4P || !hasToyFamily) {
+    const fallbackInspectables = await Inspectable.findAll({
+      where: {
+        name: {
+          [Op.or]: [
+            { [Op.like]: '%TOY BOX 4P%' },
+            { [Op.like]: '%TOY FAMILY%' },
+            { [Op.like]: '%TOY BOX XL%' },
+            { [Op.like]: '%WORK ZONE%' }
+          ]
+        }
+      },
+      ...(transaction ? { transaction } : {})
+    });
+
+    for (const fb of fallbackInspectables) {
+      if (!specific.some(s => s.ins_id === fb.ins_id)) {
+        specific.push(fb);
+        try {
+          await connection.query(
+            `INSERT IGNORE INTO ChecklistTypeInspectables (checklist_type_id, ins_id, createdAt, updatedAt)
+             VALUES (?, ?, NOW(), NOW())`,
+            {
+              replacements: [checklistTypeId, fb.ins_id],
+              ...(transaction ? { transaction } : {})
+            }
+          );
+        } catch (e) {
+          // ignore duplicate
+        }
+      }
+    }
+  }
+
+  return specific;
+};
+
+const findPremiosInspectable = (parentText, inspectablesList) => {
+  const textUp = (parentText || '').trim().toUpperCase();
+  const isToyBoxSection =
+    textUp.startsWith('TOY BOX - SECCION') ||
+    /^TOY BOX \d/.test(textUp);
+
+  if (isToyBoxSection) {
+    return inspectablesList.find(i => /TOY BOX.*4P/i.test(i.name) || (i.name || '').toUpperCase().trim() === 'TOY BOX 4P MINI');
+  }
+
+  const textNorm = (parentText || '').trim().toLowerCase();
+  return inspectablesList.find(i => (i.name || '').trim().toLowerCase() === textNorm);
+};
+
 const processSpecificChecklistItems = async (checklistTypeId, checklists = [], allResponses = []) => {
-  const specificInspectables = await ChecklistType.findByPk(checklistTypeId, {
+  let specificInspectables = await ChecklistType.findByPk(checklistTypeId, {
     include: [{ model: Inspectable, as: 'specificInspectables' }],
   }).then(ct => ct ? ct.specificInspectables : []);
+
+  specificInspectables = await ensureSpecificInspectables(checklistTypeId, specificInspectables);
 
   const templateItems = await ChecklistItem.findAll({
     where: { checklist_type_id: checklistTypeId },
@@ -109,19 +167,7 @@ const processSpecificChecklistItems = async (checklistTypeId, checklists = [], a
   });
 
   const items = parentItems.map((parent, index) => {
-    const textUp = parent.question_text.toUpperCase();
-    // Atrapar TODAS las variantes de secciones del TOY BOX 4P MINI:
-    // "TOY BOX - SECCION N" (nuevo) y "TOY BOX N" (legado sin guion)
-    const isToyBoxSection =
-      textUp.startsWith('TOY BOX - SECCION') ||
-      /^TOY BOX \d/.test(textUp);
-
-    let inspectable = null;
-    if (isToyBoxSection) {
-      inspectable = specificInspectables.find(i => i.name === 'TOY BOX 4P MINI');
-    } else {
-      inspectable = specificInspectables.find(i => i.name.toLowerCase() === parent.question_text.toLowerCase());
-    }
+    const inspectable = findPremiosInspectable(parent.question_text, specificInspectables);
 
     if (!inspectable) {
       console.warn(`No matching inspectable found for parent item: ${parent.question_text}`);
@@ -462,6 +508,7 @@ const ensureChecklistInstance = async ({ inspectableId, premise_id, created_by, 
           transaction,
         });
       }
+      specificInspectables = await ensureSpecificInspectables(checklistTypeInstance.checklist_type_id, specificInspectables, transaction);
 
       if (!specificInspectables || specificInspectables.length === 0) {
         throw new Error(
@@ -1465,7 +1512,8 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id, cre
   endOfDay.setUTCHours(23, 59, 59, 999);
 
   if (definitiveChecklistType.type_category === 'specific') {
-    const specificInspectables = definitiveChecklistType.specificInspectables || [];
+    let specificInspectables = definitiveChecklistType.specificInspectables || [];
+    specificInspectables = await ensureSpecificInspectables(checklistTypeId, specificInspectables);
     const inspectableIds = specificInspectables.map(i => i.ins_id);
 
     // Resolver bounds: semanales (e.g. Premios) usan week_identifier; diarios usan createdAt.
@@ -1496,18 +1544,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id, cre
       const childItems = templateItems.filter(item => item.parent_item_id !== null);
 
       const items = parentItems.map((parent, index) => {
-        let inspectable = null;
-        const textUp = parent.question_text.toUpperCase();
-        // Atrapar TODAS las variantes de secciones del TOY BOX 4P MINI:
-        // "TOY BOX - SECCION N" (nuevo) y "TOY BOX N" (legado sin guion)
-        const isToyBoxSection =
-          textUp.startsWith('TOY BOX - SECCION') ||
-          /^TOY BOX \d/.test(textUp);
-        if (isToyBoxSection) {
-          inspectable = specificInspectables.find(i => i.name === 'TOY BOX 4P MINI');
-        } else {
-          inspectable = specificInspectables.find(i => i.name.toLowerCase() === parent.question_text.toLowerCase());
-        }
+        const inspectable = findPremiosInspectable(parent.question_text, specificInspectables);
         if (!inspectable) return null;
 
         const subItemsForParent = childItems.filter(child => child.parent_item_id === parent.checklist_item_id);
@@ -1556,18 +1593,7 @@ const getLatestChecklistByType = async ({ checklistTypeId, user_id, role_id, cre
     const childItems = templateItems.filter(item => item.parent_item_id !== null);
 
     const items = parentItems.map((parent, index) => {
-      let inspectable = null;
-      const textUp = parent.question_text.toUpperCase();
-      // Atrapar TODAS las variantes de secciones del TOY BOX 4P MINI:
-      // "TOY BOX - SECCION N" (nuevo) y "TOY BOX N" (legado sin guion)
-      const isToyBoxSection =
-        textUp.startsWith('TOY BOX - SECCION') ||
-        /^TOY BOX \d/.test(textUp);
-      if (isToyBoxSection) {
-        inspectable = specificInspectables.find(i => i.name === 'TOY BOX 4P MINI');
-      } else {
-        inspectable = specificInspectables.find(i => i.name.toLowerCase() === parent.question_text.toLowerCase());
-      }
+      const inspectable = findPremiosInspectable(parent.question_text, specificInspectables);
       
       if (!inspectable) {
         console.warn(`No matching inspectable found for parent item: ${parent.question_text}`);
