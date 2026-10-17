@@ -1,6 +1,6 @@
 ---
 name: Cronograma mantenimiento
-overview: Nuevo módulo de cronograma de mantenimiento (preventivo semanal + preventivo programado) con flujo QR independiente de los checklists familiares actuales. El administrador marca qué máquinas son semanales; el resto del parque entra al ciclo programado. Implementación 100% aditiva en BD y APIs para no tocar ni migrar datos históricos de fallas, checklists u OT existentes.
+overview: Nuevo módulo de cronograma de mantenimiento (preventivo semanal + preventivo quincenal + preventivo programado) con flujo QR independiente de los checklists familiares actuales. El administrador marca qué máquinas son semanales, qué máquinas son quincenales (1ª+3ª o 2ª+4ª semana) y el resto del parque entra al ciclo programado. Implementación 100% aditiva en BD y APIs para no tocar ni migrar datos históricos de fallas, checklists u OT existentes.
 todos:
   - id: db-schema
     content: Diseñar y crear migraciones aditivas (configs, plans, slots, sessions, evidences, QR) + requisitions.maintenance_session_id nullable
@@ -76,31 +76,38 @@ flowchart LR
 
 ## Reglas de negocio acordadas
 
-1. **Clasificación de máquinas (admin)**  
-   - Por cada dispositivo (`inspectables` + `devices`): el admin activa **preventivo semanal** (`weekly_enabled`).  
-   - Las máquinas **sin** marca semanal entran al pool de **preventivo programado** (ciclo mensual/ configurable).  
+1. **Clasificación de máquinas (admin)**
+   - Por cada dispositivo (`inspectables` + `devices`): el admin activa **preventivo semanal** (`weekly_enabled`).
+   - Si no es semanal, el admin puede activar **preventivo quincenal** (`biweekly_enabled`) con día fijo (`biweekly_weekday`) y patrón de semanas (`biweekly_pattern`: `FIRST_THIRD` = 1ª+3ª, `SECOND_FOURTH` = 2ª+4ª del mes).
+   - Las máquinas **sin** marca semanal/quincenal entran al pool de **preventivo programado** (ciclo mensual/ configurable).
    - Opcional en configuración: **“sin preventivo programado”** (`scheduled_exempt`) → solo correctivos; en ordenamiento van **al final del ciclo** (como pediste).
 
-2. **Tipos de actividad en un día**  
-   - Una misma fecha puede tener **varias casillas**: semanal de máquina A + programado de máquina B (+ correctivos ad hoc).  
+2. **Tipos de actividad en un día**
+   - Una misma fecha puede tener **varias casillas**: semanal de máquina A + programado de máquina B (+ correctivos ad hoc).
    - El técnico ejecuta cada ítem desde el calenadrio o escaneando QR de la máquina (lista de pendientes del día para ese `ins_id`).
 
-3. **Semanal (flujo nuevo)**  
-   - QR válido → inicia sesión → **4 fotos obligatorias** (`INICIO`, `PROCESO_1`, `PROCESO_2`, `FIN`) + descripción.  
+3. **Semanal (flujo nuevo)**
+   - QR válido → inicia sesión → **4 fotos obligatorias** (`INICIO`, `PROCESO_1`, `PROCESO_2`, `FIN`) + descripción.
    - Inventario consumido y requisiciones desde la misma pantalla (reutilizar componentes: [`WorkOrderPartsManager`](client/src/components/checklist/WorkOrderPartsManager.jsx), modales de inventario/requisición).
 
-4. **Programado (preventivo programado — PP)**  
-   - **QR obligatorio** igual que el semanal: no se puede iniciar ni completar sesión `SCHEDULED` sin escaneo válido del QR de la máquina (`maintenance_machine_qr_codes`).  
-   - Misma UX: 4 fotos obligatorias + descripción (+ inventario/requisiciones en fase 3).  
+3b. **Quincenal (flujo nuevo)**
+   - Genera **2 slots BIWEEKLY** al mes en el día configurado: semanas **1ª+3ª** o **2ª+4ª** según patrón.
+   - Misma UX/flujo que la semanal: QR obligatorio + 4 fotos + descripción (+ inventario/requisiciones).
+   - Las máquinas quincenales quedan **fuera** del pool de programados (igual que las semanales).
+   - Al completarse una sesión BIWEEKLY se actualiza `last_scheduled_at` (como los SCHEDULED).
+
+4. **Programado (preventivo programado — PP)**
+   - **QR obligatorio** igual que el semanal: no se puede iniciar ni completar sesión `SCHEDULED` sin escaneo válido del QR de la máquina (`maintenance_machine_qr_codes`).
+   - Misma UX: 4 fotos obligatorias + descripción (+ inventario/requisiciones en fase 3).
    - Plantilla de tareas **configurable por admin** (fase 2 opcional; MVP: 4 fotos + descripción).
 
-5. **QR obligatorio en ambos preventivos**  
-   - `POST .../sessions/start` exige `qr_code` + coincidencia `ins_id` del slot; abrir solo desde calendario sin QR queda deshabilitado.  
+5. **QR obligatorio en ambos preventivos**
+   - `POST .../sessions/start` exige `qr_code` + coincidencia `ins_id` del slot; abrir solo desde calendario sin QR queda deshabilitado.
    - Auditoría en `maintenance_qr_scans` al iniciar sesión.
 
-6. **Estados visuales — dos niveles**  
+6. **Estados visuales — dos niveles**
 
-   **A) Casilla por slot (máquina + tipo + fecha)**  
+   **A) Casilla por slot (máquina + tipo + fecha)**
 
    | Color | Condición |
    |-------|-----------|
@@ -108,24 +115,24 @@ flowchart LR
    | **Amarillo** | Sesión iniciada o incompleta (faltan evidencias / no “completar”) |
    | **Azul** | Sesión del slot completada al 100% (QR + 4 fotos + descripción + completar) |
 
-   **B) Celda agregada del día (por técnico)** — bonificación de productividad  
+   **B) Celda agregada del día (por técnico)** — bonificación de productividad
 
    | Color | Condición |
    |-------|-----------|
    | **Rojo** | Ningún preventivo planificado del día completado |
    | **Amarillo** | Al menos uno iniciado o parcial; no todos los preventivos del día en azul |
-   | **Azul** | **Todos** los preventivos planificados ese día cumplidos: cada slot **semanal** que tocaba ese día **+** cada slot **PP** que tocaba ese día (si a una máquina solo le toca semanal, no exige PP; si solo PP, no exige semanal) |
+   | **Azul** | **Todos** los preventivos planificados ese día cumplidos: cada slot **semanal** que tocaba ese día **+** cada slot **quincenal** que tocaba ese día **+** cada slot **PP** que tocaba ese día (si a una máquina solo le toca semanal, no exige PP ni quincenal; si solo quincenal, no exige semanal) |
    | **Verde** | Condición **azul** **+** al menos una falla cerrada (AR/OT resuelta) el mismo día en una **máquina distinta**: `failure_orders.affected_id` **≠** cualquier `ins_id` con slot preventivo (WEEKLY o SCHEDULED) planificado ese día para ese técnico. Cerrar fallas de la misma máquina del cronograma **no** sube a verde (es lo esperado en esa visita). |
 
    Cálculo en backend (`slot_display_status`, `day_display_status`) para calendario y reportes. Tabla `maintenance_day_failure_closures` registra cierres del **día/técnico**; solo cuentan para verde si `affected_ins_id` no está en el conjunto de máquinas con preventivo planificado ese día.
 
-7. **Priorización del calendario (admin elige estrategia por sede/mes)**  
-   - **Por último preventivo programado** (`last_scheduled_at` en config o última sesión `SCHEDULED` completada).  
-   - **Por fallas acumuladas** (conteo de `FailureOrder` activas por `affected_id`, rol técnico).  
-   - **Híbrido (recomendado default)**: score = `failure_count * peso + days_since_last_scheduled * peso`; exentas al final.  
+7. **Priorización del calendario (admin elige estrategia por sede/mes)**
+   - **Por último preventivo programado** (`last_scheduled_at` en config o última sesión `SCHEDULED` completada).
+   - **Por fallas acumuladas** (conteo de `FailureOrder` activas por `affected_id`, rol técnico).
+   - **Híbrido (recomendado default)**: score = `failure_count * peso + days_since_last_scheduled * peso`; exentas al final.
    - **Capacidad**: N programados por día laborable (config); semanales anclados al **día de la semana** configurado por máquina o global.
 
-8. **Replanificación**  
+8. **Replanificación**
    - Admin puede **arrastrar/swap** slots de meses futuros; cambios guardados como `is_manual_override = true` para no sobrescribir en regeneración automática.
 
 ---
@@ -137,18 +144,19 @@ Archivo sugerido: prefijo `20261010000000-*` en [`server/src/migrations/`](serve
 | Tabla | Propósito |
 |-------|-----------|
 | `maintenance_settings` | `premise_id`, estrategia, `max_scheduled_per_day`, días laborables, pesos híbrido |
-| `maintenance_machine_configs` | `ins_id` (unique), `weekly_enabled`, `weekly_weekday`, `scheduled_exempt`, `last_scheduled_at` (nullable, carga inicial manual), `is_active` |
+| `maintenance_machine_configs` | `ins_id` (unique), `weekly_enabled`, `weekly_weekday`, `biweekly_enabled`, `biweekly_weekday`, `biweekly_pattern` (FIRST_THIRD/SECOND_FOURTH), `scheduled_exempt`, `last_scheduled_at` (nullable, carga inicial manual), `is_active` |
 | `maintenance_schedule_plans` | `year_month` (2026-10), `status` DRAFT/PUBLISHED, `generated_at`, `published_by` |
-| `maintenance_schedule_slots` | `plan_id`, `scheduled_date`, `ins_id`, `slot_type` WEEKLY/SCHEDULED, `sort_priority`, `is_manual_override`, `assigned_user_id` nullable |
-| `maintenance_sessions` | `slot_id`, `ins_id`, `type`, `status` DRAFT/COMPLETED, `technician_id`, `description`, `started_at`, `completed_at`, `duration_minutes` |
+| `maintenance_schedule_slots` | `plan_id`, `scheduled_date`, `ins_id`, `slot_type` WEEKLY/BIWEEKLY/SCHEDULED, `sort_priority`, `is_manual_override`, `assigned_user_id` nullable |
+| `maintenance_sessions` | `slot_id`, `ins_id`, `type` WEEKLY/BIWEEKLY/SCHEDULED, `status` DRAFT/COMPLETED, `technician_id`, `description`, `started_at`, `completed_at`, `duration_minutes` |
 | `maintenance_session_evidences` | `session_id`, `phase` enum 4 fases, `file_url` |
 | `maintenance_session_parts` | `session_id`, `inventory_id`, `quantity` (consumo directo) |
 | `maintenance_day_failure_closures` | `closure_date`, `technician_id`, `failure_order_id`, `affected_ins_id` (para bonificación verde: distinto de `ins_id` con slot ese día) |
 | `maintenance_machine_qr_codes` | `ins_id`, `qr_code` unique, `is_active`, `created_by` |
 | `maintenance_qr_scans` | auditoría de escaneos (opcional fase 1) |
 
-**Alteración mínima existente (segura):**  
+**Alteración mínima existente (segura):**
 - `requisitions.maintenance_session_id` NULLable + índice. **No** modificar columnas NOT NULL actuales.
+- Migración adicional aditiva [`20261016000000-add-biweekly-to-maintenance-module.js`](server/src/migrations/20261016000000-add-biweekly-to-maintenance-module.js): columnas `biweekly_enabled`/`biweekly_weekday`/`biweekly_pattern` en configs + extiende ENUMs `slot_type`/`type` con `BIWEEKLY`.
 
 **No usar** [`maintenance_actions`](server/src/models/maintenance_action.js) (tabla huérfana ligada solo a `work_orders`); evita confusión semántica.
 
@@ -167,11 +175,11 @@ Nuevo namespace **`/api/maintenance-scheduler`** en [`server/src/index.js`](serv
 | Reportes | `MaintenanceReportService` | `GET .../reports/monthly?month=` (Excel); `GET .../sessions/:id/pdf` (Puppeteer) |
 | Integración fallas | reutilizar `repairExecutionService` / `workOrderService` | `POST .../days/:date/link-failure-closure` (vincula cierre al día del técnico; valida máquina distinta para verde) |
 
-**Autorización:**  
-- Admin (1) y Soporte (2): config, plan, reportes.  
+**Autorización:**
+- Admin (1) y Soporte (2): config, plan, reportes.
 - Técnico (3, 7): calendario operativo, sesiones, cierre fallas en contexto de día/máquina.
 
-**Regeneración de plan:**  
+**Regeneración de plan:**
 - Solo meses **DRAFT** o futuros no publicados; slots con `is_manual_override` se preservan al regenerar.
 
 ---
@@ -180,22 +188,22 @@ Nuevo namespace **`/api/maintenance-scheduler`** en [`server/src/index.js`](serv
 
 Estructura espejo de failure-book:
 
-- [`client/src/features/maintenance-scheduler/`](client/src/features/maintenance-scheduler/)  
-  - `MaintenanceSchedulerPage.jsx` — calendario mensual (grid: días × chips por máquina/tipo).  
-  - `MaintenanceConfigPanel.jsx` — tabla de dispositivos: toggle semanal, día semana, exento programado, última fecha programada.  
-  - `MaintenanceDayDrawer.jsx` — detalle del día: abrir sesión, ver colores, cerrar fallas.  
-  - `MaintenanceSessionWizard.jsx` — QR → evidencias → descripción → partes/requisiciones → completar → descargar PDF.  
-  - `hooks/useMaintenanceCalendar.js`, `useMaintenanceSession.js`  
+- [`client/src/features/maintenance-scheduler/`](client/src/features/maintenance-scheduler/)
+  - `MaintenanceSchedulerPage.jsx` — calendario mensual (grid: días × chips por máquina/tipo).
+  - `MaintenanceConfigPanel.jsx` — tabla de dispositivos: toggle semanal, día semana, exento programado, última fecha programada.
+  - `MaintenanceDayDrawer.jsx` — detalle del día: abrir sesión, ver colores, cerrar fallas.
+  - `MaintenanceSessionWizard.jsx` — QR → evidencias → descripción → partes/requisiciones → completar → descargar PDF.
+  - `hooks/useMaintenanceCalendar.js`, `useMaintenanceSession.js`
   - `utils/maintenanceSchedulerApi.js`
 
-**Rutas Next.js:**  
-- `/mantenimiento/cronograma` — técnicos + admin (vista operativa).  
-- `/AdminDashboard` — nueva pestaña “Cronograma mantenimiento” (solo config/planes/publicar), o subruta `/mantenimiento/admin`.  
+**Rutas Next.js:**
+- `/mantenimiento/cronograma` — técnicos + admin (vista operativa).
+- `/AdminDashboard` — nueva pestaña “Cronograma mantenimiento” (solo config/planes/publicar), o subruta `/mantenimiento/admin`.
 - Enlace en [`dashboard.js`](client/src/components/dashboard/dashboard.js) quick actions.
 
-**Componentes reutilizados (sin romper checklists):**  
-- Escaneo QR: adaptar flujo de [`QrUnlockBar`](client/src/components/checklist/QrUnlockBar.jsx) / validación API nueva.  
-- Fallas: [`FailureDetailModal`](client/src/components/checklist/FailureDetailModal.jsx) filtrado por `affected_id` + fecha.  
+**Componentes reutilizados (sin romper checklists):**
+- Escaneo QR: adaptar flujo de [`QrUnlockBar`](client/src/components/checklist/QrUnlockBar.jsx) / validación API nueva.
+- Fallas: [`FailureDetailModal`](client/src/components/checklist/FailureDetailModal.jsx) filtrado por `affected_id` + fecha.
 - Partes: `WorkOrderPartsManager` + APIs inventario existentes.
 
 ---
@@ -206,7 +214,8 @@ Estructura espejo de failure-book:
 flowchart TD
   start[Inicio mes M] --> loadCfg[Cargar maintenance_machine_configs]
   loadCfg --> weekly[Colocar slots WEEKLY en weekday configurado]
-  loadCfg --> pool[Máquinas weekly_enabled=false y no scheduled_exempt]
+  loadCfg --> biweekly[Colocar slots BIWEEKLY en 1ª+3ª o 2ª+4ª semana]
+  loadCfg --> pool[Máquinas weekly_enabled=false y biweekly_enabled=false y no scheduled_exempt]
   pool --> rank[Ordenar por estrategia elegida]
   rank --> distribute[Distribuir SCHEDULED en días laborables respetando max_per_day]
   distribute --> exempt[scheduled_exempt al final del mes o sin slot]

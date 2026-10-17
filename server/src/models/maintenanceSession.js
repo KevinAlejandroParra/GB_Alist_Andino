@@ -29,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
     MaintenanceSession.init({
         slot_id: { type: DataTypes.INTEGER, allowNull: true },
         ins_id: { type: DataTypes.INTEGER, allowNull: false },
-        type: { type: DataTypes.ENUM('WEEKLY', 'SCHEDULED'), allowNull: false },
+        type: { type: DataTypes.ENUM('WEEKLY', 'SCHEDULED', 'BIWEEKLY'), allowNull: false },
         status: { type: DataTypes.ENUM('DRAFT', 'COMPLETED'), defaultValue: 'DRAFT' },
         technician_id: { type: DataTypes.INTEGER, allowNull: true },
         description: { type: DataTypes.TEXT, allowNull: true },

@@ -8,7 +8,7 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState('ALL'); // ALL, WEEKLY, SCHEDULED, EXEMPT
+  const [filterType, setFilterType] = useState('ALL'); // ALL, WEEKLY, BIWEEKLY, SCHEDULED, EXEMPT
   const [savingId, setSavingId] = useState(null);
 
   const fetchConfigs = async () => {
@@ -91,7 +91,8 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
     if (!matchSearch) return false;
 
     if (filterType === 'WEEKLY') return c.weekly_enabled;
-    if (filterType === 'SCHEDULED') return !c.weekly_enabled && !c.scheduled_exempt;
+    if (filterType === 'BIWEEKLY') return c.biweekly_enabled;
+    if (filterType === 'SCHEDULED') return !c.weekly_enabled && !c.biweekly_enabled && !c.scheduled_exempt;
     if (filterType === 'EXEMPT') return c.scheduled_exempt;
     return true;
   });
@@ -118,7 +119,8 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
           {[
             { id: 'ALL', label: `Todas (${configs.length})` },
             { id: 'WEEKLY', label: `Semanales (${configs.filter(c => c.weekly_enabled).length})` },
-            { id: 'SCHEDULED', label: `Programadas (${configs.filter(c => !c.weekly_enabled && !c.scheduled_exempt).length})` },
+            { id: 'BIWEEKLY', label: `Quincenales (${configs.filter(c => c.biweekly_enabled).length})` },
+            { id: 'SCHEDULED', label: `Programadas (${configs.filter(c => !c.weekly_enabled && !c.biweekly_enabled && !c.scheduled_exempt).length})` },
             { id: 'EXEMPT', label: `Exentas (${configs.filter(c => c.scheduled_exempt).length})` }
           ].map(tab => (
             <button
@@ -154,6 +156,8 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
                 <th className="px-5 py-4">Máquina</th>
                 <th className="px-5 py-4 text-center">Preventivo Semanal</th>
                 <th className="px-5 py-4">Día Fijo Semanal</th>
+                <th className="px-5 py-4 text-center">Preventivo Quincenal</th>
+                <th className="px-5 py-4">Quincenal: Día / Patrón</th>
                 <th className="px-5 py-4 text-center">Exento de PP</th>
                 <th className="px-5 py-4">Último Programado</th>
                 <th className="px-5 py-4 text-center">Código QR</th>
@@ -162,14 +166,14 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="text-center py-12 text-gray-400">
+                  <td colSpan="8" className="text-center py-12 text-gray-400">
                     <i className="fas fa-spinner fa-spin text-2xl mb-2 block" />
                     Cargando máquinas y configuraciones...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="text-center py-12 text-gray-400">
+                  <td colSpan="8" className="text-center py-12 text-gray-400">
                     No se encontraron máquinas con el filtro seleccionado.
                   </td>
                 </tr>
@@ -199,7 +203,8 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
                             type="checkbox"
                             checked={cfg.weekly_enabled}
                             onChange={(e) =>
-                              handleUpdate(cfg.ins_id, { weekly_enabled: e.target.checked })
+                              handleUpdate(cfg.ins_id, { weekly_enabled: e.target.checked, ...(e.target.checked && { biweekly_enabled: false }) })
+                            }
                             }
                             className="sr-only peer"
                           />
@@ -223,6 +228,56 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
                               </option>
                             ))}
                           </select>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">No aplica</span>
+                        )}
+                      </td>
+
+                      {/* Biweekly Toggle */}
+                      <td className="px-5 py-4 text-center">
+                        {!cfg.weekly_enabled ? (
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(cfg.biweekly_enabled)}
+                              onChange={(e) =>
+                                handleUpdate(cfg.ins_id, { biweekly_enabled: e.target.checked })
+                              }
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+                          </label>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">Es semanal</span>
+                        )}
+                      </td>
+
+                      {/* Biweekday / Pattern Selector */}
+                      <td className="px-5 py-4">
+                        {cfg.biweekly_enabled && !cfg.weekly_enabled ? (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={cfg.biweekly_weekday ?? 1}
+                              onChange={(e) =>
+                                handleUpdate(cfg.ins_id, { biweekly_weekday: parseInt(e.target.value, 10) })
+                              }
+                              className="bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-800 focus:ring-cyan-500 focus:border-cyan-500 shadow-2xs"
+                            >
+                              {weekdays.map(w => (
+                                <option key={w.id} value={w.id}>{w.label}</option>
+                              ))}
+                            </select>
+                            <select
+                              value={cfg.biweekly_pattern || 'FIRST_THIRD'}
+                              onChange={(e) =>
+                                handleUpdate(cfg.ins_id, { biweekly_pattern: e.target.value })
+                              }
+                              className="bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-800 focus:ring-cyan-500 focus:border-cyan-500 shadow-2xs"
+                            >
+                              <option value="FIRST_THIRD">1ª y 3ª semana</option>
+                              <option value="SECOND_FOURTH">2ª y 4ª semana</option>
+                            </select>
+                          </div>
                         ) : (
                           <span className="text-xs text-gray-400 italic">No aplica</span>
                         )}

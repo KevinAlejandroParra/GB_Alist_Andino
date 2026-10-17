@@ -151,8 +151,8 @@ class MaintenanceSessionService {
             duration_minutes: duration
         });
 
-        // Update last_scheduled_at on machine config if this was a SCHEDULED session (Regla 7)
-        if (session.type === 'SCHEDULED') {
+        // Update last_scheduled_at on machine config if this was a SCHEDULED or BIWEEKLY session (Regla 7)
+        if (session.type === 'SCHEDULED' || session.type === 'BIWEEKLY') {
             await MaintenanceMachineConfig.upsert({
                 ins_id: session.ins_id,
                 last_scheduled_at: completedAt

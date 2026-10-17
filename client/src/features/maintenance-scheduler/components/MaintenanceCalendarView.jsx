@@ -259,7 +259,7 @@ export default function MaintenanceCalendarView({
                     >
                       <div className="truncate flex-1">
                         <span className="font-bold mr-1">
-                          {slot.slot_type === 'WEEKLY' ? '🗓️' : '⚙️'}
+                          {slot.slot_type === 'WEEKLY' ? '🗓️' : slot.slot_type === 'BIWEEKLY' ? '🔂' : '⚙️'}
                         </span>
                         <span className="truncate">{slot.inspectable?.name || `Máquina #${slot.ins_id}`}</span>
                       </div>

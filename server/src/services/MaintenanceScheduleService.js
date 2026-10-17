@@ -13,7 +13,7 @@ const {
     RepairExecution
 } = require("../models");
 const MaintenanceConfigService = require("./MaintenanceConfigService");
-const { Op } = require("sequelize");
+const { Op, Sequelize } = require("sequelize");
 
 class MaintenanceScheduleService {
     /**
@@ -151,8 +151,50 @@ class MaintenanceScheduleService {
             }
         });
 
+        // 1b. GENERATE BIWEEKLY SLOTS (1ª+3ª / 2ª+4ª semana del mes)
+        const biweeklyConfigs = activeConfigs.filter(c => c.biweekly_enabled);
+        biweeklyConfigs.forEach(cfg => {
+            const targetWeekday = cfg.biweekly_weekday !== undefined && cfg.biweekly_weekday !== null ? cfg.biweekly_weekday : 1;
+            const pattern = cfg.biweekly_pattern === 'SECOND_FOURTH' ? 'SECOND_FOURTH' : 'FIRST_THIRD';
+            const targetWeekNumbers = pattern === 'FIRST_THIRD' ? [1, 3] : [2, 4];
+
+            let weekNumber = 0;
+            let lastSeenDay = null;
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateObj = new Date(year, month - 1, day);
+                const dayOfWeek = dateObj.getDay();
+                const dateStr = `${yearMonth}-${String(day).padStart(2, '0')}`;
+
+                // Avanza la numeración de semanas al pasar de una ocurrencia del weekday al día siguiente
+                if (dayOfWeek === targetWeekday) {
+                    if (lastSeenDay !== null) weekNumber++;
+                    lastSeenDay = day;
+                }
+
+                if (
+                    dayOfWeek === targetWeekday &&
+                    weekNumber >= 0 &&
+                    targetWeekNumbers.includes(weekNumber + 1) &&
+                    workingDays.includes(dayOfWeek)
+                ) {
+                    const key = `${cfg.ins_id}_${dateStr}`;
+                    if (!occupiedDatesByMachine.has(key)) {
+                        newSlots.push({
+                            plan_id: plan.id,
+                            scheduled_date: dateStr,
+                            ins_id: cfg.ins_id,
+                            slot_type: 'BIWEEKLY',
+                            sort_priority: 0,
+                            is_manual_override: false
+                        });
+                        occupiedDatesByMachine.add(key);
+                    }
+                }
+            }
+        });
+
         // 2. GENERATE SCHEDULED SLOTS (PP)
-        const nonWeeklyConfigs = activeConfigs.filter(c => !c.weekly_enabled);
+        const nonWeeklyConfigs = activeConfigs.filter(c => !c.weekly_enabled && !c.biweekly_enabled);
         const regularPool = nonWeeklyConfigs.filter(c => !c.scheduled_exempt);
         const exemptPool = nonWeeklyConfigs.filter(c => c.scheduled_exempt);
 
@@ -353,7 +395,8 @@ class MaintenanceScheduleService {
             ],
             order: [
                 ['scheduled_date', 'ASC'],
-                ['slot_type', 'DESC'], // WEEKLY first
+                // Orden: WEEKLY, luego BIWEEKLY, luego SCHEDULED (orden lexicográfico del ENUM)
+                [Sequelize.literal("FIELD(slot_type, 'WEEKLY', 'BIWEEKLY', 'SCHEDULED')"), 'ASC'],
                 ['sort_priority', 'ASC']
             ]
         });
