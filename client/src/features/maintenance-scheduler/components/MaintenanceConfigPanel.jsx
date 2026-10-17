@@ -205,7 +205,6 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
                             onChange={(e) =>
                               handleUpdate(cfg.ins_id, { weekly_enabled: e.target.checked, ...(e.target.checked && { biweekly_enabled: false }) })
                             }
-                            }
                             className="sr-only peer"
                           />
                           <div className="w-11 h-6 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
