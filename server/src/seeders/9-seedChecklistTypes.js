@@ -75,32 +75,70 @@ module.exports = {
           continue;
         }
 
-        // Limpiar para evitar duplicados por nombre
-        await queryInterface.bulkDelete('checklist_types', { name: definition.name }, {});
-
-        // Crear el tipo de checklist usando una inserción cruda para obtener el ID
-        const [newChecklistTypeId] = await queryInterface.sequelize.query(
-          `INSERT INTO checklist_types (name, description, frequency, version_label, role_id, type_category, associated_id, createdAt, updatedAt)
-           VALUES (:name, :description, :frequency, :version_label, :role_id, :type_category, :associated_id, :createdAt, :updatedAt);`,
+        // 1. Buscar si el tipo de checklist ya existe
+        const [existingType] = await queryInterface.sequelize.query(
+          `SELECT checklist_type_id FROM checklist_types WHERE name = :name LIMIT 1;`,
           {
-            replacements: {
-              name: definition.name,
-              description: definition.description,
-              // Si no se especifica frequency, usar 'diario' para atracciones y 'semanal' para familias
-              frequency: definition.frequency || (type_category === 'family' ? 'semanal' : 'diario'),
-              version_label: definition.version_label,
-              role_id: definition.role_id,
-              type_category: type_category,
-              associated_id: associated_id,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-            type: Sequelize.QueryTypes.INSERT
+            replacements: { name: definition.name },
+            type: Sequelize.QueryTypes.SELECT
           }
         );
 
-        // Si es un checklist específico, poblar la tabla de unión
-        if (type_category === 'specific' && newChecklistTypeId) {
+        let checklistTypeId;
+
+        if (existingType) {
+          // Si existe, actualizar los campos básicos
+          checklistTypeId = existingType.checklist_type_id;
+          await queryInterface.sequelize.query(
+            `UPDATE checklist_types SET 
+              description = :description, 
+              frequency = :frequency, 
+              version_label = :version_label, 
+              role_id = :role_id, 
+              type_category = :type_category, 
+              associated_id = :associated_id, 
+              updatedAt = :updatedAt 
+             WHERE checklist_type_id = :checklist_type_id;`,
+            {
+              replacements: {
+                checklist_type_id: checklistTypeId,
+                description: definition.description,
+                frequency: definition.frequency || (type_category === 'family' ? 'semanal' : 'diario'),
+                version_label: definition.version_label,
+                role_id: definition.role_id,
+                type_category: type_category,
+                associated_id: associated_id,
+                updatedAt: new Date(),
+              },
+              type: Sequelize.QueryTypes.UPDATE
+            }
+          );
+        } else {
+          // Si no existe, insertar uno nuevo
+          const [newId] = await queryInterface.sequelize.query(
+            `INSERT INTO checklist_types (name, description, frequency, version_label, role_id, type_category, associated_id, createdAt, updatedAt)
+             VALUES (:name, :description, :frequency, :version_label, :role_id, :type_category, :associated_id, :createdAt, :updatedAt);`,
+            {
+              replacements: {
+                name: definition.name,
+                description: definition.description,
+                frequency: definition.frequency || (type_category === 'family' ? 'semanal' : 'diario'),
+                version_label: definition.version_label,
+                role_id: definition.role_id,
+                type_category: type_category,
+                associated_id: associated_id,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+              type: Sequelize.QueryTypes.INSERT
+            }
+          );
+          checklistTypeId = newId;
+        }
+
+        // Si es un checklist específico, poblar la tabla de unión (limpiar y re-insertar)
+        if (type_category === 'specific' && checklistTypeId) {
+          await queryInterface.bulkDelete('ChecklistTypeInspectables', { checklist_type_id: checklistTypeId }, {});
           const inspectables = await queryInterface.sequelize.query(
             `SELECT ins_id FROM inspectables WHERE name IN (:names);`,
             {
@@ -111,7 +149,7 @@ module.exports = {
 
           if (inspectables && inspectables.length > 0) {
             const joinTableEntries = inspectables.map(inspectable => ({
-              checklist_type_id: newChecklistTypeId,
+              checklist_type_id: checklistTypeId,
               ins_id: inspectable.ins_id,
               createdAt: new Date(),
               updatedAt: new Date()
@@ -120,46 +158,122 @@ module.exports = {
           }
         }
         
-        // Insertar los ítems del checklist si están definidos
-        if (definition.items && definition.items.length > 0 && newChecklistTypeId) {
-          const itemEntries = [];
+        // 2. Procesar los ítems del checklist si están definidos
+        if (definition.items && definition.items.length > 0 && checklistTypeId) {
           for (const item of definition.items) {
-            const [parentItemId] = await queryInterface.sequelize.query(
-              `INSERT INTO checklist_items (checklist_type_id, item_number, question_text, guidance_text, input_type, allow_comment, createdAt, updatedAt)
-               VALUES (:checklist_type_id, :item_number, :question_text, :guidance_text, :input_type, :allow_comment, :createdAt, :updatedAt);`,
+            // Buscar si el ítem padre ya existe
+            const [existingParent] = await queryInterface.sequelize.query(
+              `SELECT checklist_item_id FROM checklist_items 
+               WHERE checklist_type_id = :checklist_type_id AND item_number = :item_number AND parent_item_id IS NULL LIMIT 1;`,
               {
-                replacements: {
-                  checklist_type_id: newChecklistTypeId,
-                  item_number: item.item_number,
-                  question_text: item.question_text,
-                  guidance_text: item.guidance_text || null,
-                  input_type: item.input_type || 'section', // Por defecto a 'section' para ítems principales
-                  allow_comment: item.allow_comment || false,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                },
-                type: Sequelize.QueryTypes.INSERT
+                replacements: { checklist_type_id: checklistTypeId, item_number: item.item_number },
+                type: Sequelize.QueryTypes.SELECT
               }
             );
 
+            let parentItemId;
+            if (existingParent) {
+              parentItemId = existingParent.checklist_item_id;
+              await queryInterface.sequelize.query(
+                `UPDATE checklist_items SET 
+                  question_text = :question_text, 
+                  guidance_text = :guidance_text, 
+                  input_type = :input_type, 
+                  allow_comment = :allow_comment, 
+                  updatedAt = :updatedAt 
+                 WHERE checklist_item_id = :parent_item_id;`,
+                {
+                  replacements: {
+                    parent_item_id: parentItemId,
+                    question_text: item.question_text,
+                    guidance_text: item.guidance_text || null,
+                    input_type: item.input_type || 'section',
+                    allow_comment: item.allow_comment || false,
+                    updatedAt: new Date(),
+                  },
+                  type: Sequelize.QueryTypes.UPDATE
+                }
+              );
+            } else {
+              const [newParentId] = await queryInterface.sequelize.query(
+                `INSERT INTO checklist_items (checklist_type_id, item_number, question_text, guidance_text, input_type, allow_comment, createdAt, updatedAt)
+                 VALUES (:checklist_type_id, :item_number, :question_text, :guidance_text, :input_type, :allow_comment, :createdAt, :updatedAt);`,
+                {
+                  replacements: {
+                    checklist_type_id: checklistTypeId,
+                    item_number: item.item_number,
+                    question_text: item.question_text,
+                    guidance_text: item.guidance_text || null,
+                    input_type: item.input_type || 'section',
+                    allow_comment: item.allow_comment || false,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  },
+                  type: Sequelize.QueryTypes.INSERT
+                }
+              );
+              parentItemId = newParentId;
+            }
+
+            // Procesar hijos
             if (item.children && item.children.length > 0) {
               for (const subItem of item.children) {
-                itemEntries.push({
-                  checklist_type_id: newChecklistTypeId,
-                  parent_item_id: parentItemId,
-                  item_number: subItem.item_number,
-                  question_text: subItem.question_text,
-                  guidance_text: subItem.guidance_text || null,
-                  input_type: subItem.input_type || 'radio',
-                  allow_comment: subItem.allow_comment || false,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                });
+                const [existingSub] = await queryInterface.sequelize.query(
+                  `SELECT checklist_item_id FROM checklist_items 
+                   WHERE checklist_type_id = :checklist_type_id AND item_number = :item_number AND parent_item_id = :parent_item_id LIMIT 1;`,
+                  {
+                    replacements: { 
+                      checklist_type_id: checklistTypeId, 
+                      item_number: subItem.item_number,
+                      parent_item_id: parentItemId
+                    },
+                    type: Sequelize.QueryTypes.SELECT
+                  }
+                );
+
+                if (existingSub) {
+                  await queryInterface.sequelize.query(
+                    `UPDATE checklist_items SET 
+                      question_text = :question_text, 
+                      guidance_text = :guidance_text, 
+                      input_type = :input_type, 
+                      allow_comment = :allow_comment, 
+                      updatedAt = :updatedAt 
+                     WHERE checklist_item_id = :sub_item_id;`,
+                    {
+                      replacements: {
+                        sub_item_id: existingSub.checklist_item_id,
+                        question_text: subItem.question_text,
+                        guidance_text: subItem.guidance_text || null,
+                        input_type: subItem.input_type || 'radio',
+                        allow_comment: subItem.allow_comment !== undefined ? subItem.allow_comment : true,
+                        updatedAt: new Date(),
+                      },
+                      type: Sequelize.QueryTypes.UPDATE
+                    }
+                  );
+                } else {
+                  await queryInterface.sequelize.query(
+                    `INSERT INTO checklist_items (checklist_type_id, parent_item_id, item_number, question_text, guidance_text, input_type, allow_comment, createdAt, updatedAt)
+                     VALUES (:checklist_type_id, :parent_item_id, :item_number, :question_text, :guidance_text, :input_type, :allow_comment, :createdAt, :updatedAt);`,
+                    {
+                      replacements: {
+                        checklist_type_id: checklistTypeId,
+                        parent_item_id: parentItemId,
+                        item_number: subItem.item_number,
+                        question_text: subItem.question_text,
+                        guidance_text: subItem.guidance_text || null,
+                        input_type: subItem.input_type || 'radio',
+                        allow_comment: subItem.allow_comment !== undefined ? subItem.allow_comment : true,
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                      },
+                      type: Sequelize.QueryTypes.INSERT
+                    }
+                  );
+                }
               }
             }
-          }
-          if (itemEntries.length > 0) {
-            await queryInterface.bulkInsert('checklist_items', itemEntries, {});
           }
         }
       }
