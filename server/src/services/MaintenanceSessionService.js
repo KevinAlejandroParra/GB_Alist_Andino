@@ -1,10 +1,9 @@
 const { 
     MaintenanceSession, 
     MaintenanceSessionEvidence, 
-    MaintenanceSessionPart, 
-    MaintenanceScheduleSlot, 
+    MaintenanceScheduleSlot,
     MaintenanceMachineConfig,
-    MaintenanceMachineQrCode, 
+    MaintenanceMachineQrCode,
     MaintenanceQrScan,
     Inspectable,
     User
@@ -24,11 +23,11 @@ class MaintenanceSessionService {
 
         if (!qrCode) throw new Error("El código QR es obligatorio para iniciar la sesión");
 
-        const qr = await MaintenanceMachineQrCode.findOne({ 
-            where: { qr_code: qrCode, is_active: true } 
+        const qr = await MaintenanceMachineQrCode.findOne({
+            where: { qr_code: qrCode, is_active: true }
         });
         if (!qr) throw new Error("Código QR no reconocido o inactivo en el sistema");
-        
+
         if (qr.ins_id !== slot.ins_id) {
             throw new Error(`El código QR escaneado no corresponde a la máquina planificada (${slot.inspectable?.name || 'ID ' + slot.ins_id})`);
         }
@@ -159,18 +158,15 @@ class MaintenanceSessionService {
             });
         }
 
-        return await this.getSessionById(sessionId);
-    }
+        // Etapa 3: cerrar la OT autogenerada (si el técnico usó repuestos en esta sesión)
+        try {
+            const MaintenanceWorkOrderService = require('./MaintenanceWorkOrderService');
+            await MaintenanceWorkOrderService.closeForSession(sessionId, description);
+        } catch (woErr) {
+            console.error('⚠️ No se pudo cerrar la OT de la sesión:', woErr.message);
+        }
 
-    /**
-     * Register spare part consumption
-     */
-    async addPart(sessionId, inventoryId, quantity) {
-        return await MaintenanceSessionPart.create({
-            session_id: sessionId,
-            inventory_id: inventoryId,
-            quantity: Number(quantity) || 1
-        });
+        return await this.getSessionById(sessionId);
     }
 }
 

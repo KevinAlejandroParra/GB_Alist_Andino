@@ -101,6 +101,54 @@ export const maintenanceApi = {
     return res.data;
   },
 
+  // ── Repuestos de sesión (OT autogenerada lazy) ──
+  getSessionParts: async (sessionId) => {
+    const res = await axiosInstance.get(`${API_BASE}/sessions/${sessionId}/parts`);
+    return res.data; // { work_order_id, parts }
+  },
+  addSessionPart: async (sessionId, inventoryId, quantity = 1) => {
+    const res = await axiosInstance.post(`${API_BASE}/sessions/${sessionId}/parts`, {
+      inventoryId,
+      quantity
+    });
+    return res.data;
+  },
+  removeSessionPart: async (sessionId, partId) => {
+    const res = await axiosInstance.delete(`${API_BASE}/sessions/${sessionId}/parts/${partId}`);
+    return res.data;
+  },
+  getSessionWorkOrder: async (sessionId) => {
+    const res = await axiosInstance.get(`${API_BASE}/sessions/${sessionId}/work-order`);
+    return res.data;
+  },
+
+  // ── Requisiciones de sesión (manuales, desde el wizard) ──
+  getSessionRequisitions: async (sessionId) => {
+    const res = await axiosInstance.get(`${API_BASE}/sessions/${sessionId}/requisitions`);
+    return res.data;
+  },
+  createSessionRequisition: async (sessionId, { partReference, quantity, notes }) => {
+    const res = await axiosInstance.post(`${API_BASE}/sessions/${sessionId}/requisitions`, {
+      partReference,
+      quantity,
+      notes
+    });
+    return res.data;
+  },
+
+  // ── PDF de sesión ──
+  downloadSessionPdf: async (sessionId) => {
+    const res = await axiosInstance.get(`${API_BASE}/sessions/${sessionId}/pdf`, {
+      responseType: 'blob'
+    });
+    return res.data; // Blob
+  },
+
+  getInventoryItems: async () => {
+    const res = await axiosInstance.get('/api/inventory');
+    return res.data;
+  },
+
   // QR Codes
   getMachineQrs: async (premiseId) => {
     const res = await axiosInstance.get(`${API_BASE}/qr/machines`, {

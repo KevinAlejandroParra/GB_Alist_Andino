@@ -20,9 +20,9 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'session_id',
                 as: 'evidences'
             });
-            MaintenanceSession.hasMany(models.MaintenanceSessionPart, {
-                foreignKey: 'session_id',
-                as: 'parts'
+            MaintenanceSession.hasOne(models.WorkOrder, {
+                foreignKey: 'maintenance_session_id',
+                as: 'workOrder'
             });
         }
     }

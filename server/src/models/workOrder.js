@@ -19,6 +19,13 @@ module.exports = (sequelize, DataTypes) => {
         as: 'resolver'
       });
 
+      if (models.MaintenanceSession) {
+        WorkOrder.belongsTo(models.MaintenanceSession, {
+          foreignKey: 'maintenance_session_id',
+          as: 'maintenanceSession'
+        });
+      }
+
       WorkOrder.belongsTo(models.User, {
         foreignKey: 'cancelled_by_id',
         as: 'cancelledBy'
@@ -99,9 +106,14 @@ module.exports = (sequelize, DataTypes) => {
     // Relaciones principales
     failure_order_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
       unique: true,
-      comment: 'ID de la orden de falla asociada (relación 1:1)'
+      comment: 'ID de la orden de falla asociada (null para OTs de mantenimiento preventivo)'
+    },
+    maintenance_session_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'Sesión de mantenimiento que generó esta OT (preventivo)'
     },
     resolved_by_id: {
       type: DataTypes.INTEGER,

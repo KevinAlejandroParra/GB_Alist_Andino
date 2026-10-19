@@ -51,7 +51,6 @@ const MaintenanceSchedulePlanModel = require("./maintenanceSchedulePlan.js");
 const MaintenanceScheduleSlotModel = require("./maintenanceScheduleSlot.js");
 const MaintenanceSessionModel = require("./maintenanceSession.js");
 const MaintenanceSessionEvidenceModel = require("./maintenanceSessionEvidence.js");
-const MaintenanceSessionPartModel = require("./maintenanceSessionPart.js");
 const MaintenanceDayFailureClosureModel = require("./maintenanceDayFailureClosure.js");
 const MaintenanceMachineQrCodeModel = require("./maintenanceMachineQrCode.js");
 const MaintenanceQrScanModel = require("./maintenanceQrScan.js");
@@ -78,7 +77,7 @@ const Audit = AuditModel(connection, DataTypes);
 const FailureOrder = FailureOrderModel(connection, DataTypes);
 const RepairExecution = RepairExecutionModel(connection, DataTypes);
 const WorkOrder = WorkOrderModel(connection, DataTypes);
-const WorkOrderPart = WorkOrderPartModel(connection, DataTypes); 
+const WorkOrderPart = WorkOrderPartModel(connection, DataTypes);
 const ChecklistQrCode = ChecklistQrCodeModel(connection, DataTypes);
 const ChecklistQrScan = ChecklistQrScanModel(connection, DataTypes);
 const ChecklistQrItemAssociation = ChecklistQrItemAssociationModel(connection, DataTypes);
@@ -91,7 +90,6 @@ const MaintenanceSchedulePlan = MaintenanceSchedulePlanModel(connection, DataTyp
 const MaintenanceScheduleSlot = MaintenanceScheduleSlotModel(connection, DataTypes);
 const MaintenanceSession = MaintenanceSessionModel(connection, DataTypes);
 const MaintenanceSessionEvidence = MaintenanceSessionEvidenceModel(connection, DataTypes);
-const MaintenanceSessionPart = MaintenanceSessionPartModel(connection, DataTypes);
 const MaintenanceDayFailureClosure = MaintenanceDayFailureClosureModel(connection, DataTypes);
 const MaintenanceMachineQrCode = MaintenanceMachineQrCodeModel(connection, DataTypes);
 const MaintenanceQrScan = MaintenanceQrScanModel(connection, DataTypes);
@@ -99,14 +97,14 @@ const MaintenanceQrScan = MaintenanceQrScanModel(connection, DataTypes);
 
 const models = {
       User, Role, Premise, ChecklistType, Checklist, ChecklistItem, ChecklistResponse,
-      ChecklistSignature, MaintenanceAction, Requisition, 
+      ChecklistSignature, MaintenanceAction, Requisition,
       Inventory, Inspectable, Device, Attraction, Family, Entity, Audit,
-      FailureOrder, RepairExecution, WorkOrder, WorkOrderPart, 
+      FailureOrder, RepairExecution, WorkOrder, WorkOrderPart,
       ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation,
     PremiosConfig, PremiosAnalisis, RetroactiveAccessRequest,
     MaintenanceSetting, MaintenanceMachineConfig, MaintenanceSchedulePlan,
     MaintenanceScheduleSlot, MaintenanceSession, MaintenanceSessionEvidence,
-    MaintenanceSessionPart, MaintenanceDayFailureClosure, MaintenanceMachineQrCode, MaintenanceQrScan
+    MaintenanceDayFailureClosure, MaintenanceMachineQrCode, MaintenanceQrScan
 };
 
 
@@ -118,14 +116,14 @@ Object.values(models).forEach(model => {
 
 module.exports = {
       User, Role, Premise, ChecklistType, Checklist, ChecklistItem, ChecklistResponse,
-      ChecklistSignature, MaintenanceAction, Requisition, 
+      ChecklistSignature, MaintenanceAction, Requisition,
       Inventory, Inspectable, Device, Attraction, Family, Entity, Audit,
-      FailureOrder, RepairExecution, WorkOrder, WorkOrderPart, 
+      FailureOrder, RepairExecution, WorkOrder, WorkOrderPart,
       ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation,
     PremiosConfig, PremiosAnalisis, RetroactiveAccessRequest,
     MaintenanceSetting, MaintenanceMachineConfig, MaintenanceSchedulePlan,
     MaintenanceScheduleSlot, MaintenanceSession, MaintenanceSessionEvidence,
-    MaintenanceSessionPart, MaintenanceDayFailureClosure, MaintenanceMachineQrCode, MaintenanceQrScan,
+    MaintenanceDayFailureClosure, MaintenanceMachineQrCode, MaintenanceQrScan,
     connection, Sequelize,
 
   };

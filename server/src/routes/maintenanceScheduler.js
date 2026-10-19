@@ -5,6 +5,9 @@ const MaintenanceScheduleService = require('../services/MaintenanceScheduleServi
 const MaintenanceSessionService = require('../services/MaintenanceSessionService');
 const MaintenanceQrService = require('../services/MaintenanceQrService');
 const MaintenanceFailureClosureService = require('../services/MaintenanceFailureClosureService');
+const MaintenanceWorkOrderService = require('../services/MaintenanceWorkOrderService');
+const MaintenanceSessionPdfService = require('../services/MaintenanceSessionPdfService');
+const { WorkOrder } = require('../models');
 const { verifyToken, checkRole } = require('../middleware/authMiddleware');
 const { uploadMaintenanceEvidence, toRelativePath } = require('../config/multerConfig');
 
@@ -223,12 +226,91 @@ router.post('/sessions/:id/complete', async (req, res) => {
     }
 });
 
-router.post('/sessions/parts', async (req, res) => {
+// ─────────────────────────────────────────────────────────────
+// REPUESTOS DE SESIÓN (Etapa 3 — OT autogenerada lazy)
+// ─────────────────────────────────────────────────────────────
+
+// Listar repuestos de la OT de la sesión (vacío si aún no hay OT)
+router.get('/sessions/:id/parts', async (req, res) => {
     try {
-        const { sessionId, inventoryId, quantity } = req.body;
-        const part = await MaintenanceSessionService.addPart(sessionId, inventoryId, quantity);
-        res.json(part);
+        const result = await MaintenanceWorkOrderService.listPartsForSession(req.params.id);
+        res.json(result);
     } catch (e) {
+        console.error('Error listing session parts:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Agregar repuesto → crea la OT MTO perezosamente + descuenta stock
+router.post('/sessions/:id/parts', async (req, res) => {
+    try {
+        const { inventoryId, quantity } = req.body;
+        const technicianId = req.user?.user_id || null;
+        const result = await MaintenanceWorkOrderService.addPartToSession(req.params.id, inventoryId, quantity, technicianId);
+        res.json(result);
+    } catch (e) {
+        console.error('Error adding session part:', e);
+        res.status(400).json({ error: e.message });
+    }
+});
+
+// Quitar repuesto (devuelve stock; si queda vacía la OT no se elimina hasta cierre)
+router.delete('/sessions/:id/parts/:partId', async (req, res) => {
+    try {
+        const technicianId = req.user?.user_id || null;
+        const result = await MaintenanceWorkOrderService.removePartFromSession(req.params.id, req.params.partId, technicianId);
+        res.json(result);
+    } catch (e) {
+        console.error('Error removing session part:', e);
+        res.status(400).json({ error: e.message });
+    }
+});
+
+// Info de la OT de la sesión (para el wizard)
+router.get('/sessions/:id/work-order', async (req, res) => {
+    try {
+        const wo = await WorkOrder.findOne({ where: { maintenance_session_id: req.params.id } });
+        res.json(wo ? { id: wo.id, work_order_id: wo.work_order_id, status: wo.status } : null);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────
+// REQUISICIONES DE SESIÓN (manual, desde el wizard)
+// ─────────────────────────────────────────────────────────────
+
+router.get('/sessions/:id/requisitions', async (req, res) => {
+    try {
+        const list = await MaintenanceWorkOrderService.listRequisitionsForSession(req.params.id);
+        res.json(list);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+router.post('/sessions/:id/requisitions', async (req, res) => {
+    try {
+        const { partReference, quantity, notes } = req.body;
+        const technicianId = req.user?.user_id || null;
+        const req2 = await MaintenanceWorkOrderService.createManualRequisition(
+            req.params.id, { partReference, quantity, notes }, technicianId
+        );
+        res.status(201).json(req2);
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+// PDF de la sesión (resumen con repuestos y requisiciones)
+router.get('/sessions/:id/pdf', async (req, res) => {
+    try {
+        const pdfBuffer = await MaintenanceSessionPdfService.generatePdf(req.params.id);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="mantenimiento_sesion_${req.params.id}.pdf"`);
+        res.send(pdfBuffer);
+    } catch (e) {
+        console.error('Error generating session PDF:', e);
         res.status(500).json({ error: e.message });
     }
 });
