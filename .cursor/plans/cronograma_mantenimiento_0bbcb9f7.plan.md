@@ -328,6 +328,30 @@ Al cerrar la fase, la IA debe entregar: archivos tocados, migraciones nuevas, va
 
 ---
 
+## Etapa de limpieza (post-implementación quincenal)
+
+La lógica quincenal (BIWEEKLY) ya está implementada en backend, migraciones y UI. Antes de cerrar el módulo, revisar/remover lo que quedó obsoleto para no arrastrar código pesado:
+
+**Código/copy a limpiar:**
+1. `MaintenanceConfigPanel.jsx` — textos condicionales del tipo `"Es semanal"` que ocultan toggles cuando `weekly_enabled` está activo: ahora deben considerar también `biweekly_enabled` y `quarterly_enabled` (ej.: mostrar "Es semanal/quincenal/cuatrimestral" según corresponda).
+2. `MaintenanceScheduleService.js` — verificar que el comentario "1b. GENERATE BIWEEKLY SLOTS" y el filtro del pool PP (`!weekly_enabled && !biweekly_enabled && !quarterly_enabled`) no dejen restos de lógica vieja de pool solo-weekly (comentarios que digan "nonWeekly" con significado desactualizado → renombrar a `nonRecurringConfigs` o similar).
+3. Badges/leyendas del calendario, drawer del día y wizard técnico: confirmar que `BIWEEKLY` aparece en todas las listas de tipos (donde solo había `WEEKLY` / `SCHEDULED`) y que no queden arreglos/constantes hardcodeadas sin el valor nuevo.
+4. `MaintenanceConfigService.js` — remover cualquier validación o default que asuma solo semanal (p. ej. excluir máquinas con `biweekly_enabled` de sugerencias basadas en `last_scheduled_at` del pool).
+5. Docs/comentarios que digan "semanal o programado" como únicas opciones — actualizar a semanal/quincenal/cuatrimestral/programado.
+
+**Ya NO aplica (remplazado, no migrar nada de esto):**
+- Migraciones viejas de solo `ENUM('WEEKLY','SCHEDULED')` — se dejaron atrás con `20261016000000` y `20261017000000`; **no** revertir, solo omitir en futuros ENUM (todo ENUM nuevo debe incluir `BIWEEKLY` y `QUARTERLY`).
+- Lógica de "máquinas semanales únicas fuera del pool" — remplazada por el filtro conjunto semanal/quincenal/cuatrimestral.
+- Cualquier endpoint/hook del cliente que exponga solo `weekly_enabled` como única marca de preventivo fijo.
+
+**Checklist de limpieza:**
+- [ ] grep `"Es semanal"` en `client/src/features/maintenance-scheduler/` → actualizar condicionales.
+- [ ] grep `nonWeekly|weekly_enabled &&` en `server/src/services/Maintenance*Service.js` → renombrar/ajustar comentarios y filtros.
+- [ ] grep `WEEKLY` en constantes/badges del cliente → asegurar que `BIWEEKLY` y `QUARTERLY` estén presentes.
+- [ ] Correr `npm run lint` y build del client para validar que no quedó referencia muerta.
+
+---
+
 ## Riesgos y mitigaciones
 
 | Riesgo | Mitigación |

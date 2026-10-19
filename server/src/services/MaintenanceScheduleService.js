@@ -223,10 +223,10 @@ class MaintenanceScheduleService {
             }
         });
 
-        // 2. GENERATE SCHEDULED SLOTS (PP)
-        const nonWeeklyConfigs = activeConfigs.filter(c => !c.weekly_enabled && !c.biweekly_enabled && !c.quarterly_enabled);
-        const regularPool = nonWeeklyConfigs.filter(c => !c.scheduled_exempt);
-        const exemptPool = nonWeeklyConfigs.filter(c => c.scheduled_exempt);
+        // 2. GENERATE SCHEDULED SLOTS (PP) — pool = máquinas sin preventivo fijo (semanal/quincenal/cuatrimestral)
+        const nonRecurringConfigs = activeConfigs.filter(c => !c.weekly_enabled && !c.biweekly_enabled && !c.quarterly_enabled);
+        const regularPool = nonRecurringConfigs.filter(c => !c.scheduled_exempt);
+        const exemptPool = nonRecurringConfigs.filter(c => c.scheduled_exempt);
 
         // Collect failure counts for regularPool
         const insIds = regularPool.map(c => c.ins_id);
