@@ -170,7 +170,7 @@ class MaintenanceWorkOrderService {
             const existing = await Requisition.findOne({
                 where: {
                     work_order_id: workOrder.id,
-                    part_reference: inventoryItem.name,
+                    part_reference: inventoryItem.part_name,
                     status: ['SOLICITADO', 'PENDIENTE']
                 }
             });
@@ -179,11 +179,11 @@ class MaintenanceWorkOrderService {
             return await Requisition.create({
                 work_order_id: workOrder.id,
                 maintenance_session_id: workOrder.maintenance_session_id,
-                part_reference: inventoryItem.name,
+                part_reference: inventoryItem.part_name,
                 quantity_requested: 1,
                 status: 'SOLICITADO',
                 requested_by_id: technicianId,
-                notes: `Reposición automática: stock agotado de "${inventoryItem.name}" durante mantenimiento preventivo`
+                notes: `Reposición automática: stock agotado de "${inventoryItem.part_name}" durante mantenimiento preventivo`
             });
         } catch (err) {
             console.error('⚠️ No se pudo crear la requisición automática:', err.message);

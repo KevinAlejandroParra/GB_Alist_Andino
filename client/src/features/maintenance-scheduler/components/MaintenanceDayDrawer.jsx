@@ -15,6 +15,32 @@ export default function MaintenanceDayDrawer({
   const [loadingF, setLoadingF] = useState(false);
   const [savingClosure, setSavingClosure] = useState(null);
   const [sectionOpen, setSectionOpen] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadDayPdf = async () => {
+    if (!dayData?.dateStr) return;
+    setDownloadingPdf(true);
+    try {
+      const blob = await maintenanceApi.downloadDayReportPdf(dayData.dateStr);
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `informe_diario_${dayData.dateStr}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'No se pudo generar el informe',
+        text: err.response?.data?.error || err.message,
+        confirmButtonColor: '#d33'
+      });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   const fetchFailures = useCallback(async () => {
     if (!dayData?.dateStr) return;
@@ -135,13 +161,26 @@ export default function MaintenanceDayDrawer({
             <div className="mt-2">{getStatusBadge(dayStatus)}</div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
-          >
-            <i className="fas fa-times text-lg" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadDayPdf}
+              disabled={downloadingPdf}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-black disabled:bg-gray-300 text-white transition-colors"
+              title="Descargar informe consolidado del día (preventivos, tiempos, fallas cerradas y repuestos)"
+            >
+              <i className={`fas ${downloadingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} />
+              {downloadingPdf ? 'Generando…' : 'Informe del Día (PDF)'}
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <i className="fas fa-times text-lg" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}

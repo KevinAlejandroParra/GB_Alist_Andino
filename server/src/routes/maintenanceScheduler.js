@@ -7,6 +7,7 @@ const MaintenanceQrService = require('../services/MaintenanceQrService');
 const MaintenanceFailureClosureService = require('../services/MaintenanceFailureClosureService');
 const MaintenanceWorkOrderService = require('../services/MaintenanceWorkOrderService');
 const MaintenanceSessionPdfService = require('../services/MaintenanceSessionPdfService');
+const MaintenanceDayReportPdfService = require('../services/MaintenanceDayReportPdfService');
 const { WorkOrder } = require('../models');
 const { verifyToken, checkRole } = require('../middleware/authMiddleware');
 const { uploadMaintenanceEvidence, toRelativePath } = require('../config/multerConfig');
@@ -377,6 +378,27 @@ router.get('/days/:date/failures', async (req, res) => {
         res.json(failures);
     } catch (e) {
         console.error("Error fetching active failures for day:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/*
+ * Informe PDF CONSOLIDADO del día:
+ * - Preventivos completados (máquina, tipo, técnico, tiempos, descripción, repuestos/requisiciones)
+ * - Fallas cerradas ese día (máquina, falla, estado AR, técnico, tiempos, repuestos)
+ */
+router.get('/days/:date/report-pdf', async (req, res) => {
+    try {
+        const { date } = req.params;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ error: "Formato de fecha inválido (YYYY-MM-DD)" });
+        }
+        const pdfBuffer = await MaintenanceDayReportPdfService.generateDayPdf(date);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="informe_diario_${date}.pdf"`);
+        res.send(pdfBuffer);
+    } catch (e) {
+        console.error('Error generating day report PDF:', e);
         res.status(500).json({ error: e.message });
     }
 });

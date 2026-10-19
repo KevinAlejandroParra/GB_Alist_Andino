@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { maintenanceApi } from './utils/maintenanceSchedulerApi';
 import { getImageSrc } from '../../utils/imageUrl';
 import QrScannerModal from '../../components/checklist/QrScannerModal';
+import SessionPartsManager from './components/SessionPartsManager';
 import Swal from 'sweetalert2';
 
 const PHASES = [
@@ -14,7 +15,7 @@ const PHASES = [
 ];
 
 export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) {
-  const [step, setStep] = useState(0); // 0: QR, 1: Evidencias, 2: Descripción, 3: Repuestos, 4: Finalizar
+  const [step, setStep] = useState(0); // 0: QR, 1: Evidencias + Repuestos, 2: Descripción, 3: Finalizar
   const [session, setSession] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [qrCode, setQrCode] = useState('');
@@ -23,21 +24,8 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
   const [uploadingPhase, setUploadingPhase] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Repuestos (OT autogenerada lazy)
-  const [woInfo, setWoInfo] = useState(null); // { work_order_id, parts: [] }
-  const [inventory, setInventory] = useState([]);
-  const [selectedInventoryId, setSelectedInventoryId] = useState('');
-  const [partQty, setPartQty] = useState(1);
-  const [addingPart, setAddingPart] = useState(false);
-  const [partsLoaded, setPartsLoaded] = useState(false);
-
-  // Requisiciones manuales (repuestos solicitados sin stock)
-  const [requisitions, setRequisitions] = useState([]);
-  const [reqPartRef, setReqPartRef] = useState('');
-  const [reqQty, setReqQty] = useState(1);
-  const [reqNotes, setReqNotes] = useState('');
-  const [addingReq, setAddingReq] = useState(false);
-  const [requisitionsLoaded, setRequisitionsLoaded] = useState(false);
+  // Repuestos (OT autogenerada lazy) — gestionados por <SessionPartsManager />
+  const [woInfo, setWoInfo] = useState({ workOrderId: null, parts: [], requisitions: [] });
 
   const [evidences, setEvidences] = useState({
     INICIO: null,
@@ -66,10 +54,14 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
           setEvidences(evMap);
 
           if (existing.status === 'COMPLETED') {
-            setStep(4); // View completed summary
+            setStep(3); // View completed summary
             // Cargar repuestos de la OT si existe
             maintenanceApi.getSessionParts(existing.id)
-              .then(data => setWoInfo(data))
+              .then(data => setWoInfo({
+                workOrderId: data?.work_order_id || null,
+                parts: data?.parts || [],
+                requisitions: []
+              }))
               .catch(() => {});
           } else {
             setStep(1); // Resume at evidences
@@ -207,105 +199,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
 
   const isCompleted = session?.status === 'COMPLETED';
   const allEvidencesUploaded = Object.values(evidences).every(v => v !== null && v !== '');
-  const totalParts = (woInfo?.parts || []).reduce((sum, p) => sum + (p.quantity_used || 0), 0);
-
-  const stepLabels = ['Validar QR', '4 Evidencias', 'Descripción', 'Repuestos', 'Finalizar'];
-
-  // Carga inventario + repuestos existentes al entrar al paso 3
-  useEffect(() => {
-    if (step !== 3 || !sessionId) return;
-    if (!partsLoaded) {
-      setPartsLoaded(true);
-      maintenanceApi.getSessionParts(sessionId)
-        .then(setWoInfo)
-        .catch(err => console.error('Error cargando repuestos:', err));
-    }
-    if (inventory.length === 0) {
-      maintenanceApi.getInventoryItems()
-        .then(data => setInventory(Array.isArray(data) ? data : data.items || []))
-        .catch(err => console.error('Error cargando inventario:', err));
-    }
-    loadRequisitions();
-  }, [step, sessionId]);
-
-  const handleAddPart = async () => {
-    if (!selectedInventoryId) return;
-    setAddingPart(true);
-    try {
-      const result = await maintenanceApi.addSessionPart(sessionId, Number(selectedInventoryId), partQty);
-      setWoInfo(prev => ({
-        work_order_id: result.work_order_id,
-        parts: [...(prev?.parts || []).filter(p => p.id !== result.part.id), result.part]
-      }));
-      setSelectedInventoryId('');
-      setPartQty(1);
-      Swal.fire({
-        icon: 'success',
-        title: 'Repuesto agregado',
-        text: `Stock restante: ${result.remaining_stock}`,
-        timer: 1500,
-        showConfirmButton: false
-      });
-    } catch (err) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error al agregar repuesto',
-        text: err.response?.data?.error || err.message
-      });
-    } finally {
-      setAddingPart(false);
-    }
-  };
-
-  const handleRemovePart = async (partId) => {
-    try {
-      await maintenanceApi.removeSessionPart(sessionId, partId);
-      setWoInfo(prev => ({ ...prev, parts: (prev?.parts || []).filter(p => p.id !== partId) }));
-    } catch (err) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error al quitar repuesto',
-        text: err.response?.data?.error || err.message
-      });
-    }
-  };
-
-  // ── Requisiciones manuales ──
-  const loadRequisitions = async () => {
-    if (!sessionId || requisitionsLoaded) return;
-    try {
-      const list = await maintenanceApi.getSessionRequisitions(sessionId);
-      setRequisitions(list || []);
-    } catch (err) {
-      console.error('Error al cargar requisiciones:', err);
-    } finally {
-      setRequisitionsLoaded(true);
-    }
-  };
-
-  const handleAddRequisition = async () => {
-    if (!reqPartRef.trim()) return;
-    try {
-      setAddingReq(true);
-      const created = await maintenanceApi.createSessionRequisition(sessionId, {
-        partReference: reqPartRef.trim(),
-        quantity: Number(reqQty) || 1,
-        notes: reqNotes.trim() || null
-      });
-      setRequisitions(prev => [...prev, created]);
-      setReqPartRef('');
-      setReqQty(1);
-      setReqNotes('');
-    } catch (err) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error al crear requisición',
-        text: err.response?.data?.error || err.message
-      });
-    } finally {
-      setAddingReq(false);
-    }
-  };
+  const stepLabels = ['Validar QR', 'Evidencias y Repuestos', 'Descripción', 'Finalizar'];
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
@@ -522,6 +416,11 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                 })}
               </div>
 
+              {/* Repuestos: en la misma vista de evidencias, disponibles en cualquier momento */}
+              <div className="pt-2 border-t border-gray-100">
+                <SessionPartsManager sessionId={sessionId} onChange={setWoInfo} />
+              </div>
+
               <div className="pt-4 flex justify-between">
                 <button
                   type="button"
@@ -579,170 +478,8 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
             </div>
           )}
 
-          {/* STEP 3: PARTS (OT autogenerada lazy) */}
-          {step === 3 && !isCompleted && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-base font-bold text-gray-900">Repuestos Utilizados (Opcional)</h4>
-                  <p className="text-xs text-gray-500">
-                    Si usó repuestos, regístrelos aquí: se descuentan del inventario y generan una OT (MTO) automáticamente.
-                  </p>
-                </div>
-                {woInfo?.work_order_id && (
-                  <span className="text-[10px] font-bold font-mono px-2 py-1 rounded-full bg-slate-100 text-slate-700">
-                    OT {woInfo.work_order_id}
-                  </span>
-                )}
-              </div>
-
-              {/* Agregar repuesto */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <select
-                    value={selectedInventoryId}
-                    onChange={(e) => setSelectedInventoryId(e.target.value)}
-                    className="flex-1 px-3 py-2.5 bg-white border border-gray-300 rounded-xl text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="">— Seleccione un repuesto del inventario —</option>
-                    {inventory.map(item => (
-                      <option key={item.id} value={item.id} disabled={item.quantity <= 0}>
-                        {item.name} (stock: {item.quantity})
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    min="1"
-                    value={partQty}
-                    onChange={(e) => setPartQty(Math.max(1, Number(e.target.value) || 1))}
-                    className="w-full sm:w-24 px-3 py-2.5 bg-white border border-gray-300 rounded-xl text-sm font-bold text-center focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Cant."
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddPart}
-                    disabled={addingPart || !selectedInventoryId}
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white font-bold rounded-xl text-sm shadow-sm transition-all"
-                  >
-                    {addingPart ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-plus mr-1" />Agregar</>}
-                  </button>
-                </div>
-              </div>
-
-              {/* Lista de repuestos */}
-              {(woInfo?.parts || []).length > 0 ? (
-                <div className="border border-gray-200 rounded-2xl divide-y divide-gray-100 overflow-hidden">
-                  {woInfo.parts.map(part => (
-                    <div key={part.id} className="flex items-center justify-between px-4 py-3 bg-white">
-                      <div>
-                        <p className="text-sm font-bold text-gray-800">{part.inventory?.name || `Repuesto #${part.inventory_id}`}</p>
-                        <p className="text-xs text-gray-500">Cantidad usada: <span className="font-semibold">{part.quantity_used}</span></p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePart(part.id)}
-                        className="text-rose-600 hover:text-rose-800 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-rose-50 transition-colors"
-                      >
-                        <i className="fas fa-trash-alt mr-1" />Quitar
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 rounded-2xl">
-                  <i className="fas fa-box-open text-2xl mb-2" />
-                  <p>No se usaron repuestos en este mantenimiento. Puede continuar sin registrar ninguno.</p>
-                </div>
-              )}
-
-              {/* Requisiciones manuales (repuestos solicitados sin stock) */}
-              <div className="pt-2">
-                <h5 className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
-                  Requisiciones de Repuestos
-                </h5>
-                {requisitions.length > 0 && (
-                  <div className="border border-amber-200 rounded-2xl divide-y divide-amber-100 overflow-hidden mb-3">
-                    {requisitions.map(rq => (
-                      <div key={rq.id} className="flex items-center justify-between px-4 py-3 bg-amber-50">
-                        <div>
-                          <p className="text-sm font-bold text-gray-800">{rq.part_reference}</p>
-                          <p className="text-xs text-gray-500">
-                            Cantidad: <span className="font-semibold">{rq.quantity}</span>
-                            {rq.notes ? ` — ${rq.notes}` : ''}
-                          </p>
-                        </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-amber-100 text-amber-700">
-                          Requerido
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-2 items-end">
-                  <div className="flex-1 min-w-[160px]">
-                    <label className="text-xs font-semibold text-gray-600 block mb-1">Repuesto / Referencia</label>
-                    <input
-                      type="text"
-                      value={reqPartRef}
-                      onChange={(e) => setReqPartRef(e.target.value)}
-                      placeholder="Ej: Filtro A-123"
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
-                    />
-                  </div>
-                  <div className="w-20">
-                    <label className="text-xs font-semibold text-gray-600 block mb-1">Cant.</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={reqQty}
-                      onChange={(e) => setReqQty(e.target.value)}
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-[140px]">
-                    <label className="text-xs font-semibold text-gray-600 block mb-1">Notas (opcional)</label>
-                    <input
-                      type="text"
-                      value={reqNotes}
-                      onChange={(e) => setReqNotes(e.target.value)}
-                      placeholder="Detalle / observación"
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddRequisition}
-                    disabled={addingReq || !reqPartRef.trim()}
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white font-bold rounded-xl text-sm transition-all"
-                  >
-                    <i className={`fas ${addingReq ? 'fa-spinner fa-spin' : 'fa-plus'} mr-1`} />
-                    Requerir
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-between">
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-900 text-sm font-semibold"
-                >
-                  ← Volver a Descripción
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep(4)}
-                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-sm transition-all"
-                >
-                  Revisar y Finalizar →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: SUMMARY & FINALIZE (OR VIEW COMPLETED) */}
-          {step === 4 && (
+          {/* STEP 3: SUMMARY & FINALIZE (OR VIEW COMPLETED) */}
+          {step === 3 && (
             <div className="space-y-5">
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
                 <div>
@@ -808,13 +545,13 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
               {/* Parts summary */}
               <div>
                 <h5 className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
-                  Repuestos Utilizados {woInfo?.work_order_id ? `(OT ${woInfo.work_order_id})` : ''}
+                  Repuestos Utilizados {woInfo?.workOrderId ? `(OT ${woInfo.workOrderId})` : ''}
                 </h5>
                 {(woInfo?.parts || []).length > 0 ? (
                   <ul className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 space-y-1">
                     {woInfo.parts.map(part => (
                       <li key={part.id} className="flex justify-between font-medium">
-                        <span>{part.inventory?.name || `Repuesto #${part.inventory_id}`}</span>
+                        <span>{part.inventory?.part_name || `Repuesto #${part.inventory_id}`}</span>
                         <span className="font-bold">× {part.quantity_used}</span>
                       </li>
                     ))}
@@ -831,7 +568,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                 <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
                   <button
                     type="button"
-                    onClick={() => setStep(3)}
+                    onClick={() => setStep(2)}
                     className="px-4 py-2 text-gray-600 hover:text-gray-900 text-sm font-semibold"
                   >
                     ← Modificar Descripción/Repuestos

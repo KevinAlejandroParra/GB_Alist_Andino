@@ -48,6 +48,7 @@ const getBrowserInstance = async () => {
 const TYPE_LABELS = {
     WEEKLY: 'Preventivo Semanal',
     BIWEEKLY: 'Preventivo Quincenal',
+    QUARTERLY: 'Preventivo Cuatrimestral',
     SCHEDULED: 'Preventivo Programado'
 };
 
@@ -60,7 +61,7 @@ class MaintenanceSessionPdfService {
             include: [
                 { model: MaintenanceScheduleSlot, as: 'slot', include: [{ model: Inspectable, as: 'inspectable' }] },
                 { model: Inspectable, as: 'inspectable' },
-                { model: User, as: 'completedBy' }
+                { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
             ]
         });
         if (!session) throw new Error(`Sesión de mantenimiento ${sessionId} no encontrada`);
@@ -97,7 +98,7 @@ class MaintenanceSessionPdfService {
 
         const partsRows = parts.length
             ? parts.map(p => `<tr>
-                <td>${esc(p.inventory?.name || `Repuesto #${p.inventory_id}`)}</td>
+                <td>${esc(p.inventory?.part_name || `Repuesto #${p.inventory_id}`)}</td>
                 <td style="text-align:center">${p.quantity_used}</td>
             </tr>`).join('')
             : `<tr><td colspan="2" style="text-align:center;color:#888">Sin repuestos utilizados</td></tr>`;
@@ -135,7 +136,7 @@ class MaintenanceSessionPdfService {
     <tr><th style="width:35%">Máquina</th><td>${esc(machineName)}</td></tr>
     <tr><th>Sesión</th><td>#${session.id} — ${fmtDate(session.completed_at || session.createdAt)}</td></tr>
     <tr><th>Estado</th><td>${esc(session.status)}</td></tr>
-    <tr><th>Técnico</th><td>${esc(session.completedBy?.name || session.completed_by_id || 'No registrado')}</td></tr>
+    <tr><th>Técnico</th><td>${esc(session.technician?.user_name || 'No registrado')}</td></tr>
     ${workOrder ? `<tr><th>OT asociada</th><td>${esc(workOrder.work_order_id)} (${esc(workOrder.status)})</td></tr>` : ''}
   </table>
 
@@ -155,13 +156,19 @@ class MaintenanceSessionPdfService {
     }
 
     /**
-     * Genera el PDF y devuelve un Buffer.
+     * Genera el PDF de una sesión y devuelve un Buffer.
      */
     async generatePdf(sessionId) {
         const data = await this.collectSessionData(sessionId);
         const htmlContent = this.buildHtml(data);
+        return this.renderHtmlToPdf(htmlContent, 'Alist GBX | Reporte de Mantenimiento');
+    }
 
-        const tempFileName = `maintenance_session_${sessionId}_${Date.now()}.html`;
+    /**
+     * Renderiza un HTML a Buffer PDF. Reutilizable por otros reportes del módulo.
+     */
+    async renderHtmlToPdf(htmlContent, footerLabel = 'Alist GBX | Reporte de Mantenimiento') {
+        const tempFileName = `maintenance_report_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.html`;
         const tempFilePath = path.join(os.tmpdir(), tempFileName);
         const fileUrl = tempFilePath.replace(/\\/g, '/');
         fs.writeFileSync(tempFilePath, htmlContent);
@@ -197,7 +204,7 @@ class MaintenanceSessionPdfService {
                 footerTemplate: `
           <div style="font-size: 10px; text-align: center; width: 100%; padding: 0 50px;">
             <hr style="border: 1px solid #ccc; margin-bottom: 10px;"/>
-            Alist GBX | Reporte de Mantenimiento
+            ${footerLabel}
             <span style="float: right;">Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
           </div>
         `

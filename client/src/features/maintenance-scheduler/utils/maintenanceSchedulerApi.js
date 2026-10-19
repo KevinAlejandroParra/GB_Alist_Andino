@@ -144,9 +144,12 @@ export const maintenanceApi = {
     return res.data; // Blob
   },
 
-  getInventoryItems: async () => {
-    const res = await axiosInstance.get('/api/inventory');
-    return res.data;
+  // ── Informe PDF consolidado del día (preventivos + fallas cerradas) ──
+  downloadDayReportPdf: async (date) => {
+    const res = await axiosInstance.get(`${API_BASE}/days/${date}/report-pdf`, {
+      responseType: 'blob'
+    });
+    return res.data; // Blob
   },
 
   // QR Codes
