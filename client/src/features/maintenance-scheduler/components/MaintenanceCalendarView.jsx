@@ -262,6 +262,11 @@ export default function MaintenanceCalendarView({
                           {slot.slot_type === 'WEEKLY' ? '🗓️' : slot.slot_type === 'BIWEEKLY' ? '🔂' : slot.slot_type === 'QUARTERLY' ? '📅' : '⚙️'}
                         </span>
                         <span className="truncate">{slot.inspectable?.name || `Máquina #${slot.ins_id}`}</span>
+                        {slot.exclusive_technician && (
+                          <span className="block mt-0.5 text-[9px] font-bold truncate" title={`Exclusivo para ${slot.exclusive_technician.user_name}`}>
+                            Exclusivo para {slot.exclusive_technician.user_name}
+                          </span>
+                        )}
                       </div>
                       <span className="text-[9px] uppercase font-bold opacity-90 px-1 py-0.2 rounded bg-black/20 shrink-0">
                         {slot.slot_display_status}

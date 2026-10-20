@@ -21,6 +21,16 @@ class MaintenanceSessionService {
         });
         if (!slot) throw new Error("Slot no encontrado en el cronograma");
 
+        const { User, MaintenanceMachineConfig } = require('../models');
+        const machineConfig = await MaintenanceMachineConfig.findOne({ where: { ins_id: slot.ins_id } });
+        const exclusiveTechnicianId = machineConfig?.assigned_technician_id || slot.assigned_user_id;
+        if (exclusiveTechnicianId && Number(exclusiveTechnicianId) !== Number(technicianId)) {
+            const requester = await User.findByPk(technicianId, { attributes: ['role_id'] });
+            if (![1, 2].includes(Number(requester?.role_id))) {
+                throw new Error('Este mantenimiento es exclusivo para el técnico asignado.');
+            }
+        }
+
         if (!qrCode) throw new Error("El código QR es obligatorio para iniciar la sesión");
 
         const qr = await MaintenanceMachineQrCode.findOne({

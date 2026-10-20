@@ -18,6 +18,7 @@ module.exports = (sequelize, DataTypes) => {
         biweekly_enabled: { type: DataTypes.BOOLEAN, defaultValue: false },
         biweekly_weekday: { type: DataTypes.INTEGER, allowNull: true },
         biweekly_pattern: { type: DataTypes.ENUM('FIRST_THIRD', 'SECOND_FOURTH'), allowNull: true, defaultValue: 'FIRST_THIRD' },
+        assigned_technician_id: { type: DataTypes.INTEGER, allowNull: true },
         quarterly_enabled: { type: DataTypes.BOOLEAN, defaultValue: false },
         quarterly_start_month: { type: DataTypes.INTEGER, allowNull: true }, // 1-12: mes de la primera ocurrencia
         quarterly_day_of_month: { type: DataTypes.INTEGER, allowNull: true }, // 1-28: día del mes de ejecución

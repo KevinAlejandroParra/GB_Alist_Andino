@@ -249,6 +249,11 @@ export default function MaintenanceDayDrawer({
                         <p className="text-xs text-gray-500">
                           Familia: <span className="font-medium text-gray-700">{slot.family_name}</span>
                         </p>
+                        {slot.exclusive_technician && (
+                          <p className="mt-2 inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-800">
+                            <i className="fas fa-user-lock" /> Exclusivo para {slot.exclusive_technician.user_name}
+                          </p>
+                        )}
                       </div>
                     </div>
 

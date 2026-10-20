@@ -36,6 +36,11 @@ export const maintenanceApi = {
     return res.data;
   },
 
+  getTechnicians: async () => {
+    const res = await axiosInstance.get('/api/users/technicians');
+    return res.data?.data || [];
+  },
+
   updateMachineConfig: async (insId, data) => {
     const res = await axiosInstance.post(`${API_BASE}/config/machine`, {
       ins_id: insId,

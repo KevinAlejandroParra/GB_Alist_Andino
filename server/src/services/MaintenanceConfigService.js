@@ -4,7 +4,8 @@ const {
     MaintenanceSetting, 
     Inspectable,
     Device,
-    Family
+    Family,
+    User
 } = require("../models");
 const { Op } = require("sequelize");
 
@@ -48,17 +49,19 @@ class MaintenanceConfigService {
 
         const insIds = inspectables.map(i => i.ins_id);
 
-        const [configs, qrs] = await Promise.all([
+        const [configs, qrs, technicians] = await Promise.all([
             MaintenanceMachineConfig.findAll({
                 where: { ins_id: { [Op.in]: insIds } }
             }),
             MaintenanceMachineQrCode.findAll({
                 where: { ins_id: { [Op.in]: insIds }, is_active: true }
-            })
+            }),
+            User.findAll({ where: { role_id: 3, user_state: 'activo' }, attributes: ['user_id', 'user_name'] })
         ]);
 
         const configMap = new Map(configs.map(c => [c.ins_id, c]));
         const qrMap = new Map(qrs.map(q => [q.ins_id, q]));
+        const technicianMap = new Map(technicians.map(tech => [tech.user_id, tech]));
 
         return inspectables.map(ins => {
             const cfg = configMap.get(ins.ins_id);
@@ -76,6 +79,8 @@ class MaintenanceConfigService {
                 biweekly_enabled: cfg ? Boolean(cfg.biweekly_enabled) : false,
                 biweekly_weekday: cfg?.biweekly_weekday ?? 1, // default 1 = Lunes
                 biweekly_pattern: cfg?.biweekly_pattern || 'FIRST_THIRD',
+                assigned_technician_id: cfg?.assigned_technician_id ?? null,
+                assigned_technician: technicianMap.get(Number(cfg?.assigned_technician_id)) || null,
                 quarterly_enabled: cfg ? Boolean(cfg.quarterly_enabled) : false,
                 quarterly_start_month: cfg?.quarterly_start_month ?? null, // 1-12
                 quarterly_day_of_month: cfg?.quarterly_day_of_month ?? null, // 1-28
@@ -96,6 +101,7 @@ class MaintenanceConfigService {
             ...(data.biweekly_enabled !== undefined && { biweekly_enabled: Boolean(data.biweekly_enabled) }),
             ...(data.biweekly_weekday !== undefined && { biweekly_weekday: data.biweekly_weekday !== null ? Number(data.biweekly_weekday) : null }),
             ...(data.biweekly_pattern !== undefined && ['FIRST_THIRD', 'SECOND_FOURTH'].includes(data.biweekly_pattern) && { biweekly_pattern: data.biweekly_pattern }),
+            ...(data.assigned_technician_id !== undefined && { assigned_technician_id: data.assigned_technician_id ? Number(data.assigned_technician_id) : null }),
             ...(data.quarterly_enabled !== undefined && { quarterly_enabled: Boolean(data.quarterly_enabled) }),
             ...(data.quarterly_start_month !== undefined && { quarterly_start_month: data.quarterly_start_month !== null ? Number(data.quarterly_start_month) : null }),
             ...(data.quarterly_day_of_month !== undefined && { quarterly_day_of_month: data.quarterly_day_of_month !== null ? Number(data.quarterly_day_of_month) : null }),
@@ -105,6 +111,12 @@ class MaintenanceConfigService {
         };
 
         const existing = await MaintenanceMachineConfig.findOne({ where: { ins_id: insId } });
+        if (payload.assigned_technician_id) {
+            const technician = await User.findOne({
+                where: { user_id: payload.assigned_technician_id, role_id: 3, user_state: 'activo' }
+            });
+            if (!technician) throw new Error('El técnico asignado debe estar activo y tener rol 3');
+        }
         if (existing) {
             await existing.update(payload);
             return existing;

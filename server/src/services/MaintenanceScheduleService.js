@@ -143,6 +143,7 @@ class MaintenanceScheduleService {
                             scheduled_date: dateStr,
                             ins_id: cfg.ins_id,
                             slot_type: 'WEEKLY',
+                            assigned_user_id: cfg.assigned_technician_id || null,
                             sort_priority: 0,
                             is_manual_override: false
                         });
@@ -185,6 +186,7 @@ class MaintenanceScheduleService {
                             scheduled_date: dateStr,
                             ins_id: cfg.ins_id,
                             slot_type: 'BIWEEKLY',
+                            assigned_user_id: cfg.assigned_technician_id || null,
                             sort_priority: 0,
                             is_manual_override: false
                         });
@@ -216,6 +218,7 @@ class MaintenanceScheduleService {
                     scheduled_date: dateStr,
                     ins_id: cfg.ins_id,
                     slot_type: 'QUARTERLY',
+                    assigned_user_id: cfg.assigned_technician_id || null,
                     sort_priority: 0,
                     is_manual_override: false
                 });
@@ -288,6 +291,7 @@ class MaintenanceScheduleService {
                         scheduled_date: dateStr,
                         ins_id: machine.ins_id,
                         slot_type: 'SCHEDULED',
+                        assigned_user_id: machine.assigned_technician_id || null,
                         sort_priority: poolIndex + 1,
                         is_manual_override: false
                     });
@@ -431,6 +435,9 @@ class MaintenanceScheduleService {
             ]
         });
 
+        const configs = await MaintenanceConfigService.getAllMachineConfigs(pId);
+        const technicianByMachine = new Map(configs.map(config => [Number(config.ins_id), config.assigned_technician]));
+
         let completedCount = 0;
         let draftCount = 0;
         let pendingCount = 0;
@@ -455,6 +462,7 @@ class MaintenanceScheduleService {
 
             return {
                 ...slot,
+                exclusive_technician: technicianByMachine.get(Number(slot.ins_id)) || null,
                 latest_session: latestSession,
                 slot_display_status: slotDisplayStatus,
                 family_name: slot.inspectable?.deviceData?.family?.name || 'General'

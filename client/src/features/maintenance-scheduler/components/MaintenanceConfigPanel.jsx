@@ -10,12 +10,17 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('ALL'); // ALL, WEEKLY, BIWEEKLY, QUARTERLY, SCHEDULED, EXEMPT
   const [savingId, setSavingId] = useState(null);
+  const [technicians, setTechnicians] = useState([]);
 
   const fetchConfigs = async () => {
     setLoading(true);
     try {
-      const data = await maintenanceApi.getMachineConfigs(premiseId);
+      const [data, technicianList] = await Promise.all([
+        maintenanceApi.getMachineConfigs(premiseId),
+        maintenanceApi.getTechnicians()
+      ]);
       setConfigs(data || []);
+      setTechnicians(technicianList.filter(technician => Number(technician.role_id) === 3));
     } catch (err) {
       console.error('Error fetching machine configs:', err);
       Swal.fire({
@@ -36,9 +41,16 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
     setSavingId(insId);
     try {
       await maintenanceApi.updateMachineConfig(insId, patch);
-      setConfigs(prev =>
-        prev.map(c => (c.ins_id === insId ? { ...c, ...patch } : c))
-      );
+      setConfigs(prev => prev.map(c => {
+        if (c.ins_id !== insId) return c;
+        const updated = { ...c, ...patch };
+        if (patch.assigned_technician_id !== undefined) {
+          updated.assigned_technician = technicians.find(
+            technician => Number(technician.user_id) === Number(patch.assigned_technician_id)
+          ) || null;
+        }
+        return updated;
+      }));
     } catch (err) {
       Swal.fire({
         icon: 'error',
@@ -178,6 +190,7 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
                 <th className="px-5 py-4 text-center">Preventivo Cuatrimestral</th>
                 <th className="px-5 py-4">Mes / Día Cuatrimestral</th>
                 <th className="px-5 py-4 text-center">Exento de PP</th>
+                <th className="px-5 py-4">Técnico exclusivo</th>
                 <th className="px-5 py-4">Último Programado</th>
                 <th className="px-5 py-4 text-center">Código QR</th>
               </tr>
@@ -185,14 +198,14 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="10" className="text-center py-12 text-gray-400">
+                  <td colSpan="11" className="text-center py-12 text-gray-400">
                     <i className="fas fa-spinner fa-spin text-2xl mb-2 block" />
                     Cargando máquinas y configuraciones...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="text-center py-12 text-gray-400">
+                  <td colSpan="11" className="text-center py-12 text-gray-400">
                     No se encontraron máquinas con el filtro seleccionado.
                   </td>
                 </tr>
@@ -371,6 +384,24 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
                         ) : (
                           <span className="text-xs text-gray-400 italic">No aplica</span>
                         )}
+                      </td>
+
+                      {/* Técnico exclusivo del preventivo */}
+                      <td className="px-5 py-4">
+                        <select
+                          value={cfg.assigned_technician_id || ''}
+                          disabled={isSaving}
+                          onChange={(e) => handleUpdate(cfg.ins_id, {
+                            assigned_technician_id: e.target.value ? Number(e.target.value) : null
+                          })}
+                          className="bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-800 focus:ring-indigo-500 focus:border-indigo-500 min-w-[170px]"
+                          aria-label={`Técnico exclusivo para ${cfg.name}`}
+                        >
+                          <option value="">Sin técnico exclusivo</option>
+                          {technicians.map(technician => (
+                            <option key={technician.user_id} value={technician.user_id}>{technician.user_name}</option>
+                          ))}
+                        </select>
                       </td>
 
                       {/* Last Scheduled At */}

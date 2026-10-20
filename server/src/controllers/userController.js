@@ -778,10 +778,10 @@ class UserController {
     // Obtener lista de técnicos para asignar trabajos
     static async getTechnicians(req, res) {
         try {
-            // Obtener técnicos (role_id = 3) y anfitriones (role_id = 4)
+            // Técnicos activos (rol 3) para asignaciones de mantenimiento preventivo
             const technicians = await User.findAll({
                 where: {
-                    role_id: [1, 3], // Administradores y técnicos
+                    role_id: 3,
                     user_state: 'activo'
                 },
                 attributes: ['user_id', 'user_name', 'user_email', 'role_id'],
