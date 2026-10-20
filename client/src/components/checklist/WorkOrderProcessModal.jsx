@@ -347,8 +347,28 @@ export default function WorkOrderProcessModal({
 
         console.log('Toggle requires replacement:', { currentValue, newValue })
 
+        let cancellationReason = null
+        if (!newValue) {
+            const cancellation = await Swal.fire({
+                icon: 'warning',
+                title: 'Cancelar orden de trabajo?',
+                text: 'Al indicar que no requiere repuestos, la orden de trabajo se cancelara y no podra gestionar repuestos.',
+                input: 'textarea',
+                inputLabel: 'Motivo de cancelacion',
+                inputPlaceholder: 'Describa por que ya no se requieren repuestos...',
+                showCancelButton: true,
+                confirmButtonText: 'Si, cancelar OT',
+                cancelButtonText: 'Volver',
+                confirmButtonColor: '#dc2626',
+                inputValidator: (value) => !value?.trim() && 'El motivo de cancelacion es obligatorio.'
+            })
+            if (!cancellation.isConfirmed) return
+            cancellationReason = cancellation.value.trim()
+        }
+
         setLoading(true)
         try {
+            let createdWorkOrderId = null
             if (newValue && arMode && !formalWorkOrderId) {
                 const createResp = await axiosInstance.post(
                     `${API_URL}/api/failures/repair-executions/${workOrder.id}/create-work-order`,
@@ -356,30 +376,36 @@ export default function WorkOrderProcessModal({
                     { headers: { Authorization: `Bearer ${user.token}` } }
                 )
                 if (createResp.data.success) {
-                    setFormalWorkOrderId(createResp.data.data.id)
+                    createdWorkOrderId = createResp.data.data.id
+                    setFormalWorkOrderId(createdWorkOrderId)
                 }
             }
 
-            if (!arMode || formalWorkOrderId || newValue) {
-                const woId = formalWorkOrderId || workOrder.id
-                if (!arMode || formalWorkOrderId) {
-                    await axiosInstance.put(
-                        `${API_URL}/api/work-orders/${woId}/update`,
-                        { requiere_replacement: newValue },
-                        { headers: { Authorization: `Bearer ${user.token}` } }
-                    )
+            const workOrderId = createdWorkOrderId || formalWorkOrderId || (!arMode ? workOrder.id : null)
+            if (newValue && workOrderId) {
+                await axiosInstance.put(
+                    `${API_URL}/api/work-orders/${workOrderId}/update`,
+                    { requiere_replacement: true },
+                    { headers: { Authorization: `Bearer ${user.token}` } }
+                )
+            } else if (!newValue) {
+                if (!workOrderId) {
+                    throw new Error('No se encontro una orden de trabajo para cancelar.')
                 }
+                await axiosInstance.put(
+                    `${API_URL}/api/work-orders/${workOrderId}/cancel`,
+                    { reason: cancellationReason },
+                    { headers: { Authorization: `Bearer ${user.token}` } }
+                )
             }
 
             setFormData(prev => ({ ...prev, requiresReplacement: newValue }))
 
             // Cargar o limpiar repuestos según el nuevo estado
             if (newValue) {
-                if (createResp?.data?.data?.id) {
+                if (createdWorkOrderId) {
                     // Se acaba de crear una OT formal desde la AR
-                    const newWoId = createResp.data.data.id;
-                    setFormalWorkOrderId(newWoId);
-                    loadWorkOrderParts(newWoId);
+                    loadWorkOrderParts(createdWorkOrderId);
                 } else if (formalWorkOrderId) {
                     // Ya existía una OT formal
                     loadWorkOrderParts(formalWorkOrderId);
@@ -397,13 +423,22 @@ export default function WorkOrderProcessModal({
 
             await Swal.fire({
                 icon: 'success',
-                title: newValue ? 'Repuestos requeridos' : 'Sin repuestos requeridos',
+                title: newValue ? 'Repuestos requeridos' : 'Orden de trabajo cancelada',
                 timer: 1000,
                 showConfirmButton: false,
                 customClass: { popup: 'rounded-xl' }
             })
 
-            onUpdate && onUpdate({ ...workOrder, requiere_replacement: newValue })
+            onUpdate && onUpdate({
+                ...workOrder,
+                requiere_replacement: newValue,
+                ...(newValue ? {} : {
+                    status: 'CANCELADO',
+                    cancellation_reason: cancellationReason,
+                    cancelled_at: new Date(),
+                    cancelled_by_id: user.user_id
+                })
+            })
         } catch (error) {
             console.error('Error updating requires replacement:', error)
             Swal.fire('Error', 'No se pudo actualizar el estado', 'error')
@@ -844,7 +879,7 @@ export default function WorkOrderProcessModal({
                                         {formData.requiresReplacement && (
                                             <div className="flex items-center gap-2 text-blue-600">
                                                 <FontAwesomeIcon icon={faTools} />
-                                                <span className="text-sm font-medium">Se deshabilitará la gestión de repuestos</span>
+                                                <span className="text-sm font-medium">Se solicitará un motivo para cancelar la OT y deshabilitar los repuestos</span>
                                             </div>
                                         )}
                                     </div>
