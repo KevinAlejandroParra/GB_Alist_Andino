@@ -8566,9 +8566,6 @@
               "properties": {
                 "failureOrderId": {
                   "example": "any"
-                },
-                "technicianId": {
-                  "example": "any"
                 }
               }
             }

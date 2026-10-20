@@ -180,7 +180,7 @@ class MaintenanceSessionPdfService {
             await page.setRequestInterception(true);
             page.on('request', (request) => {
                 const resourceType = request.resourceType();
-                if (['font', 'media', 'websocket'].includes(resourceType)) request.abort();
+                if (['font', 'websocket'].includes(resourceType)) request.abort();
                 else request.continue();
             });
 

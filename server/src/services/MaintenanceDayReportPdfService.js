@@ -24,7 +24,8 @@ const {
     Inventory,
     Requisition,
     Inspectable,
-    User
+    User,
+    MaintenanceSessionEvidence
 } = require('../models');
 
 const TYPE_LABELS = {
@@ -42,18 +43,24 @@ class MaintenanceDayReportPdfService {
         const dayStart = new Date(`${dateStr}T00:00:00`);
         const dayEnd = new Date(`${dateStr}T23:59:59.999`);
 
-        // 1) Preventivos completados ese día
+        // 1) Preventivos del día (completados, en proceso o no iniciados)
         const sessions = await MaintenanceSession.findAll({
             where: {
-                status: 'COMPLETED',
-                completed_at: { [Op.between]: [dayStart, dayEnd] }
+                [Op.or]: [
+                    { completed_at: { [Op.between]: [dayStart, dayEnd] } },
+                    { 
+                        status: { [Op.ne]: 'COMPLETED' },
+                        createdAt: { [Op.between]: [dayStart, dayEnd] }
+                    }
+                ]
             },
             include: [
                 { model: MaintenanceScheduleSlot, as: 'slot', required: false, include: [{ model: Inspectable, as: 'inspectable', required: false, attributes: ['ins_id', 'name'] }] },
                 { model: Inspectable, as: 'inspectable', required: false, attributes: ['ins_id', 'name'] },
-                { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
+                { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] },
+                { model: MaintenanceSessionEvidence, as: 'evidences' }
             ],
-            order: [['completed_at', 'ASC']]
+            order: [['createdAt', 'ASC']]
         });
 
         const preventives = [];
@@ -75,6 +82,7 @@ class MaintenanceDayReportPdfService {
                 id: session.id,
                 machineName: machine ? machine.name : `Máquina #${session.ins_id}`,
                 typeLabel: TYPE_LABELS[session.type] || 'Preventivo',
+                status: session.status,
                 technicianName: session.technician?.user_name || 'No registrado',
                 startedAt: session.started_at,
                 completedAt: session.completed_at,
@@ -82,7 +90,8 @@ class MaintenanceDayReportPdfService {
                 description: session.description,
                 workOrder,
                 parts,
-                requisitions
+                requisitions,
+                evidences: session.evidences || []
             });
         }
 
@@ -147,6 +156,28 @@ class MaintenanceDayReportPdfService {
             (sum, f) => sum + f.parts.reduce((s, part) => s + (part.quantity_used || 0), 0), 0
         );
 
+        const evidenceGallery = (evidences) => {
+            if (!evidences.length) return '';
+            const items = evidences.map(e => {
+                const isVideo = e.file_url.match(/\.(mp4|mov|avi|mkv|webm)$/i) || e.file_url.includes('video');
+                if (isVideo) {
+                    return `
+                        <div style="display:inline-block; width:30%; margin:5px; text-align:center; vertical-align:top;">
+                            <div style="width:100%; height:100px; background:#eee; border:1px solid #ccc; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:20px;">🎥</div>
+                            <div style="font-size:10px; color:#666; margin-top:2px;">${e.phase} (Video)</div>
+                            <a href="${e.file_url}" style="font-size:10px; color:#3498db; text-decoration:none;">Ver video →</a>
+                        </div>`;
+                }
+                return `
+                    <div style="display:inline-block; width:30%; margin:5px; text-align:center; vertical-align:top;">
+                        <img src="${e.file_url}" style="width:100%; height:100px; object-fit:cover; border:1px solid #ccc; border-radius:4px;">
+                        <div style="font-size:10px; color:#666; margin-top:2px;">${e.phase}</div>
+                    </div>`;
+            }).join('');
+            return `<h3 style="font-size:13px;margin:12px 0 4px;">Evidencias Fotográficas y Videos</h3>
+                    <div style="display:block; text-align:left;">${items}</div>`;
+        };
+
         const partsTable = (parts) => {
             if (!parts.length) {
                 return `<table><tr><td style="text-align:center;color:#888">Sin repuestos utilizados</td></tr></table>`;
@@ -176,20 +207,27 @@ class MaintenanceDayReportPdfService {
         };
 
         const preventivesHtml = preventives.length
-            ? preventives.map((p, idx) => `
-            <div class="block">
-              <h2>${idx + 1}. ${esc(p.machineName)} <span class="badge">${esc(p.typeLabel)}</span></h2>
-              <table>
-                <tr><th style="width:30%">Técnico</th><td>${esc(p.technicianName)}</td></tr>
-                <tr><th>Inicio / Fin</th><td>${fmtTime(p.startedAt)} → ${fmtTime(p.completedAt)} (${p.durationMinutes || 0} min)</td></tr>
-                ${p.workOrder ? `<tr><th>OT asociada</th><td>${esc(p.workOrder.work_order_id)} (${esc(p.workOrder.status)})</td></tr>` : ''}
-                <tr><th>Descripción</th><td>${esc(p.description || 'Sin descripción registrada.')}</td></tr>
-              </table>
-              <h3 style="font-size:13px;margin:12px 0 4px;">Repuestos utilizados</h3>
-              ${partsTable(p.parts)}
-              ${requisitionsTable(p.requisitions)}
-            </div>`).join('')
-            : `<p style="color:#888">No se completaron mantenimientos preventivos en esta fecha.</p>`;
+            ? preventives.map((p, idx) => {
+                const statusBadge = p.status === 'COMPLETED' 
+                    ? `<span class="badge">${esc(p.typeLabel)}</span>` 
+                    : `<span class="badge badge-warn">${p.status === 'IN_PROGRESS' ? 'En Proceso' : 'No Iniciado'}</span>`;
+                
+                return `
+                <div class="block">
+                  <h2>${idx + 1}. ${esc(p.machineName)} ${statusBadge}</h2>
+                  <table>
+                    <tr><th style="width:30%">Técnico</th><td>${esc(p.technicianName)}</td></tr>
+                    <tr><th>Inicio / Fin</th><td>${fmtTime(p.startedAt)} → ${fmtTime(p.completedAt)} (${p.durationMinutes || 0} min)</td></tr>
+                    ${p.workOrder ? `<tr><th>OT asociada</th><td>${esc(p.workOrder.work_order_id)} (${esc(p.workOrder.status)})</td></tr>` : ''}
+                    <tr><th>Descripción</th><td>${esc(p.description || 'Sin descripción registrada.')}</td></tr>
+                  </table>
+                  ${evidenceGallery(p.evidences)}
+                  <h3 style="font-size:13px;margin:12px 0 4px;">Repuestos utilizados</h3>
+                  ${partsTable(p.parts)}
+                  ${requisitionsTable(p.requisitions)}
+                </div>`;
+            }).join('')
+            : `<p style="color:#888">No se registraron mantenimientos preventivos en esta fecha.</p>`;
 
         const failuresHtml = failures.length
             ? failures.map((f, idx) => `
@@ -222,11 +260,13 @@ class MaintenanceDayReportPdfService {
   th { background: #f0f4f8; }
   .badge { display: inline-block; padding: 3px 10px; border-radius: 10px; background: #e8f4fd; color: #2c7fbe; font-size: 11px; font-weight: bold; }
   .badge-fail { background: #fdecea; color: #c0392b; }
+  .badge-warn { background: #fff4e5; color: #d35400; }
   .summary { display: flex; gap: 12px; margin-top: 12px; }
   .card { flex: 1; border: 1px solid #d5e3ef; border-radius: 8px; padding: 10px; text-align: center; background: #f8fbfe; }
   .card .n { font-size: 22px; font-weight: bold; color: #2c7fbe; }
   .card .l { font-size: 11px; color: #555; }
   .block { page-break-inside: avoid; }
+  img { max-width: 100%; }
 </style>
 </head>
 <body>
