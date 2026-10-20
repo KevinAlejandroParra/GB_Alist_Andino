@@ -1,6 +1,6 @@
 'use strict';
 
-const { Requisition, WorkOrder, User, FailureOrder, Inventory } = require('../models');
+const { Requisition, WorkOrder, User, FailureOrder, Inventory, Premise, Entity } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const path = require('path');
@@ -124,7 +124,12 @@ class RequisitionService {
               }
             ]
           },
-          { model: User, as: 'requester', attributes: ['user_id', 'user_name'] }
+          { model: User, as: 'requester', attributes: ['user_id', 'user_name', 'user_email', 'premise_id', 'entity_id'], include: [
+            { model: Premise, as: 'premise', attributes: ['premise_name'], required: false },
+            { model: Entity, as: 'entity', attributes: ['entity_name'], required: false, include: [
+              { model: Premise, as: 'premise', attributes: ['premise_name'], required: false }
+            ] }
+          ] }
         ]
       });
 

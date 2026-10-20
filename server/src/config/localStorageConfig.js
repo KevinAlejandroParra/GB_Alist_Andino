@@ -33,7 +33,17 @@ const failureEvidenceStorage = makeStorage(['fallas', 'evidencias']);
 const repairEvidenceStorage = makeStorage(['fallas', 'reparaciones']);
 const deviceStorage = makeStorage(['dispositivos']);
 const attractionStorage = makeStorage(['atracciones']);
-const requisitionStorage = makeStorage(['requisiciones']);
+const requisitionStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(UPLOADS_ROOT, 'requisiciones');
+    ensureDir(dir);
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    cb(null, `requisicion-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  }
+});
 const userStorage = makeStorage(['usuarios']);
 const maintenanceEvidenceStorage = makeStorage(['mantenimiento', 'evidencias']);
 
@@ -60,11 +70,22 @@ const maintenanceEvidenceFileFilter = (req, file, cb) => {
 };
 
 const uploadFailureEvidence = multer({ storage: failureEvidenceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
+const requisitionEvidenceFileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+    return cb(null, true);
+  }
+  cb(new Error('Solo se permiten imágenes o archivos PDF'));
+};
 const uploadRepairEvidence = multer({ storage: repairEvidenceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadDevice = multer({ storage: deviceStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadAttraction = multer({ storage: attractionStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadRequisition = multer({ storage: requisitionStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
 const uploadUser = multer({ storage: userStorage, limits: { fileSize: FILE_SIZE_LIMIT } });
+const uploadRequisitionEvidence = multer({
+  storage: requisitionStorage,
+  limits: { fileSize: FILE_SIZE_LIMIT },
+  fileFilter: requisitionEvidenceFileFilter
+});
 const uploadMaintenanceEvidence = multer({
   storage: maintenanceEvidenceUniqueStorage,
   limits: { fileSize: MAINTENANCE_FILE_SIZE_LIMIT },
@@ -117,6 +138,7 @@ module.exports = {
   uploadDevice,
   uploadAttraction,
   uploadRequisition,
+  uploadRequisitionEvidence,
   uploadUser,
   uploadMaintenanceEvidence,
   toRelativePath,

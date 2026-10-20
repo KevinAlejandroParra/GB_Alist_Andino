@@ -5,7 +5,6 @@ import axiosInstance from '../../../utils/axiosConfig';
 import { useAuth } from '../../AuthContext';
 import Swal from 'sweetalert2';
 import { getLatestWorkOrderByUser } from '../../../utils/inventoryApi';
-import { compressImage } from '../../../utils/imageCompression';
 
 /**
  * Modal para crear una nueva requisición de repuesto
@@ -123,7 +122,7 @@ const CreateRequisitionModal = ({
    }
 
    if (!formData.image) {
-     newErrors.image = 'La foto del repuesto es obligatoria';
+     newErrors.image = 'Adjunta una imagen o un PDF de la requisición';
    }
 
    if (!currentWorkOrderId || isNaN(currentWorkOrderId)) {
@@ -134,7 +133,7 @@ const CreateRequisitionModal = ({
    return Object.keys(newErrors).length === 0;
   };
 
-  // Función para subir imagen (comprime a WebP 70% antes de subir)
+  // Sube una imagen o PDF de referencia a la carpeta de evidencias.
   const uploadImageToServer = async (file) => {
     if (!file) return null;
 
@@ -142,15 +141,10 @@ const CreateRequisitionModal = ({
     try {
       const API_URL = process.env.NEXT_PUBLIC_API;
 
-      // Comprimir imagen antes de subir
-      console.log('🗜️ Comprimiendo imagen:', file.name, 'Tamaño original:', file.size);
-      const compressedFile = await compressImage(file);
-      console.log('✅ Imagen comprimida:', compressedFile.name, 'Tamaño:', compressedFile.size);
-
       const formData = new FormData();
-      formData.append("evidence", compressedFile);
+      formData.append("evidence", file);
 
-      console.log('📤 Subiendo imagen comprimida...');
+      console.log('📤 Subiendo archivo adjunto...');
 
       const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData);
      
@@ -199,20 +193,21 @@ const CreateRequisitionModal = ({
     setLoading(true);
 
     try {
-      // Subir imagen (obligatoria)
+      // Adjuntar el archivo cuando el técnico lo proporciona.
       let imageUrl = null;
-      try {
-        imageUrl = await uploadImageToServer(formData.image);
-      } catch (imageError) {
-        console.error('Error subiendo imagen:', imageError);
-        // Detener el proceso si no se puede subir la imagen obligatoria
-        Swal.fire({
-          title: 'Error',
-          text: 'No se pudo subir la imagen del repuesto. Es obligatoria para crear la requisición.',
-          icon: 'error',
-          confirmButtonText: 'Aceptar'
-        });
-        return;
+      if (formData.image) {
+        try {
+          imageUrl = await uploadImageToServer(formData.image);
+        } catch (imageError) {
+          console.error('Error subiendo archivo:', imageError);
+          Swal.fire({
+            title: 'Error',
+            text: 'No se pudo subir el archivo adjunto. Intenta nuevamente.',
+            icon: 'error',
+            confirmButtonText: 'Aceptar'
+          });
+          return;
+        }
       }
 
       const requisitionData = {
@@ -322,7 +317,6 @@ const CreateRequisitionModal = ({
              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.partReference ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Ej: Motor de 12V, Sensor de proximidad..."
-              required
             />
             {errors.partReference && (
               <p className="text-red-500 text-xs mt-1">{errors.partReference}</p>
@@ -366,38 +360,29 @@ const CreateRequisitionModal = ({
             </select>
           </div>
 
-          {/* Imagen del repuesto */}
+          {/* Imagen o PDF de la requisición */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Foto del repuesto *
+              Imagen o PDF de referencia *
             </label>
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,application/pdf,.pdf"
               onChange={(e) => handleFileChange('image', e.target.files[0])}
              className={`w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 ${errors.image ? 'border-red-500' : ''
               }`}
               required
             />
             <p className="text-xs text-gray-500 mt-1">
-              Sube una foto del repuesto (obligatorio)
+              Adjunta una imagen o un PDF. Solo se requiere uno de los dos. Máximo 10 MB.
             </p>
             {errors.image && (
               <p className="text-red-500 text-xs mt-1">{errors.image}</p>
             )}
 
-            {/* Vista previa de imagen */}
+            {/* Vista previa del archivo */}
             {formData.image && (
-              <div className="mt-3">
-                <img
-                  src={URL.createObjectURL(formData.image)}
-                  alt="Vista previa del repuesto"
-                  className="max-w-32 max-h-32 object-cover rounded-lg border border-gray-300"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-              </div>
+              <p className="mt-2 text-sm text-gray-600">📎 {formData.image.name}</p>
             )}
           </div>
 

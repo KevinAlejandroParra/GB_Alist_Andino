@@ -2,6 +2,7 @@
 
 const RequisitionService = require('../services/RequisitionService');
 const FailureRequisitionService = require('../services/FailureRequisitionService');
+const { sendRequisitionNotification } = require('../services/requisitionNotificationEmailService');
 
 class RequisitionController {
   // === CREACIÓN DE REQUISICIONES ===
@@ -55,6 +56,13 @@ class RequisitionController {
         imageUrl,
         requestedBy
       });
+
+      // El correo es complementario: si el SMTP falla, conservar la solicitud y reportarlo en logs.
+      try {
+        await sendRequisitionNotification(result.data);
+      } catch (emailError) {
+        console.error('❌ Requisición creada, pero no se pudo enviar la notificación por correo:', emailError.message);
+      }
 
       res.status(201).json(result);
 

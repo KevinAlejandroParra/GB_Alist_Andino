@@ -1,7 +1,7 @@
 const express = require("express")
 const router = express.Router()
 const { verifyToken } = require("../middleware/authMiddleware")
-const { uploadFailureEvidence, toRelativePath } = require("../config/multerConfig")
+const { uploadFailureEvidence, uploadRequisitionEvidence, toRelativePath } = require("../config/multerConfig")
 const {
   ensureChecklistInstance,
   getLatestChecklist,
@@ -65,7 +65,7 @@ router.get("/type/:checklistTypeId/analytics/premios/export", verifyToken, expor
 router.get("/type/:checklistTypeId/premios-config", verifyToken, getPremiosConfig)
 router.post("/type/:checklistTypeId/premios-config", verifyToken, savePremiosConfig)
 
-router.post("/upload-evidence", verifyToken, uploadFailureEvidence.single("evidence"), (req, res) => {
+router.post("/upload-evidence", verifyToken, uploadRequisitionEvidence.single("evidence"), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No se proporcionó ningún archivo" })
