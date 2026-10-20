@@ -147,8 +147,7 @@ class MaintenanceDayReportPdfService {
                 : null;
             const evidences = [
                 this.getEvidence(failure?.evidence_url, 'Evidencia reportada de la falla', publicBaseUrl),
-                this.getEvidence(repair?.evidence_url, 'Evidencia del Acta de Reparación', publicBaseUrl),
-                this.getEvidence(workOrder?.evidence_url, 'Evidencia de la Orden de Trabajo', publicBaseUrl)
+                this.getEvidence(repair?.evidence_url, 'Evidencia del Acta de Reparación', publicBaseUrl)
             ].filter(Boolean);
 
             failures.push({
