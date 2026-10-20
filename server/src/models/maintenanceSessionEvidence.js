@@ -8,12 +8,17 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'session_id',
                 as: 'session'
             });
+            MaintenanceSessionEvidence.belongsTo(models.User, {
+                foreignKey: 'uploaded_by_id',
+                as: 'uploader'
+            });
         }
     }
     MaintenanceSessionEvidence.init({
         session_id: { type: DataTypes.INTEGER, allowNull: false },
         phase: { type: DataTypes.ENUM('INICIO', 'PROCESO_1', 'PROCESO_2', 'FIN'), allowNull: false },
         file_url: { type: DataTypes.STRING, allowNull: false },
+        uploaded_by_id: { type: DataTypes.INTEGER, allowNull: true },
     }, {
         sequelize,
         modelName: "MaintenanceSessionEvidence",

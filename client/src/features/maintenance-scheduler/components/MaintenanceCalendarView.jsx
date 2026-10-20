@@ -262,6 +262,9 @@ export default function MaintenanceCalendarView({
                           {slot.slot_type === 'WEEKLY' ? '🗓️' : slot.slot_type === 'BIWEEKLY' ? '🔂' : slot.slot_type === 'QUARTERLY' ? '📅' : '⚙️'}
                         </span>
                         <span className="truncate">{slot.inspectable?.name || `Máquina #${slot.ins_id}`}</span>
+                        {slot.shared_enabled && (
+                          <span className="ml-1 rounded bg-violet-900/25 px-1 text-[8px] font-extrabold uppercase">Compartido</span>
+                        )}
                         {slot.exclusive_technician && (
                           <span className="block mt-0.5 text-[9px] font-bold truncate" title={`Exclusivo para ${slot.exclusive_technician.user_name}`}>
                             Exclusivo para {slot.exclusive_technician.user_name}

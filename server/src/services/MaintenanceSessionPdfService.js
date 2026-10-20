@@ -8,7 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const puppeteer = require('puppeteer');
-const { MaintenanceSession, MaintenanceScheduleSlot, Inspectable, WorkOrder, WorkOrderPart, Inventory, Requisition, User } = require('../models');
+const { MaintenanceSession, MaintenanceScheduleSlot, Inspectable, WorkOrder, WorkOrderPart, Inventory, Requisition, User, MaintenanceSessionParticipant } = require('../models');
 
 let browserInstance = null;
 let browserLaunchPromise = null;
@@ -61,7 +61,10 @@ class MaintenanceSessionPdfService {
             include: [
                 { model: MaintenanceScheduleSlot, as: 'slot', include: [{ model: Inspectable, as: 'inspectable', required: false, attributes: ['ins_id', 'name'] }] },
                 { model: Inspectable, as: 'inspectable', required: false, attributes: ['ins_id', 'name'] },
-                { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
+                { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] },
+                { model: MaintenanceSessionParticipant, as: 'participants', include: [
+                    { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
+                ] }
             ]
         });
         if (!session) throw new Error(`Sesión de mantenimiento ${sessionId} no encontrada`);
@@ -137,6 +140,7 @@ class MaintenanceSessionPdfService {
     <tr><th>Sesión</th><td>#${session.id} — ${fmtDate(session.completed_at || session.createdAt)}</td></tr>
     <tr><th>Estado</th><td>${esc(session.status)}</td></tr>
     <tr><th>Técnico</th><td>${esc(session.technician?.user_name || 'No registrado')}</td></tr>
+    <tr><th>Participantes</th><td>${esc((session.participants || []).map(p => p.technician?.user_name).filter(Boolean).join(', ') || session.technician?.user_name || 'No registrados')}</td></tr>
     ${workOrder ? `<tr><th>OT asociada</th><td>${esc(workOrder.work_order_id)} (${esc(workOrder.status)})</td></tr>` : ''}
   </table>
 

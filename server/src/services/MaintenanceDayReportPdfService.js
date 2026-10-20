@@ -16,7 +16,8 @@ const {
     Inventory,
     Inspectable,
     User,
-    MaintenanceSessionEvidence
+    MaintenanceSessionEvidence,
+    MaintenanceSessionParticipant
 } = require('../models');
 
 const TYPE_LABELS = {
@@ -71,8 +72,13 @@ class MaintenanceDayReportPdfService {
                     as: 'sessions',
                     required: false,
                     include: [
-                        { model: MaintenanceSessionEvidence, as: 'evidences', required: false },
-                        { model: User, as: 'technician', required: false, attributes: ['user_id', 'user_name'] }
+                        { model: MaintenanceSessionEvidence, as: 'evidences', required: false, include: [
+                            { model: User, as: 'uploader', required: false, attributes: ['user_id', 'user_name'] }
+                        ] },
+                        { model: User, as: 'technician', required: false, attributes: ['user_id', 'user_name'] },
+                        { model: MaintenanceSessionParticipant, as: 'participants', required: false, include: [
+                            { model: User, as: 'technician', required: false, attributes: ['user_id', 'user_name'] }
+                        ] }
                     ]
                 }
             ],
@@ -91,7 +97,7 @@ class MaintenanceDayReportPdfService {
                 ? await Requisition.findAll({ where: { maintenance_session_id: latest.id }, order: [['createdAt', 'ASC']] })
                 : [];
             const evidences = (latest?.evidences || [])
-                .map(e => this.getEvidence(e.file_url, `Evidencia ${e.phase}`, publicBaseUrl))
+                .map(e => this.getEvidence(e.file_url, `Evidencia ${e.phase}${e.uploader?.user_name ? ` · ${e.uploader.user_name}` : ''}`, publicBaseUrl))
                 .filter(Boolean);
 
             preventives.push({
@@ -101,6 +107,7 @@ class MaintenanceDayReportPdfService {
                 status,
                 assignedName: slot.assignedUser?.user_name || null,
                 technicianName: latest?.technician?.user_name || 'No iniciado',
+                participantNames: (latest?.participants || []).map(participant => participant.technician?.user_name).filter(Boolean),
                 startedAt: latest?.started_at || null,
                 completedAt: latest?.completed_at || null,
                 durationMinutes: latest?.duration_minutes || null,
@@ -199,6 +206,7 @@ class MaintenanceDayReportPdfService {
               <tr><th>Tipo / slot</th><td>${esc(p.typeLabel)} · #${p.slotId}</td></tr>
               <tr><th>Técnico programado</th><td>${esc(p.assignedName || 'No asignado')}</td></tr>
               <tr><th>Técnico ejecutor</th><td>${esc(p.technicianName)}</td></tr>
+              <tr><th>Participantes</th><td>${esc(p.participantNames.join(', ') || p.technicianName)}</td></tr>
               <tr><th>Sesión</th><td>${p.sessionId ? `#${p.sessionId}` : 'No se escaneó el QR ni se inició sesión.'}</td></tr>
               <tr><th>Inicio / fin</th><td>${fmtTime(p.startedAt)} → ${fmtTime(p.completedAt)}${p.durationMinutes ? ` (${p.durationMinutes} min)` : ''}</td></tr>
               ${p.workOrder ? `<tr><th>OT asociada</th><td>${esc(p.workOrder.work_order_id)} (${esc(p.workOrder.status)})</td></tr>` : ''}

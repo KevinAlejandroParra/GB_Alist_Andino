@@ -5,6 +5,7 @@ const {
     MaintenanceMachineConfig,
     MaintenanceMachineQrCode,
     MaintenanceQrScan,
+    MaintenanceSessionParticipant,
     Inspectable,
     User
 } = require("../models");
@@ -21,16 +22,7 @@ class MaintenanceSessionService {
         });
         if (!slot) throw new Error("Slot no encontrado en el cronograma");
 
-        const { User, MaintenanceMachineConfig } = require('../models');
         const machineConfig = await MaintenanceMachineConfig.findOne({ where: { ins_id: slot.ins_id } });
-        const exclusiveTechnicianId = machineConfig?.assigned_technician_id || slot.assigned_user_id;
-        if (exclusiveTechnicianId && Number(exclusiveTechnicianId) !== Number(technicianId)) {
-            const requester = await User.findByPk(technicianId, { attributes: ['role_id'] });
-            if (![1, 2].includes(Number(requester?.role_id))) {
-                throw new Error('Este mantenimiento es exclusivo para el técnico asignado.');
-            }
-        }
-
         if (!qrCode) throw new Error("El código QR es obligatorio para iniciar la sesión");
 
         const qr = await MaintenanceMachineQrCode.findOne({
@@ -42,21 +34,32 @@ class MaintenanceSessionService {
             throw new Error(`El código QR escaneado no corresponde a la máquina planificada (${slot.inspectable?.name || 'ID ' + slot.ins_id})`);
         }
 
+        const requester = await User.findByPk(technicianId, { attributes: ['user_id', 'user_name', 'role_id'] });
+        if (!requester) throw new Error('Técnico no encontrado');
+        const isAdmin = [1, 2].includes(Number(requester.role_id));
+        const isShared = Boolean(machineConfig?.shared_enabled);
+        const exclusiveTechnicianId = machineConfig?.assigned_technician_id || slot.assigned_user_id;
+        if (!isShared && exclusiveTechnicianId && Number(exclusiveTechnicianId) !== Number(technicianId) && !isAdmin) {
+            throw new Error('Este mantenimiento es exclusivo para el técnico asignado.');
+        }
+
+        let session = await MaintenanceSession.findOne({
+            where: { slot_id: slot.id },
+            order: [['createdAt', 'DESC']]
+        });
+        if (session?.status === 'COMPLETED') {
+            throw new Error('Este mantenimiento ya fue completado.');
+        }
+        if (session && !isShared && Number(session.technician_id) !== Number(technicianId) && !isAdmin) {
+            throw new Error('Este mantenimiento ya fue iniciado por otro técnico y no es compartido.');
+        }
+
         // Record scan audit log
         await MaintenanceQrScan.create({
             qr_code: qrCode,
             ins_id: qr.ins_id,
             technician_id: technicianId,
             scanned_at: new Date()
-        });
-
-        // Reuse existing DRAFT session if available for this slot
-        let session = await MaintenanceSession.findOne({
-            where: {
-                slot_id: slot.id,
-                status: 'DRAFT'
-            },
-            include: [{ model: MaintenanceSessionEvidence, as: 'evidences' }]
         });
 
         if (!session) {
@@ -69,12 +72,14 @@ class MaintenanceSessionService {
                 started_at: new Date()
             });
 
-            session = await MaintenanceSession.findByPk(session.id, {
-                include: [{ model: MaintenanceSessionEvidence, as: 'evidences' }]
-            });
         }
 
-        return session;
+        await MaintenanceSessionParticipant.findOrCreate({
+            where: { session_id: session.id, technician_id: technicianId },
+            defaults: { joined_at: new Date() }
+        });
+
+        return await this.getSessionById(session.id);
     }
 
     /**
@@ -85,6 +90,9 @@ class MaintenanceSessionService {
             where: { slot_id: slotId },
             include: [
                 { model: MaintenanceSessionEvidence, as: 'evidences' },
+                { model: MaintenanceSessionParticipant, as: 'participants', include: [
+                    { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
+                ] },
                 { model: Inspectable, as: 'inspectable' },
                 { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
             ],
@@ -99,6 +107,9 @@ class MaintenanceSessionService {
         return await MaintenanceSession.findByPk(sessionId, {
             include: [
                 { model: MaintenanceSessionEvidence, as: 'evidences' },
+                { model: MaintenanceSessionParticipant, as: 'participants', include: [
+                    { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
+                ] },
                 { model: Inspectable, as: 'inspectable' },
                 { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
             ]
@@ -108,7 +119,34 @@ class MaintenanceSessionService {
     /**
      * Upload or update evidence photo for a specific phase
      */
-    async uploadEvidence(sessionId, phase, fileUrl) {
+    async assertCanEditSession(sessionId, userId, roleId) {
+        const session = await MaintenanceSession.findByPk(sessionId);
+        if (!session) throw new Error('Sesión de mantenimiento no encontrada');
+        if (session.status === 'COMPLETED') throw new Error('El mantenimiento ya fue completado.');
+        if ([1, 2].includes(Number(roleId))) return session;
+
+        const config = await MaintenanceMachineConfig.findOne({ where: { ins_id: session.ins_id } });
+        if (config?.shared_enabled) {
+            const participant = await MaintenanceSessionParticipant.findOne({
+                where: { session_id: session.id, technician_id: userId }
+            });
+            if (!participant) throw new Error('Escanea el QR para registrarte como participante antes de intervenir.');
+        } else if (Number(session.technician_id) !== Number(userId)) {
+            throw new Error('Este mantenimiento ya fue iniciado por otro técnico.');
+        }
+        return session;
+    }
+
+    async assertCanViewSession(sessionId, userId, roleId) {
+        const session = await MaintenanceSession.findByPk(sessionId);
+        if (!session) return null;
+        if ([1, 2].includes(Number(roleId)) || session.status === 'COMPLETED') return session;
+        const config = await MaintenanceMachineConfig.findOne({ where: { ins_id: session.ins_id } });
+        if (config?.shared_enabled || Number(session.technician_id) === Number(userId)) return session;
+        throw new Error('Este mantenimiento fue iniciado por otro técnico.');
+    }
+
+    async uploadEvidence(sessionId, phase, fileUrl, uploadedById) {
         if (!VALID_PHASES.includes(phase)) {
             throw new Error(`Fase de evidencia inválida: ${phase}. Debe ser una de: ${VALID_PHASES.join(', ')}`);
         }
@@ -117,7 +155,7 @@ class MaintenanceSessionService {
         if (!session) throw new Error("Sesión de mantenimiento no encontrada");
 
         const existing = await MaintenanceSessionEvidence.findOne({
-            where: { session_id: sessionId, phase }
+            where: { session_id: sessionId, phase, uploaded_by_id: uploadedById || null }
         });
 
         if (existing) {
@@ -128,7 +166,8 @@ class MaintenanceSessionService {
         return await MaintenanceSessionEvidence.create({
             session_id: sessionId,
             phase,
-            file_url: fileUrl
+            file_url: fileUrl,
+            uploaded_by_id: uploadedById || null
         });
     }
 

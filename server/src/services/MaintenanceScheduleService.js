@@ -436,7 +436,7 @@ class MaintenanceScheduleService {
         });
 
         const configs = await MaintenanceConfigService.getAllMachineConfigs(pId);
-        const technicianByMachine = new Map(configs.map(config => [Number(config.ins_id), config.assigned_technician]));
+        const configByMachine = new Map(configs.map(config => [Number(config.ins_id), config]));
 
         let completedCount = 0;
         let draftCount = 0;
@@ -462,7 +462,9 @@ class MaintenanceScheduleService {
 
             return {
                 ...slot,
-                exclusive_technician: technicianByMachine.get(Number(slot.ins_id)) || null,
+                exclusive_technician: configByMachine.get(Number(slot.ins_id))?.assigned_technician || null,
+                shared_enabled: Boolean(configByMachine.get(Number(slot.ins_id))?.shared_enabled),
+                shared_instructions: configByMachine.get(Number(slot.ins_id))?.shared_instructions || '',
                 latest_session: latestSession,
                 slot_display_status: slotDisplayStatus,
                 family_name: slot.inspectable?.deviceData?.family?.name || 'General'

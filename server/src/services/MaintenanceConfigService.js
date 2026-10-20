@@ -81,6 +81,8 @@ class MaintenanceConfigService {
                 biweekly_pattern: cfg?.biweekly_pattern || 'FIRST_THIRD',
                 assigned_technician_id: cfg?.assigned_technician_id ?? null,
                 assigned_technician: technicianMap.get(Number(cfg?.assigned_technician_id)) || null,
+                shared_enabled: cfg ? Boolean(cfg.shared_enabled) : false,
+                shared_instructions: cfg?.shared_instructions || '',
                 quarterly_enabled: cfg ? Boolean(cfg.quarterly_enabled) : false,
                 quarterly_start_month: cfg?.quarterly_start_month ?? null, // 1-12
                 quarterly_day_of_month: cfg?.quarterly_day_of_month ?? null, // 1-28
@@ -102,6 +104,8 @@ class MaintenanceConfigService {
             ...(data.biweekly_weekday !== undefined && { biweekly_weekday: data.biweekly_weekday !== null ? Number(data.biweekly_weekday) : null }),
             ...(data.biweekly_pattern !== undefined && ['FIRST_THIRD', 'SECOND_FOURTH'].includes(data.biweekly_pattern) && { biweekly_pattern: data.biweekly_pattern }),
             ...(data.assigned_technician_id !== undefined && { assigned_technician_id: data.assigned_technician_id ? Number(data.assigned_technician_id) : null }),
+            ...(data.shared_enabled !== undefined && { shared_enabled: Boolean(data.shared_enabled) }),
+            ...(data.shared_instructions !== undefined && { shared_instructions: String(data.shared_instructions || '').trim() || null }),
             ...(data.quarterly_enabled !== undefined && { quarterly_enabled: Boolean(data.quarterly_enabled) }),
             ...(data.quarterly_start_month !== undefined && { quarterly_start_month: data.quarterly_start_month !== null ? Number(data.quarterly_start_month) : null }),
             ...(data.quarterly_day_of_month !== undefined && { quarterly_day_of_month: data.quarterly_day_of_month !== null ? Number(data.quarterly_day_of_month) : null }),
@@ -109,6 +113,8 @@ class MaintenanceConfigService {
             ...(data.last_scheduled_at !== undefined && { last_scheduled_at: data.last_scheduled_at ? new Date(data.last_scheduled_at) : null }),
             ...(data.is_active !== undefined && { is_active: Boolean(data.is_active) })
         };
+
+        if (data.shared_enabled === true) payload.assigned_technician_id = null;
 
         const existing = await MaintenanceMachineConfig.findOne({ where: { ins_id: insId } });
         if (payload.assigned_technician_id) {

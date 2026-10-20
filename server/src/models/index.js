@@ -50,6 +50,7 @@ const MaintenanceMachineConfigModel = require("./maintenanceMachineConfig.js");
 const MaintenanceSchedulePlanModel = require("./maintenanceSchedulePlan.js");
 const MaintenanceScheduleSlotModel = require("./maintenanceScheduleSlot.js");
 const MaintenanceSessionModel = require("./maintenanceSession.js");
+const MaintenanceSessionParticipantModel = require("./maintenanceSessionParticipant.js");
 const MaintenanceSessionEvidenceModel = require("./maintenanceSessionEvidence.js");
 const MaintenanceDayFailureClosureModel = require("./maintenanceDayFailureClosure.js");
 const MaintenanceMachineQrCodeModel = require("./maintenanceMachineQrCode.js");
@@ -89,6 +90,7 @@ const MaintenanceMachineConfig = MaintenanceMachineConfigModel(connection, DataT
 const MaintenanceSchedulePlan = MaintenanceSchedulePlanModel(connection, DataTypes);
 const MaintenanceScheduleSlot = MaintenanceScheduleSlotModel(connection, DataTypes);
 const MaintenanceSession = MaintenanceSessionModel(connection, DataTypes);
+const MaintenanceSessionParticipant = MaintenanceSessionParticipantModel(connection, DataTypes);
 const MaintenanceSessionEvidence = MaintenanceSessionEvidenceModel(connection, DataTypes);
 const MaintenanceDayFailureClosure = MaintenanceDayFailureClosureModel(connection, DataTypes);
 const MaintenanceMachineQrCode = MaintenanceMachineQrCodeModel(connection, DataTypes);
@@ -103,7 +105,7 @@ const models = {
       ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation,
     PremiosConfig, PremiosAnalisis, RetroactiveAccessRequest,
     MaintenanceSetting, MaintenanceMachineConfig, MaintenanceSchedulePlan,
-    MaintenanceScheduleSlot, MaintenanceSession, MaintenanceSessionEvidence,
+    MaintenanceScheduleSlot, MaintenanceSession, MaintenanceSessionParticipant, MaintenanceSessionEvidence,
     MaintenanceDayFailureClosure, MaintenanceMachineQrCode, MaintenanceQrScan
 };
 
@@ -122,7 +124,7 @@ module.exports = {
       ChecklistQrCode, ChecklistQrScan, ChecklistQrItemAssociation,
     PremiosConfig, PremiosAnalisis, RetroactiveAccessRequest,
     MaintenanceSetting, MaintenanceMachineConfig, MaintenanceSchedulePlan,
-    MaintenanceScheduleSlot, MaintenanceSession, MaintenanceSessionEvidence,
+    MaintenanceScheduleSlot, MaintenanceSession, MaintenanceSessionParticipant, MaintenanceSessionEvidence,
     MaintenanceDayFailureClosure, MaintenanceMachineQrCode, MaintenanceQrScan,
     connection, Sequelize,
 

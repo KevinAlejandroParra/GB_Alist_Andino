@@ -254,6 +254,11 @@ export default function MaintenanceDayDrawer({
                             <i className="fas fa-user-lock" /> Exclusivo para {slot.exclusive_technician.user_name}
                           </p>
                         )}
+                        {slot.shared_enabled && (
+                          <p className="mt-2 inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-800">
+                            <i className="fas fa-people-group" /> Mantenimiento compartido
+                          </p>
+                        )}
                       </div>
                     </div>
 

@@ -63,6 +63,11 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                 requisitions: []
               }))
               .catch(() => {});
+          } else if (slot.shared_enabled) {
+            // Cada técnico debe validar el QR para quedar inscrito como participante.
+            setSession(existing);
+            setSessionId(null);
+            setStep(0);
           } else {
             setStep(1); // Resume at evidences
           }
@@ -277,6 +282,31 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                 </p>
               </div>
 
+              {slot.shared_enabled && (
+                <div className="max-w-md mx-auto rounded-2xl border border-violet-200 bg-violet-50 p-4 text-left">
+                  <h5 className="flex items-center gap-2 text-sm font-bold text-violet-900">
+                    <i className="fas fa-people-group" /> Mantenimiento compartido
+                  </h5>
+                  <p className="mt-1 text-xs text-violet-800">
+                    Cada técnico debe escanear el QR para quedar registrado y poder aportar evidencias y completar el mantenimiento.
+                  </p>
+                  {slot.shared_instructions?.trim() ? (
+                    <ol className="mt-3 list-decimal space-y-1 pl-5 text-xs text-violet-950">
+                      {slot.shared_instructions.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map((line, index) => (
+                        <li key={`${index}-${line}`}>{line}</li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="mt-3 text-xs italic text-violet-700">El administrador no agregó instrucciones específicas.</p>
+                  )}
+                  {session?.participants?.length > 0 && (
+                    <div className="mt-3 border-t border-violet-200 pt-2 text-xs text-violet-900">
+                      <strong>Participantes registrados:</strong> {session.participants.map(p => p.technician?.user_name).filter(Boolean).join(', ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="max-w-md mx-auto space-y-3">
                 <button
                   type="button"
@@ -330,6 +360,12 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                   {Object.values(evidences).filter(Boolean).length} / 4 Fotos
                 </span>
               </div>
+
+              {slot.shared_enabled && session?.participants?.length > 0 && (
+                <div className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900">
+                  <strong>Participantes:</strong> {session.participants.map(p => p.technician?.user_name).filter(Boolean).join(', ')}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 {PHASES.map((ph) => {

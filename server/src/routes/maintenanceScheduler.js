@@ -21,6 +21,16 @@ const checkModuleEnabled = (req, res, next) => {
     next();
 };
 
+const authorizeSessionWrite = async (req, res, next) => {
+    try {
+        const sessionId = req.params.id || req.body.sessionId;
+        await MaintenanceSessionService.assertCanEditSession(sessionId, req.user.user_id, req.user.role_id);
+        next();
+    } catch (e) {
+        res.status(403).json({ error: e.message });
+    }
+};
+
 // All routes require authentication and module check
 router.use(verifyToken);
 router.use(checkModuleEnabled);
@@ -150,14 +160,16 @@ router.patch('/slots/:id', checkRole([1, 2]), async (req, res) => {
 router.get('/sessions/slot/:slotId', async (req, res) => {
     try {
         const session = await MaintenanceSessionService.getSessionBySlot(req.params.slotId);
+        if (session) await MaintenanceSessionService.assertCanViewSession(session.id, req.user.user_id, req.user.role_id);
         res.json(session || null);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(403).json({ error: e.message });
     }
 });
 
 router.get('/sessions/:id', async (req, res) => {
     try {
+        await MaintenanceSessionService.assertCanViewSession(req.params.id, req.user.user_id, req.user.role_id);
         const session = await MaintenanceSessionService.getSessionById(req.params.id);
         if (!session) return res.status(404).json({ error: "Sesión no encontrada" });
         res.json(session);
@@ -182,7 +194,7 @@ router.post('/sessions/start', async (req, res) => {
 });
 
 // Upload evidence with Multer (multipart/form-data)
-router.post('/sessions/:id/evidence-upload', uploadMaintenanceEvidence.single('file'), async (req, res) => {
+router.post('/sessions/:id/evidence-upload', authorizeSessionWrite, uploadMaintenanceEvidence.single('file'), async (req, res) => {
     try {
         const sessionId = req.params.id;
         const { phase } = req.body;
@@ -194,7 +206,7 @@ router.post('/sessions/:id/evidence-upload', uploadMaintenanceEvidence.single('f
         }
 
         const relativePath = toRelativePath(req.file.path);
-        const evidence = await MaintenanceSessionService.uploadEvidence(sessionId, phase, relativePath);
+        const evidence = await MaintenanceSessionService.uploadEvidence(sessionId, phase, relativePath, req.user.user_id);
         res.json(evidence);
     } catch (e) {
         console.error("Error uploading evidence:", e);
@@ -209,14 +221,15 @@ router.post('/sessions/evidence', async (req, res) => {
         if (!sessionId || !phase || !fileUrl) {
             return res.status(400).json({ error: "sessionId, phase y fileUrl son requeridos" });
         }
-        const evidence = await MaintenanceSessionService.uploadEvidence(sessionId, phase, fileUrl);
+        await MaintenanceSessionService.assertCanEditSession(sessionId, req.user.user_id, req.user.role_id);
+        const evidence = await MaintenanceSessionService.uploadEvidence(sessionId, phase, fileUrl, req.user.user_id);
         res.json(evidence);
     } catch (e) {
         res.status(400).json({ error: e.message });
     }
 });
 
-router.post('/sessions/:id/complete', async (req, res) => {
+router.post('/sessions/:id/complete', authorizeSessionWrite, async (req, res) => {
     try {
         const { description } = req.body;
         const session = await MaintenanceSessionService.completeSession(req.params.id, description);
@@ -243,7 +256,7 @@ router.get('/sessions/:id/parts', async (req, res) => {
 });
 
 // Agregar repuesto → crea la OT MTO perezosamente + descuenta stock
-router.post('/sessions/:id/parts', async (req, res) => {
+router.post('/sessions/:id/parts', authorizeSessionWrite, async (req, res) => {
     try {
         const { inventoryId, quantity } = req.body;
         const technicianId = req.user?.user_id || null;
@@ -256,7 +269,7 @@ router.post('/sessions/:id/parts', async (req, res) => {
 });
 
 // Quitar repuesto (devuelve stock; si queda vacía la OT no se elimina hasta cierre)
-router.delete('/sessions/:id/parts/:partId', async (req, res) => {
+router.delete('/sessions/:id/parts/:partId', authorizeSessionWrite, async (req, res) => {
     try {
         const technicianId = req.user?.user_id || null;
         const result = await MaintenanceWorkOrderService.removePartFromSession(req.params.id, req.params.partId, technicianId);
@@ -290,7 +303,7 @@ router.get('/sessions/:id/requisitions', async (req, res) => {
     }
 });
 
-router.post('/sessions/:id/requisitions', async (req, res) => {
+router.post('/sessions/:id/requisitions', authorizeSessionWrite, async (req, res) => {
     try {
         const { partReference, quantity, notes } = req.body;
         const technicianId = req.user?.user_id || null;

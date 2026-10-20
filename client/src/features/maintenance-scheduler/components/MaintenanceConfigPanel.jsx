@@ -190,6 +190,8 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
                 <th className="px-5 py-4 text-center">Preventivo Cuatrimestral</th>
                 <th className="px-5 py-4">Mes / Día Cuatrimestral</th>
                 <th className="px-5 py-4 text-center">Exento de PP</th>
+                <th className="px-5 py-4">Programado compartido</th>
+                <th className="px-5 py-4">Instrucciones para técnicos</th>
                 <th className="px-5 py-4">Técnico exclusivo</th>
                 <th className="px-5 py-4">Último Programado</th>
                 <th className="px-5 py-4 text-center">Código QR</th>
@@ -198,14 +200,14 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="11" className="text-center py-12 text-gray-400">
+                  <td colSpan="13" className="text-center py-12 text-gray-400">
                     <i className="fas fa-spinner fa-spin text-2xl mb-2 block" />
                     Cargando máquinas y configuraciones...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className="text-center py-12 text-gray-400">
+                  <td colSpan="13" className="text-center py-12 text-gray-400">
                     No se encontraron máquinas con el filtro seleccionado.
                   </td>
                 </tr>
@@ -386,11 +388,44 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
                         )}
                       </td>
 
+                      {/* Shared preventive */}
+                      <td className="px-5 py-4 text-center">
+                        <label className="inline-flex items-center gap-2 text-xs font-semibold text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(cfg.shared_enabled)}
+                            disabled={isSaving}
+                            onChange={(e) => handleUpdate(cfg.ins_id, {
+                              shared_enabled: e.target.checked,
+                              ...(e.target.checked && { assigned_technician_id: null })
+                            })}
+                            aria-label={`Mantenimiento compartido para ${cfg.name}`}
+                            className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                          />
+                          Compartido
+                        </label>
+                      </td>
+
+                      <td className="px-5 py-4 min-w-[220px]">
+                        <textarea
+                          rows={2}
+                          value={cfg.shared_instructions || ''}
+                          disabled={isSaving || !cfg.shared_enabled}
+                          onChange={(e) => setConfigs(prev => prev.map(item =>
+                            item.ins_id === cfg.ins_id ? { ...item, shared_instructions: e.target.value } : item
+                          ))}
+                          onBlur={(e) => handleUpdate(cfg.ins_id, { shared_instructions: e.target.value })}
+                          placeholder="Una instrucción por línea"
+                          aria-label={`Instrucciones del mantenimiento compartido para ${cfg.name}`}
+                          className="w-full min-w-[200px] rounded-lg border border-gray-300 px-2 py-1.5 text-xs disabled:bg-gray-100 disabled:text-gray-400"
+                        />
+                      </td>
+
                       {/* Técnico exclusivo del preventivo */}
                       <td className="px-5 py-4">
                         <select
                           value={cfg.assigned_technician_id || ''}
-                          disabled={isSaving}
+                          disabled={isSaving || cfg.shared_enabled}
                           onChange={(e) => handleUpdate(cfg.ins_id, {
                             assigned_technician_id: e.target.value ? Number(e.target.value) : null
                           })}
