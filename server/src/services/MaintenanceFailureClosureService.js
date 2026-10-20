@@ -31,7 +31,7 @@ class MaintenanceFailureClosureService {
      * Listar fallas activas (no resueltas) de una fecha, filtradas opcionalmente por máquina.
      * Used por el drawer del día para seleccionar qué falla se cerró ese día.
      */
-    async getActiveFailuresForDay(dateStr, insId = null) {
+    async getActiveFailuresForDay(dateStr, technicianId, insId = null) {
         const dayStart = new Date(`${dateStr}T00:00:00`);
         const dayEnd = new Date(`${dateStr}T23:59:59.999`);
 
@@ -48,6 +48,7 @@ class MaintenanceFailureClosureService {
                     required: true,
                     where: {
                         status: RESOLVED_STATUSES,
+                        resolved_by_id: technicianId,
                         end_time: { [Op.between]: [dayStart, dayEnd] }
                     }
                 },
@@ -99,13 +100,24 @@ class MaintenanceFailureClosureService {
      *  - La falla está efectivamente resuelta (AR en estado resuelto / aprobada / completada).
      *  - No duplicar el mismo cierre (misma falla + mismo día + mismo técnico).
      */
-    async linkFailureClosure(dateStr, technicianId, failureOrderId, userId) {
+    async linkFailureClosure(dateStr, technicianId, failureOrderId) {
         if (!dateStr || !failureOrderId) {
             throw new Error("date y failureOrderId son obligatorios");
         }
 
+        const dayStart = new Date(`${dateStr}T00:00:00`);
+        const dayEnd = new Date(`${dateStr}T23:59:59.999`);
         const failure = await FailureOrder.findByPk(failureOrderId, {
-            include: [{ model: RepairExecution, as: 'repairExecution', required: false }]
+            include: [{
+                model: RepairExecution,
+                as: 'repairExecution',
+                required: true,
+                where: {
+                    status: RESOLVED_STATUSES,
+                    resolved_by_id: technicianId,
+                    end_time: { [Op.between]: [dayStart, dayEnd] }
+                }
+            }]
         });
         if (!failure) throw new Error("Orden de falla no encontrada");
 
@@ -127,7 +139,7 @@ class MaintenanceFailureClosureService {
 
         return await MaintenanceDayFailureClosure.create({
             closure_date: dateStr,
-            technician_id: technicianId || userId,
+            technician_id: technicianId,
             failure_order_id: failureOrderId,
             affected_ins_id: failure.affected_id
         });
@@ -136,9 +148,12 @@ class MaintenanceFailureClosureService {
     /**
      * Eliminar (desvincular) un cierre del día.
      */
-    async unlinkFailureClosure(closureId) {
+    async unlinkFailureClosure(closureId, technicianId) {
         const closure = await MaintenanceDayFailureClosure.findByPk(closureId);
         if (!closure) throw new Error("Registro de cierre no encontrado");
+        if (Number(closure.technician_id) !== Number(technicianId)) {
+            throw new Error("Solo el tecnico que registro este cierre puede desvincularlo.");
+        }
         await closure.destroy();
         return { ok: true };
     }
@@ -146,9 +161,9 @@ class MaintenanceFailureClosureService {
     /**
      * Cierres registrados para una fecha.
      */
-    async getClosuresForDate(dateStr) {
+    async getClosuresForDate(dateStr, technicianId) {
         return await MaintenanceDayFailureClosure.findAll({
-            where: { closure_date: dateStr },
+            where: { closure_date: dateStr, technician_id: technicianId },
             include: [
                 {
                     model: FailureOrder,

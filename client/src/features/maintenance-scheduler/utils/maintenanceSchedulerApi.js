@@ -190,10 +190,9 @@ export const maintenanceApi = {
     return res.data;
   },
 
-  linkFailureClosure: async (date, failureOrderId, technicianId = null) => {
+  linkFailureClosure: async (date, failureOrderId) => {
     const res = await axiosInstance.post(`${API_BASE}/days/${date}/link-failure-closure`, {
-      failureOrderId,
-      ...(technicianId ? { technicianId } : {})
+      failureOrderId
     });
     return res.data;
   },

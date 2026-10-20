@@ -319,10 +319,14 @@ export default function MaintenanceDayDrawer({
 
             {sectionOpen && (
               <div className="p-4 space-y-4 bg-white">
+                <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5">
+                  <i className="fas fa-user-check mr-1" />
+                  Solo puedes vincular fallas que resolviste el <b>{dateStr}</b>.
+                </p>
                 {/* Registered closures */}
                 <div>
                   <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
-                    Cierres registrados ({closures.length})
+                    Mis cierres registrados ({closures.length})
                   </p>
                   {closures.length === 0 ? (
                     <p className="text-xs text-gray-400 italic">Sin cierres registrados este día.</p>
@@ -363,7 +367,7 @@ export default function MaintenanceDayDrawer({
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      Fallas resueltas hoy (sin vincular)
+                      Fallas que resolví este día (sin vincular)
                     </p>
                     <button
                       type="button"
@@ -380,7 +384,7 @@ export default function MaintenanceDayDrawer({
                     </p>
                   ) : failures.filter(f => !closures.some(c => c.failure_order_id === f.id)).length === 0 ? (
                     <p className="text-xs text-gray-400 italic">
-                      No hay fallas resueltas hoy pendientes de vincular.
+                      No tienes fallas resueltas este dia pendientes de vincular.
                     </p>
                   ) : (
                     <ul className="space-y-2 max-h-64 overflow-y-auto">

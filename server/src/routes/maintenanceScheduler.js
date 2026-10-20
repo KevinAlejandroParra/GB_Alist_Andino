@@ -374,7 +374,11 @@ router.get('/days/:date/failures', async (req, res) => {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({ error: "Formato de fecha inválido (YYYY-MM-DD)" });
         }
-        const failures = await MaintenanceFailureClosureService.getActiveFailuresForDay(date, req.query.insId);
+        const failures = await MaintenanceFailureClosureService.getActiveFailuresForDay(
+            date,
+            req.user.user_id,
+            req.query.insId
+        );
         res.json(failures);
     } catch (e) {
         console.error("Error fetching active failures for day:", e);
@@ -409,7 +413,7 @@ router.get('/days/:date/closures', async (req, res) => {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({ error: "Formato de fecha inválido (YYYY-MM-DD)" });
         }
-        const closures = await MaintenanceFailureClosureService.getClosuresForDate(date);
+        const closures = await MaintenanceFailureClosureService.getClosuresForDate(date, req.user.user_id);
         res.json(closures);
     } catch (e) {
         console.error("Error fetching closures for day:", e);
@@ -423,14 +427,13 @@ router.post('/days/:date/link-failure-closure', async (req, res) => {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({ error: "Formato de fecha inválido (YYYY-MM-DD)" });
         }
-        const { failureOrderId, technicianId } = req.body || {};
+        const { failureOrderId } = req.body || {};
         if (!failureOrderId) return res.status(400).json({ error: "failureOrderId es requerido" });
 
         const closure = await MaintenanceFailureClosureService.linkFailureClosure(
             date,
-            technicianId || req.user.user_id,
-            failureOrderId,
-            req.user.user_id
+            req.user.user_id,
+            failureOrderId
         );
         res.json(closure);
     } catch (e) {
@@ -441,7 +444,10 @@ router.post('/days/:date/link-failure-closure', async (req, res) => {
 
 router.delete('/days/:date/closures/:closureId', checkRole([1, 2, 3, 7]), async (req, res) => {
     try {
-        const result = await MaintenanceFailureClosureService.unlinkFailureClosure(req.params.closureId);
+        const result = await MaintenanceFailureClosureService.unlinkFailureClosure(
+            req.params.closureId,
+            req.user.user_id
+        );
         res.json(result);
     } catch (e) {
         console.error("Error unlinking failure closure:", e);
