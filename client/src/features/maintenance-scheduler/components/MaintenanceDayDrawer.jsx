@@ -363,7 +363,7 @@ export default function MaintenanceDayDrawer({
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      Fallas activas ({failures.filter(f => !closures.some(c => c.failure_order_id === f.id)).length})
+                      Fallas resueltas hoy (sin vincular)
                     </p>
                     <button
                       type="button"
@@ -371,7 +371,7 @@ export default function MaintenanceDayDrawer({
                       className="text-emerald-600 hover:text-emerald-800 p-1 rounded-lg hover:bg-emerald-50"
                       title="Recargar"
                     >
-                      <i className={`fas fa-sync-alt text-xs ${loadingF ? 'fa-spin' : ''}`} />
+                      <i className={`fas ${loadingF ? 'fa-spinner fa-spin' : 'fa-sync-alt'} text-xs`} />
                     </button>
                   </div>
                   {loadingF ? (
@@ -380,7 +380,7 @@ export default function MaintenanceDayDrawer({
                     </p>
                   ) : failures.filter(f => !closures.some(c => c.failure_order_id === f.id)).length === 0 ? (
                     <p className="text-xs text-gray-400 italic">
-                      Sin fallas activas registradas este día.
+                      No hay fallas resueltas hoy pendientes de vincular.
                     </p>
                   ) : (
                     <ul className="space-y-2 max-h-64 overflow-y-auto">
@@ -391,8 +391,8 @@ export default function MaintenanceDayDrawer({
                               {f.affected_name}
                               {f.severity && (
                                 <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                  f.severity === 'ALTA' ? 'bg-rose-100 text-rose-700'
-                                    : f.severity === 'MEDIA' ? 'bg-amber-100 text-amber-700'
+                                  f.severity === 'CRITICA' ? 'bg-rose-100 text-rose-700'
+                                    : f.severity === 'MODERADA' ? 'bg-amber-100 text-amber-700'
                                     : 'bg-gray-100 text-gray-600'
                                 }`}>
                                   {f.severity}
@@ -400,23 +400,30 @@ export default function MaintenanceDayDrawer({
                               )}
                             </p>
                             <p className="text-gray-500 mt-0.5">{f.description || '—'}</p>
-                            <p className="text-gray-400 mt-0.5">
-                              AR: {f.repair_execution?.status || 'sin AR'}
-                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-green-100 text-green-700 rounded">
+                                {f.status}
+                              </span>
+                              {f.repair_execution?.end_time && (
+                                <span className="text-[10px] text-gray-400">
+                                  Resuelta: {new Date(f.repair_execution.end_time).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <button
                             type="button"
                             disabled={savingClosure === f.id}
                             onClick={() => handleLinkClosure(f.id)}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 shrink-0"
-                            title="Registrar cierre de esta falla en este día"
+                            title="Vincular este correctivo al día laboral"
                           >
                             {savingClosure === f.id ? (
                               <i className="fas fa-spinner fa-spin" />
                             ) : (
                               <i className="fas fa-link" />
                             )}
-                            Registrar cierre
+                            Vincular
                           </button>
                         </li>
                       ))}

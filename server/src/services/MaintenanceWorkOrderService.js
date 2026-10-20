@@ -151,14 +151,18 @@ class MaintenanceWorkOrderService {
      */
     async listPartsForSession(sessionId) {
         const workOrder = await WorkOrder.findOne({ where: { maintenance_session_id: sessionId } });
-        if (!workOrder) return { work_order_id: null, parts: [] };
+        if (!workOrder) return { id: null, work_order_id: null, parts: [] };
 
         const parts = await WorkOrderPart.findAll({
             where: { work_order_id: workOrder.id },
             include: [{ model: Inventory, as: 'inventory' }]
         });
 
-        return { work_order_id: workOrder.work_order_id, parts };
+        return { 
+            id: workOrder.id, 
+            work_order_id: workOrder.work_order_id, 
+            parts 
+        };
     }
 
     /**

@@ -49,8 +49,8 @@ class MaintenanceDayReportPdfService {
                 completed_at: { [Op.between]: [dayStart, dayEnd] }
             },
             include: [
-                { model: MaintenanceScheduleSlot, as: 'slot', include: [{ model: Inspectable, as: 'inspectable' }] },
-                { model: Inspectable, as: 'inspectable' },
+                { model: MaintenanceScheduleSlot, as: 'slot', required: false, include: [{ model: Inspectable, as: 'inspectable', required: false, attributes: ['ins_id', 'name'] }] },
+                { model: Inspectable, as: 'inspectable', required: false, attributes: ['ins_id', 'name'] },
                 { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
             ],
             order: [['completed_at', 'ASC']]
@@ -95,7 +95,7 @@ class MaintenanceDayReportPdfService {
                     as: 'failureOrder',
                     include: [{ model: RepairExecution, as: 'repairExecution', required: false }]
                 },
-                { model: Inspectable, as: 'inspectable', required: false, attributes: ['id', 'name'] },
+                { model: Inspectable, as: 'inspectable', required: false, attributes: ['ins_id', 'name'] },
                 { model: User, as: 'technician', attributes: ['user_id', 'user_name'] }
             ],
             order: [['createdAt', 'ASC']]

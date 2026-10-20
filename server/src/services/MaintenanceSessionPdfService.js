@@ -59,8 +59,8 @@ class MaintenanceSessionPdfService {
     async collectSessionData(sessionId) {
         const session = await MaintenanceSession.findByPk(sessionId, {
             include: [
-                { model: MaintenanceScheduleSlot, as: 'slot', include: [{ model: Inspectable, as: 'inspectable' }] },
-                { model: Inspectable, as: 'inspectable' },
+                { model: MaintenanceScheduleSlot, as: 'slot', include: [{ model: Inspectable, as: 'inspectable', required: false, attributes: ['ins_id', 'name'] }] },
+                { model: Inspectable, as: 'inspectable', required: false, attributes: ['ins_id', 'name'] },
                 { model: User, as: 'technician', attributes: ['user_id', 'user_name', 'user_email'] }
             ]
         });

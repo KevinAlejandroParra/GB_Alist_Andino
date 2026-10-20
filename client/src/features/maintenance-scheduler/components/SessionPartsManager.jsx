@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Swal from 'sweetalert2';
 import { maintenanceApi } from '../utils/maintenanceSchedulerApi';
 import InventorySearchModal from '../../../components/checklist/InventorySearchModal';
+import CreateRequisitionModal from '../../../components/checklist/requisitions/CreateRequisitionModal';
 
 /**
  * Gestor de repuestos de una sesión de mantenimiento preventivo.
@@ -17,18 +18,16 @@ import InventorySearchModal from '../../../components/checklist/InventorySearchM
  */
 export default function SessionPartsManager({ sessionId, onChange }) {
   const [parts, setParts] = useState([]);
-  const [workOrderId, setWorkOrderId] = useState(null);
+  const [workOrderId, setWorkOrderId] = useState(null); // ID numérico (PK)
+  const [workOrderCode, setWorkOrderCode] = useState(null); // Código STRING (MTO-...)
   const [requisitions, setRequisitions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [addingPart, setAddingPart] = useState(false);
 
-  // Requisiciones manuales (repuestos solicitados sin stock)
-  const [showReqForm, setShowReqForm] = useState(false);
-  const [reqPartRef, setReqPartRef] = useState('');
-  const [reqQty, setReqQty] = useState(1);
-  const [reqNotes, setReqNotes] = useState('');
-  const [addingReq, setAddingReq] = useState(false);
+  // Requisiciones (usando el modal estándar)
+  const [showRequisitionModal, setShowRequisitionModal] = useState(false);
+  const [requisitionPartInfo, setRequisitionPartInfo] = useState(null);
 
   const load = useCallback(async () => {
     if (!sessionId) return;
@@ -39,7 +38,8 @@ export default function SessionPartsManager({ sessionId, onChange }) {
         maintenanceApi.getSessionRequisitions(sessionId)
       ]);
       setParts(partsData?.parts || []);
-      setWorkOrderId(partsData?.work_order_id || null);
+      setWorkOrderId(partsData?.id || null);
+      setWorkOrderCode(partsData?.work_order_id || null);
       setRequisitions(reqs || []);
     } catch (err) {
       console.error('Error cargando repuestos de la sesión:', err);
@@ -54,8 +54,8 @@ export default function SessionPartsManager({ sessionId, onChange }) {
 
   // Mantener informado al wizard (resumen final y PDF)
   useEffect(() => {
-    if (onChange) onChange({ workOrderId, parts, requisitions });
-  }, [workOrderId, parts, requisitions, onChange]);
+    if (onChange) onChange({ workOrderId, workOrderCode, parts, requisitions });
+  }, [workOrderId, workOrderCode, parts, requisitions, onChange]);
 
   const totalUnits = parts.reduce((sum, p) => sum + (p.quantity_used || 0), 0);
 
@@ -132,30 +132,9 @@ export default function SessionPartsManager({ sessionId, onChange }) {
     }
   };
 
-  const handleAddRequisition = async () => {
-    if (!reqPartRef.trim()) return;
-    setAddingReq(true);
-    try {
-      const created = await maintenanceApi.createSessionRequisition(sessionId, {
-        partReference: reqPartRef.trim(),
-        quantity: Number(reqQty) || 1,
-        notes: reqNotes.trim() || null
-      });
-      setRequisitions((prev) => [...prev, created]);
-      setReqPartRef('');
-      setReqQty(1);
-      setReqNotes('');
-      setShowReqForm(false);
-    } catch (err) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error al crear requisición',
-        text: err.response?.data?.error || err.message,
-        confirmButtonColor: '#d33'
-      });
-    } finally {
-      setAddingReq(false);
-    }
+  const handleAddRequisition = () => {
+    setRequisitionPartInfo(null);
+    setShowRequisitionModal(true);
   };
 
   return (
@@ -171,9 +150,9 @@ export default function SessionPartsManager({ sessionId, onChange }) {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {workOrderId && (
+          {workOrderCode && (
             <span className="text-[10px] font-bold font-mono px-2 py-1 rounded-full bg-slate-100 text-slate-700">
-              OT {workOrderId}
+              OT {workOrderCode}
             </span>
           )}
           <button
@@ -235,11 +214,11 @@ export default function SessionPartsManager({ sessionId, onChange }) {
           </h6>
           <button
             type="button"
-            onClick={() => setShowReqForm((v) => !v)}
+            onClick={handleAddRequisition}
             className="text-xs font-bold text-amber-600 hover:text-amber-800"
           >
-            <i className={`fas ${showReqForm ? 'fa-times' : 'fa-plus'} mr-1`} />
-            {showReqForm ? 'Cancelar' : 'Solicitar repuesto sin stock'}
+            <i className="fas fa-plus mr-1" />
+            Solicitar repuesto sin stock
           </button>
         </div>
 
@@ -247,12 +226,22 @@ export default function SessionPartsManager({ sessionId, onChange }) {
           <div className="border border-amber-200 rounded-2xl divide-y divide-amber-100 overflow-hidden mt-2">
             {requisitions.map((rq) => (
               <div key={rq.id} className="flex items-center justify-between px-4 py-3 bg-amber-50">
-                <div>
-                  <p className="text-sm font-bold text-gray-800">{rq.part_reference}</p>
-                  <p className="text-xs text-gray-500">
-                    Cantidad: <span className="font-semibold">{rq.quantity_requested}</span>
-                    {rq.notes ? ` — ${rq.notes}` : ''}
-                  </p>
+                <div className="flex items-center gap-3">
+                  {rq.image_url && (
+                    <img 
+                      src={rq.image_url} 
+                      alt={rq.part_reference} 
+                      className="w-10 h-10 object-cover rounded border border-amber-200" 
+                    />
+                  )}
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">{rq.part_reference}</p>
+                    <p className="text-xs text-gray-500">
+                      Cantidad: <span className="font-semibold">{rq.quantity_requested}</span>
+                      {rq.notes ? ` — ${rq.notes}` : ''}
+                      {rq.urgency_level && ` · ${rq.urgency_level}`}
+                    </p>
+                  </div>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-amber-100 text-amber-700">
                   {rq.status || 'Solicitado'}
@@ -261,63 +250,33 @@ export default function SessionPartsManager({ sessionId, onChange }) {
             ))}
           </div>
         )}
-
-        {showReqForm && (
-          <div className="flex flex-wrap gap-2 items-end mt-3">
-            <div className="flex-1 min-w-[160px]">
-              <label className="text-xs font-semibold text-gray-600 block mb-1">Repuesto / Referencia</label>
-              <input
-                type="text"
-                value={reqPartRef}
-                onChange={(e) => setReqPartRef(e.target.value)}
-                placeholder="Ej: Filtro A-123"
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
-              />
-            </div>
-            <div className="w-20">
-              <label className="text-xs font-semibold text-gray-600 block mb-1">Cant.</label>
-              <input
-                type="number"
-                min="1"
-                value={reqQty}
-                onChange={(e) => setReqQty(e.target.value)}
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
-              />
-            </div>
-            <div className="flex-1 min-w-[140px]">
-              <label className="text-xs font-semibold text-gray-600 block mb-1">Notas (opcional)</label>
-              <input
-                type="text"
-                value={reqNotes}
-                onChange={(e) => setReqNotes(e.target.value)}
-                placeholder="Detalle / observación"
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleAddRequisition}
-              disabled={addingReq || !reqPartRef.trim()}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white font-bold rounded-xl text-sm transition-all"
-            >
-              <i className={`fas ${addingReq ? 'fa-spinner fa-spin' : 'fa-plus'} mr-1`} />
-              Requerir
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* Buscador real de inventario (mismo componente del cierre de fallas) */}
+      {/* Buscador real de inventario */}
       <InventorySearchModal
         show={showSearch}
         onClose={() => setShowSearch(false)}
         onPartSelected={handlePartSelected}
         onPartNotFound={() => {
           setShowSearch(false);
-          setShowReqForm(true);
+          setRequisitionPartInfo(null);
+          setShowRequisitionModal(true);
         }}
         allowMultiple={false}
         selectedParts={[]}
+        workOrderId={workOrderId}
+      />
+
+      {/* Modal de creación de requisición estándar */}
+      <CreateRequisitionModal
+        show={showRequisitionModal}
+        onClose={() => setShowRequisitionModal(false)}
+        onSuccess={() => {
+          setShowRequisitionModal(false);
+          load(); // Recargar para ver la nueva requisición
+        }}
+        workOrderId={workOrderId}
+        partInfo={requisitionPartInfo}
       />
     </div>
   );

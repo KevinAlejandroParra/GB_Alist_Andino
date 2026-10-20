@@ -32,18 +32,30 @@ class MaintenanceFailureClosureService {
      * Used por el drawer del día para seleccionar qué falla se cerró ese día.
      */
     async getActiveFailuresForDay(dateStr, insId = null) {
+        const dayStart = new Date(`${dateStr}T00:00:00`);
+        const dayEnd = new Date(`${dateStr}T23:59:59.999`);
+
         const where = {};
         if (insId) where.affected_id = insId;
 
+        // Buscamos fallas que tengan una AR resuelta en esa fecha
         const failures = await FailureOrder.findAll({
             where,
             include: [
-                { model: RepairExecution, as: 'repairExecution', required: false },
+                {
+                    model: RepairExecution,
+                    as: 'repairExecution',
+                    required: true,
+                    where: {
+                        status: RESOLVED_STATUSES,
+                        end_time: { [Op.between]: [dayStart, dayEnd] }
+                    }
+                },
                 {
                     model: Inspectable,
                     as: 'affectedInspectable',
                     required: false,
-                    attributes: ['id', 'name']
+                    attributes: ['ins_id', 'name']
                 },
                 { model: User, as: 'reporter', attributes: ['user_id', 'user_name'] }
             ],
@@ -51,19 +63,14 @@ class MaintenanceFailureClosureService {
             limit: 200
         });
 
-        const dayStart = new Date(`${dateStr}T00:00:00`);
-        const dayEnd = new Date(`${dateStr}T23:59:59.999`);
+        // Filtrar las que ya están vinculadas como cierre para ese día
+        const linkedIds = (await MaintenanceDayFailureClosure.findAll({
+            where: { closure_date: dateStr },
+            attributes: ['failure_order_id']
+        })).map(c => c.failure_order_id);
 
         return failures
-            .filter(f => {
-                const isResolved = f.repairExecution && RESOLVED_STATUSES.includes(f.repairExecution.status);
-                if (isResolved) return false; // ya resuelta → no es "activa"
-                // Activas en el día: reportadas ese día O con reparación aún abierta iniciada ese día
-                const reportedThatDay = f.createdAt && new Date(f.createdAt) >= dayStart && new Date(f.createdAt) <= dayEnd;
-                const repairOpenThatDay = f.repairExecution && f.repairExecution.createdAt &&
-                    new Date(f.repairExecution.createdAt) >= dayStart && new Date(f.repairExecution.createdAt) <= dayEnd;
-                return reportedThatDay || repairOpenThatDay;
-            })
+            .filter(f => !linkedIds.includes(f.id))
             .map(f => ({
                 id: f.id,
                 failure_order_id: f.failure_order_id,
@@ -152,7 +159,7 @@ class MaintenanceFailureClosureService {
                     model: Inspectable,
                     as: 'inspectable',
                     required: false,
-                    attributes: ['id', 'name']
+                    attributes: ['ins_id', 'name']
                 },
                 { model: User, as: 'technician', attributes: ['user_id', 'user_name'] }
             ],
