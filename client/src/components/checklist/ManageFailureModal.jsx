@@ -255,7 +255,7 @@ const ManageFailureModal = ({
             }
             onSuccess?.();
           }}
-          workOrder={createdWorkOrder || effectiveExecution}
+          workOrder={processRecord || createdWorkOrder || effectiveExecution}
           failureId={failure.id}
           onUpdate={handleProcessSuccess}
           user={user}

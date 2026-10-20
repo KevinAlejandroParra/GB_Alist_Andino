@@ -292,7 +292,8 @@ class WorkOrderService {
     );
   }
 
-  async cancelWorkOrder(workOrderId, reason, cancelledById = null) {
+  async cancelWorkOrder(workOrderId, reason, cancelledById = null, options = {}) {
+    const { keepRepairExecutionActive = false } = options;
     const transaction = await WorkOrder.sequelize.transaction();
 
     try {
@@ -335,7 +336,7 @@ class WorkOrderService {
         requiere_replacement: false
       }, { transaction });
 
-      if (workOrder.repair_execution_id) {
+      if (workOrder.repair_execution_id && !keepRepairExecutionActive) {
         const { RepairExecution } = require('../models');
         const repairExecution = await RepairExecution.findByPk(workOrder.repair_execution_id, { transaction });
         if (repairExecution) {

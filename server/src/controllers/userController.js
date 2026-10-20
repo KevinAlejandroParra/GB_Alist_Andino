@@ -781,7 +781,7 @@ class UserController {
             // Obtener técnicos (role_id = 3) y anfitriones (role_id = 4)
             const technicians = await User.findAll({
                 where: {
-                    role_id: [3, 4], // Técnicos y Anfitriones
+                    role_id: [1, 3], // Administradores y técnicos
                     user_state: 'activo'
                 },
                 attributes: ['user_id', 'user_name', 'user_email', 'role_id'],

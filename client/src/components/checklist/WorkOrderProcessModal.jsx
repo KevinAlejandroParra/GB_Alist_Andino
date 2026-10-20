@@ -394,7 +394,7 @@ export default function WorkOrderProcessModal({
                 }
                 await axiosInstance.put(
                     `${API_URL}/api/work-orders/${workOrderId}/cancel`,
-                    { reason: cancellationReason },
+                    { reason: cancellationReason, keepRepairExecutionActive: true },
                     { headers: { Authorization: `Bearer ${user.token}` } }
                 )
             }
@@ -432,7 +432,7 @@ export default function WorkOrderProcessModal({
             onUpdate && onUpdate({
                 ...workOrder,
                 requiere_replacement: newValue,
-                ...(newValue ? {} : {
+                ...(newValue || arMode ? {} : {
                     status: 'CANCELADO',
                     cancellation_reason: cancellationReason,
                     cancelled_at: new Date(),

@@ -315,7 +315,7 @@ class WorkOrderController {
     try {
       const { id } = req.params;
       const workOrderId = parseInt(id);
-      const { reason } = req.body;
+      const { reason, keepRepairExecutionActive = false } = req.body;
 
       if (isNaN(workOrderId)) {
         return res.status(400).json({
@@ -340,7 +340,8 @@ class WorkOrderController {
       const result = await WorkOrderService.cancelWorkOrder(
         workOrderId,
         reason.trim(),
-        req.user?.user_id || null
+        req.user?.user_id || null,
+        { keepRepairExecutionActive: Boolean(keepRepairExecutionActive) }
       );
 
       res.status(200).json({

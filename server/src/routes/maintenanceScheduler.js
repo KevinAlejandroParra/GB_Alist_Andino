@@ -397,7 +397,10 @@ router.get('/days/:date/report-pdf', async (req, res) => {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({ error: "Formato de fecha inválido (YYYY-MM-DD)" });
         }
-        const pdfBuffer = await MaintenanceDayReportPdfService.generateDayPdf(date);
+        const forwardedProtocol = req.get('x-forwarded-proto');
+        const protocol = forwardedProtocol || req.protocol;
+        const publicBaseUrl = `${protocol}://${req.get('host')}`;
+        const pdfBuffer = await MaintenanceDayReportPdfService.generateDayPdf(date, { publicBaseUrl });
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="informe_diario_${date}.pdf"`);
         res.send(pdfBuffer);
