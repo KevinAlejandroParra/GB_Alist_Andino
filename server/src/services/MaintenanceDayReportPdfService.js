@@ -16,7 +16,8 @@ const {
     Requisition,
     Inventory,
     Inspectable,
-    User
+    User,
+    MaintenanceSessionEvidence
 } = require('../models');
 
 const TYPE_LABELS = {
