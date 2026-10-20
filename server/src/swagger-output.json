@@ -3061,6 +3061,9 @@
               "properties": {
                 "reason": {
                   "example": "any"
+                },
+                "keepRepairExecutionActive": {
+                  "example": "any"
                 }
               }
             }

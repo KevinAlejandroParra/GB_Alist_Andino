@@ -6,7 +6,6 @@ const MaintenanceSessionPdfService = require('./MaintenanceSessionPdfService');
 const { resolveLocalEvidencePath } = require('../config/multerConfig');
 const {
     MaintenanceSession,
-    MaintenanceSessionEvidence,
     MaintenanceScheduleSlot,
     MaintenanceDayFailureClosure,
     FailureOrder,
