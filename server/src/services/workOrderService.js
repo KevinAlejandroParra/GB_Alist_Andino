@@ -330,7 +330,10 @@ class WorkOrderService {
         cancelled_by_id: cancelledById
       };
 
-      await workOrder.update(cancelPayload, { transaction });
+      await workOrder.update({
+        ...cancelPayload,
+        requiere_replacement: false
+      }, { transaction });
 
       if (workOrder.repair_execution_id) {
         const { RepairExecution } = require('../models');
