@@ -223,21 +223,21 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {loading ? (
-                <tr>
-                  <td colSpan="13" className="text-center py-12 text-gray-400">
-                    <i className="fas fa-spinner fa-spin text-2xl mb-2 block" />
-                    Cargando máquinas y configuraciones...
-                  </td>
-                </tr>
-                filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="13" className="text-center py-12 text-gray-400">
-                    No se encontraron máquinas con el filtro seleccionado.
-                  </td>
-                </tr>
-              ) : (
-                pagedConfigs.map(cfg => {
+               {loading ? (
+                 <tr>
+                   <td colSpan="13" className="text-center py-12 text-gray-400">
+                     <i className="fas fa-spinner fa-spin text-2xl mb-2 block" />
+                     Cargando máquinas y configuraciones...
+                   </td>
+                 </tr>
+               ) : filtered.length === 0 ? (
+                 <tr>
+                   <td colSpan="13" className="text-center py-12 text-gray-400">
+                     No se encontraron máquinas con el filtro seleccionado.
+                   </td>
+                 </tr>
+               ) : (
+                 pagedConfigs.map(cfg => {
                   const isSaving = savingId === cfg.ins_id;
 
                   return (
