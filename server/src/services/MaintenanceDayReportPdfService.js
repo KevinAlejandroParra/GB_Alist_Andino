@@ -17,7 +17,8 @@ const {
     Inspectable,
     User,
     MaintenanceSessionEvidence,
-    MaintenanceSessionParticipant
+    MaintenanceSessionParticipant,
+    MaintenanceMachineConfig
 } = require('../models');
 
 const TYPE_LABELS = {
@@ -85,6 +86,12 @@ class MaintenanceDayReportPdfService {
             order: [['sort_priority', 'ASC'], ['id', 'ASC']]
         });
 
+        // Fetch machine configs to identify shared maintenance
+        const machineConfigs = await MaintenanceMachineConfig.findAll({
+            attributes: ['ins_id', 'shared_enabled']
+        });
+        const sharedMap = new Map(machineConfigs.map(cfg => [cfg.ins_id, cfg.shared_enabled]));
+
         const preventives = [];
         for (const slot of slots) {
             const sessions = slot.sessions || [];
@@ -100,12 +107,14 @@ class MaintenanceDayReportPdfService {
                 .map(e => this.getEvidence(e.file_url, `Evidencia ${e.phase}${e.uploader?.user_name ? ` · ${e.uploader.user_name}` : ''}`, publicBaseUrl))
                 .filter(Boolean);
 
-            preventives.push({
-                slotId: slot.id,
-                machineName: slot.inspectable?.name || `Máquina #${slot.ins_id}`,
-                typeLabel: TYPE_LABELS[slot.slot_type] || 'Preventivo',
-                status,
-                assignedName: slot.assignedUser?.user_name || null,
+                preventives.push({
+                    slotId: slot.id,
+                    machineName: slot.inspectable?.name || `Máquina #${slot.ins_id}`,
+                    typeLabel: TYPE_LABELS[slot.slot_type] || 'Preventivo',
+                    isManualOverride: slot.is_manual_override,
+                    isShared: sharedMap.get(slot.ins_id) || false,
+                    status,
+                    assignedName: slot.assignedUser?.user_name || null,
                 technicianName: latest?.technician?.user_name || 'No iniciado',
                 participantNames: (latest?.participants || []).map(participant => participant.technician?.user_name).filter(Boolean),
                 startedAt: latest?.started_at || null,
@@ -202,12 +211,12 @@ class MaintenanceDayReportPdfService {
 
         const preventiveHtml = preventives.length ? preventives.map((p, index) => `<section class="block">
             <h3>${index + 1}. ${esc(p.machineName)} <span class="badge ${p.status.toLowerCase()}">${statusLabel(p.status)}</span></h3>
-            <table>
-              <tr><th>Tipo / slot</th><td>${esc(p.typeLabel)} · #${p.slotId}</td></tr>
-              <tr><th>Técnico programado</th><td>${esc(p.assignedName || 'No asignado')}</td></tr>
-              <tr><th>Técnico ejecutor</th><td>${esc(p.technicianName)}</td></tr>
-              <tr><th>Participantes</th><td>${esc(p.participantNames.join(', ') || p.technicianName)}</td></tr>
-              <tr><th>Sesión</th><td>${p.sessionId ? `#${p.sessionId}` : 'No se escaneó el QR ni se inició sesión.'}</td></tr>
+             <table>
+                <tr><th>Tipo / slot</th><td>${esc(p.typeLabel)}${p.isManualOverride ? ' (Manual/Especial)' : ''}${p.isShared ? ' (Compartido)' : ''} · #${p.slotId}</td></tr>
+               <tr><th>Técnico programado</th><td>${esc(p.assignedName || 'No asignado')}</td></tr>
+               ${!p.isShared ? `<tr><th>Técnico ejecutor</th><td>${esc(p.technicianName)}</td></tr>` : ''}
+               <tr><th>Participantes</th><td>${esc(p.participantNames.join(', ') || p.technicianName)}</td></tr>
+               <tr><th>Sesión</th><td>${p.sessionId ? `#${p.sessionId}` : 'No se escaneó el QR ni se inició sesión.'}</td></tr>
               <tr><th>Inicio / fin</th><td>${fmtTime(p.startedAt)} → ${fmtTime(p.completedAt)}${p.durationMinutes ? ` (${p.durationMinutes} min)` : ''}</td></tr>
               ${p.workOrder ? `<tr><th>OT asociada</th><td>${esc(p.workOrder.work_order_id)} (${esc(p.workOrder.status)})</td></tr>` : ''}
               <tr><th>Descripción</th><td>${esc(p.description || 'Sin descripción registrada.')}</td></tr>

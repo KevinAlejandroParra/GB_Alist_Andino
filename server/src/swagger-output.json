@@ -7812,9 +7812,6 @@
           },
           "403": {
             "description": "Forbidden"
-          },
-          "500": {
-            "description": "Internal Server Error"
           }
         }
       }
@@ -7918,6 +7915,9 @@
               "properties": {
                 "phase": {
                   "example": "any"
+                },
+                "sessionId": {
+                  "example": "any"
                 }
               }
             }
@@ -8006,6 +8006,9 @@
               "properties": {
                 "description": {
                   "example": "any"
+                },
+                "sessionId": {
+                  "example": "any"
                 }
               }
             }
@@ -8083,6 +8086,9 @@
                 },
                 "quantity": {
                   "example": "any"
+                },
+                "sessionId": {
+                  "example": "any"
                 }
               }
             }
@@ -8124,6 +8130,18 @@
             "name": "authorization",
             "in": "header",
             "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "example": "any"
+                }
+              }
+            }
           }
         ],
         "responses": {
@@ -8232,6 +8250,9 @@
                   "example": "any"
                 },
                 "notes": {
+                  "example": "any"
+                },
+                "sessionId": {
                   "example": "any"
                 }
               }
