@@ -128,8 +128,8 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
   return (
     <div className="space-y-6">
       {/* Search and Filters Header */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex-1 min-w-[280px]">
+      <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-200 flex flex-col md:flex-row md:flex-wrap md:items-center justify-between gap-4">
+        <div className="flex-1 w-full md:min-w-[280px]">
           <div className="relative">
             <i className="fas fa-search absolute left-3.5 top-3 text-gray-400" />
             <input
@@ -143,7 +143,7 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
         </div>
 
         {/* Tab Filters */}
-        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold max-w-full overflow-x-auto">
           {[
             { id: 'ALL', label: `Todas (${configs.length})` },
             { id: 'WEEKLY', label: `Semanales (${configs.filter(c => c.weekly_enabled).length})` },
@@ -155,7 +155,7 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
             <button
               key={tab.id}
               onClick={() => setFilterType(tab.id)}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
+              className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
                 filterType === tab.id
                   ? 'bg-white text-blue-700 shadow-xs'
                   : 'text-gray-600 hover:text-gray-900'
