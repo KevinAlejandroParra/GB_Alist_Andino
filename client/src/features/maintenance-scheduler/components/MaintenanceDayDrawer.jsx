@@ -262,16 +262,16 @@ export default function MaintenanceDayDrawer({
                       </div>
                     </div>
 
-                    {/* Session metadata if started */}
-                    {slot.latest_session && (
-                      <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600 space-y-1">
-                        {slot.latest_session.technician && (
-                          <p>
-                            <i className="fas fa-user-cog mr-1 text-gray-400" />
-                            Técnico: <span className="font-semibold">{slot.latest_session.technician.user_name || slot.latest_session.technician.name || slot.latest_session.technician.username}</span>
-                          </p>
-                        )}
-                        {slot.latest_session.duration_minutes && (
+                     {/* Session metadata if started */}
+                     {slot.latest_session && (
+                       <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600 space-y-1">
+                         {!slot.shared_enabled && slot.latest_session.technician && (
+                           <p>
+                             <i className="fas fa-user-cog mr-1 text-gray-400" />
+                             Técnico: <span className="font-semibold">{slot.latest_session.technician.user_name || slot.latest_session.technician.name || slot.latest_session.technician.username}</span>
+                           </p>
+                         )}
+                         {slot.latest_session.duration_minutes && (
                           <p>
                             <i className="fas fa-stopwatch mr-1 text-gray-400" />
                             Duración: <span className="font-semibold">{slot.latest_session.duration_minutes} min</span>

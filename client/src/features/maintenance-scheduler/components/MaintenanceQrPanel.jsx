@@ -61,29 +61,53 @@ export default function MaintenanceQrPanel({ premiseId = 1 }) {
     }
   };
 
-  const handlePrintBadge = (item) => {
+  const handlePrintAll = () => {
     const win = window.open('', '_blank');
+    const qrs = machines.filter(m => m.dataUrl);
+    
     win.document.write(`
       <html>
         <head>
-          <title>QR Mantenimiento - ${item.name}</title>
+          <title>QRs Mantenimiento - Todos</title>
           <style>
-            body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-            .badge { border: 3px solid #1e293b; border-radius: 16px; padding: 24px; text-align: center; width: 320px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-            h2 { margin: 0 0 4px 0; font-size: 20px; color: #1e293b; }
-            p { margin: 0 0 16px 0; font-size: 13px; color: #64748b; font-weight: bold; }
-            img { width: 220px; height: 220px; margin-bottom: 12px; }
-            .code { font-family: monospace; font-size: 14px; font-weight: bold; color: #0f172a; background: #f1f5f9; padding: 4px 8px; border-radius: 6px; display: inline-block; }
-            .footer { margin-top: 12px; font-size: 11px; color: #94a3b8; }
+            @page { margin: 5mm; }
+            body { font-family: sans-serif; margin: 0; padding: 0; }
+            .grid { 
+              display: grid; 
+              grid-template-columns: repeat(3, 1fr); 
+              gap: 10px; 
+              padding: 5mm;
+            }
+            .badge { 
+              border: 2px solid #1e293b; 
+              border-radius: 12px; 
+              padding: 15px; 
+              text-align: center; 
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              page-break-inside: avoid;
+            }
+            h2 { margin: 0 0 2px 0; font-size: 14px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+            p { margin: 0 0 8px 0; font-size: 11px; color: #64748b; font-weight: bold; }
+            img { width: 150px; height: 150px; }
+            .code { font-family: monospace; font-size: 12px; font-weight: bold; color: #0f172a; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 8px; }
+            .footer { margin-top: 8px; font-size: 9px; color: #94a3b8; }
           </style>
         </head>
         <body>
-          <div class="badge">
-            <h2>${item.name}</h2>
-            <p>${item.family}</p>
-            <img src="${item.dataUrl}" alt="QR" />
-            <div><span class="code">${item.qr_code}</span></div>
-            <div class="footer">Alist Andino • Mantenimiento Preventivo</div>
+          <div class="grid">
+            ${qrs.map(item => `
+              <div class="badge">
+                <h2>${item.name}</h2>
+                <p>${item.family}</p>
+                <img src="${item.dataUrl}" alt="QR" />
+                <div class="code">${item.qr_code}</div>
+                <div class="footer">Alist Andino • Mantenimiento</div>
+              </div>
+            `).join('')}
           </div>
           <script>
             window.onload = function() { window.print(); }
@@ -108,6 +132,13 @@ export default function MaintenanceQrPanel({ premiseId = 1 }) {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handlePrintAll}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all"
+          >
+            <i className="fas fa-file-pdf" /> Descargar Todos PDF
+          </button>
           <button
             type="button"
             onClick={handleGenerateAll}
