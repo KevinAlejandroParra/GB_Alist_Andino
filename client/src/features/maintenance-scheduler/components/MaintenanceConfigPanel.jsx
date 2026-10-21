@@ -11,6 +11,8 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
   const [filterType, setFilterType] = useState('ALL'); // ALL, WEEKLY, BIWEEKLY, QUARTERLY, SCHEDULED, EXEMPT
   const [savingId, setSavingId] = useState(null);
   const [technicians, setTechnicians] = useState([]);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const fetchConfigs = async () => {
     setLoading(true);
@@ -125,6 +127,10 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
     return true;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedConfigs = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   return (
     <div className="space-y-6">
       {/* Search and Filters Header */}
@@ -178,11 +184,30 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
 
       {/* Machines Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Controles de paginación (arriba, siempre visibles) */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between gap-2 px-5 py-3 border-b border-gray-200 bg-white flex-wrap">
+            <span className="text-xs text-gray-500">
+              {filtered.length} máquina{filtered.length !== 1 ? 's' : ''} · Página {safePage} de {totalPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => setPage(1)} disabled={safePage === 1}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+              <button type="button" onClick={() => setPage(safePage - 1)} disabled={safePage === 1}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Anterior</button>
+              <button type="button" onClick={() => setPage(safePage + 1)} disabled={safePage === totalPages}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Siguiente</button>
+              <button type="button" onClick={() => setPage(totalPages)} disabled={safePage === totalPages}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+            </div>
+          </div>
+        )}
+        {/* Contenedor con altura máxima: mantiene la barra horizontal siempre visible sin bajar al final de la tabla */}
+        <div className="overflow-auto max-h-[70vh]">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-600">
+            <thead className="bg-slate-50 border-b border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-600 sticky top-0 z-20">
               <tr>
-                <th className="px-5 py-4">Máquina</th>
+                <th className="px-5 py-4 sticky left-0 bg-slate-50 z-30">Máquina</th>
                 <th className="px-5 py-4 text-center">Preventivo Semanal</th>
                 <th className="px-5 py-4">Día Fijo Semanal</th>
                 <th className="px-5 py-4 text-center">Preventivo Quincenal</th>
@@ -205,20 +230,20 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
                     Cargando máquinas y configuraciones...
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+                filtered.length === 0 ? (
                 <tr>
                   <td colSpan="13" className="text-center py-12 text-gray-400">
                     No se encontraron máquinas con el filtro seleccionado.
                   </td>
                 </tr>
               ) : (
-                filtered.map(cfg => {
+                pagedConfigs.map(cfg => {
                   const isSaving = savingId === cfg.ins_id;
 
                   return (
                     <tr key={cfg.ins_id} className="hover:bg-slate-50/70 transition-colors">
                       {/* Name & Family */}
-                      <td className="px-5 py-4 font-medium text-gray-900">
+                      <td className="px-5 py-4 font-medium text-gray-900 sticky left-0 bg-white">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
                             #{cfg.ins_id}
@@ -480,6 +505,22 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
             </tbody>
           </table>
         </div>
+        {/* Paginación inferior */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50 flex-wrap">
+            <span className="text-xs text-gray-500">Página {safePage} de {totalPages}</span>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => setPage(1)} disabled={safePage === 1}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+              <button type="button" onClick={() => setPage(safePage - 1)} disabled={safePage === 1}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">Anterior</button>
+              <button type="button" onClick={() => setPage(safePage + 1)} disabled={safePage === totalPages}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">Siguiente</button>
+              <button type="button" onClick={() => setPage(totalPages)} disabled={safePage === totalPages}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

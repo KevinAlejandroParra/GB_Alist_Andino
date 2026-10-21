@@ -46,10 +46,14 @@ const deviceController = {
             const { family_id, name, description, premise_id, public_flag, arrival_date, brand } = req.body; 
             const photo_url = req.file ? toRelativePath(req.file.path) : req.body.photo_url;
 
+            // family_id es opcional: si viene vacío el dispositivo queda "Sin familia" (NULL en BD)
+            const normalizedFamilyId = family_id ? Number(family_id) : null;
 
-            const family = await Family.findByPk(family_id);
-            if (!family) {
-                return res.status(400).json({ message: "La familia especificada no existe." });
+            if (normalizedFamilyId) {
+                const family = await Family.findByPk(normalizedFamilyId);
+                if (!family) {
+                    return res.status(400).json({ message: "La familia especificada no existe." });
+                }
             }
 
             // Crear primero el Inspectable
@@ -58,13 +62,13 @@ const deviceController = {
                 description,
                 type_code: 'device',
                 premise_id,
-                photo_url, 
+                photo_url,
             });
 
-            // Crear el Device, vinculándolo al Inspectable y a la Family
+            // Crear el Device, vinculándolo al Inspectable y a la Family (family_id opcional)
             const newDevice = await Device.create({
                 ins_id: inspectable.ins_id,
-                family_id,
+                family_id: normalizedFamilyId,
                 public_flag,
                 arrival_date,
                 brand,
@@ -81,7 +85,7 @@ const deviceController = {
     async updateDevice(req, res) {
         try {
             const deviceId = req.params.id;
-            const { family_id, name, description, premise_id, public_flag, arrival_date, brand } = req.body; 
+            const { family_id, name, description, premise_id, public_flag, arrival_date, brand } = req.body;
             let photo_url = req.body.photo_url; // photo_url puede venir del body si es una URL directa
             if (req.file) {
                 photo_url = toRelativePath(req.file.path);
@@ -93,8 +97,9 @@ const deviceController = {
             }
 
             // Validar que la familia exista si se proporciona
-            if (family_id) {
-                const family = await Family.findByPk(family_id);
+            const normalizedFamilyId = family_id ? Number(family_id) : null;
+            if (normalizedFamilyId) {
+                const family = await Family.findByPk(normalizedFamilyId);
                 if (!family) {
                     return res.status(400).json({ message: "La familia especificada no existe." });
                 }
@@ -102,13 +107,13 @@ const deviceController = {
 
             // Actualizar el Inspectable asociado
             await Inspectable.update(
-                { name, description, premise_id, type_code: 'device', photo_url }, 
+                { name, description, premise_id, type_code: 'device', photo_url },
                 { where: { ins_id: device.ins_id } }
             );
 
-            // Actualizar el Device
+            // Actualizar el Device (family_id opcional: null = Sin familia)
             const [updated] = await Device.update(
-                { family_id, public_flag, arrival_date, brand },
+                { family_id: normalizedFamilyId, public_flag, arrival_date, brand },
                 { where: { ins_id: deviceId } }
             );
 

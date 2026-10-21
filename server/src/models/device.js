@@ -27,7 +27,7 @@ module.exports = (sequelize, DataTypes) => {
             },
             family_id: {
                 type: DataTypes.INTEGER,
-                allowNull: false,
+                allowNull: true, // "Sin familia" = NULL
             },
             public_flag: {
                 type: DataTypes.STRING,

@@ -49,6 +49,7 @@ const DeviceManagement = () => {
     };
 
     const getFamilyName = (family_id) => {
+        if (!family_id) return 'Sin familia';
         const family = families.find((fam) => fam.family_id === family_id);
         return family ? family.family_name : 'Desconocida';
     };
@@ -99,9 +100,9 @@ const DeviceManagement = () => {
             name: device.parentInspectable?.name || '',
             description: device.parentInspectable?.description || '',
             premise_id: device.parentInspectable?.premise_id || '',
-            photo_url: device.parentInspectable?.photo_url ? `${API_BASE_URL}${device.parentInspectable.photo_url}` : '', 
+            photo_url: device.parentInspectable?.photo_url ? `${API_BASE_URL}${device.parentInspectable.photo_url}` : '',
         });
-        setEditingDevicePhoto(null); 
+        setEditingDevicePhoto(null);
     };
 
     const handleUpdateDevice = async (e) => {
@@ -110,7 +111,7 @@ const DeviceManagement = () => {
             const formData = new FormData();
             for (const key in editingDevice) {
                 if (key === 'photo_url' || key === 'family' || key === 'parentInspectable') {
-                    continue; 
+                    continue;
                 }
                 formData.append(key, editingDevice[key]);
             }
@@ -120,11 +121,11 @@ const DeviceManagement = () => {
                     'Content-Type': 'multipart/form-data',
                 },
             });
-            
+
             // Actualizar la lista local con los nuevos datos
             const updatedDevice = response.data.device;
             setDevices(devices.map((dev) => (dev.ins_id === editingDevice.ins_id ? updatedDevice : dev)));
-            
+
             setEditingDevice(null);
             setEditingDevicePhoto(null);
             setError(null);
@@ -189,9 +190,8 @@ const DeviceManagement = () => {
                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                             value={newDevice.family_id}
                             onChange={(e) => setNewDevice({ ...newDevice, family_id: e.target.value })}
-                            required
                         >
-                            <option value="">Selecciona una familia</option>
+                            <option value="">Sin familia</option>
                             {families.map((family) => (
                                 <option key={family.family_id} value={family.family_id}>
                                     {family.family_name}
@@ -343,9 +343,8 @@ const DeviceManagement = () => {
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                     value={editingDevice.family_id || ''}
                                     onChange={(e) => setEditingDevice({ ...editingDevice, family_id: e.target.value })}
-                                    required
                                 >
-                                    <option value="">Selecciona una familia</option>
+                                    <option value="">Sin familia</option>
                                     {families.map((family) => (
                                         <option key={family.family_id} value={family.family_id}>
                                             {family.family_name}

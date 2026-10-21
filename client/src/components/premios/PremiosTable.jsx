@@ -49,9 +49,16 @@ const DetailRow = ({ section, machineName }) => {
   )
 }
 
+const PAGE_SIZE = 10
+
 export default function PremiosTable({ rows, rollup, checklistTypeId, onViewSignature, isAdmin }) {
   const [expanded, setExpanded] = useState(null)
+  const [page, setPage] = useState(1)
   const toggle = (key) => setExpanded((prev) => (prev === key ? null : key))
+
+  const totalPages = Math.max(1, Math.ceil(rollup.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pagedRollup = rollup.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   if (rollup.length === 0) {
     return (
@@ -65,11 +72,49 @@ export default function PremiosTable({ rows, rollup, checklistTypeId, onViewSign
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-800">Registro semanal por máquina</h3>
-        <span className="text-xs text-gray-500">{rollup.length} fila{rollup.length !== 1 ? 's' : ''}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-500">{rollup.length} fila{rollup.length !== 1 ? 's' : ''}</span>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(1)}
+                disabled={safePage === 1}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                «
+              </button>
+              <button
+                onClick={() => setPage(safePage - 1)}
+                disabled={safePage === 1}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              <span className="px-2 py-1 text-xs text-gray-600">
+                Página {safePage} de {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(safePage + 1)}
+                disabled={safePage === totalPages}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Siguiente
+              </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={safePage === totalPages}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                »
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="overflow-x-auto">
+      {/* Contenedor con altura máxima: mantiene la barra horizontal visible sin bajar al final de la tabla */}
+      <div className="overflow-auto max-h-[65vh]">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 sticky top-0 z-10 shadow-[0_1px_0_0_#e5e7eb]">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Semana</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
@@ -84,7 +129,7 @@ export default function PremiosTable({ rows, rollup, checklistTypeId, onViewSign
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {rollup.map((r) => {
+            {pagedRollup.map((r) => {
               const key = `${r.week_identifier}|${r.inspectable_id}`
               const isOpen = expanded === key
               const reviewed = r.revisado || r.reviewer_name != null

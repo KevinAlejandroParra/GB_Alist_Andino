@@ -9,6 +9,8 @@ export default function PremiosHistoryTable({ tableData }) {
   const [groupByDate, setGroupByDate] = useState(true)
   const [sortBy, setSortBy] = useState('fecha')
   const [sortOrder, setSortOrder] = useState('desc')
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 10
 
   if (!tableData || tableData.length === 0) {
     return (
@@ -81,9 +83,57 @@ export default function PremiosHistoryTable({ tableData }) {
     return sorted
   }, [tableData, selectedMachine, selectedMonth, sortBy, sortOrder])
 
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedData.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pagedData = useMemo(
+    () => filteredAndSortedData.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filteredAndSortedData, safePage]
+  )
+
+  const PaginationControls = ({ totalItems }) => {
+    if (totalPages <= 1) return null
+    return (
+      <div className="flex items-center justify-between gap-2 px-4 py-2 bg-gray-50 border-t border-gray-200 flex-wrap">
+        <span className="text-xs text-gray-500">
+          {totalItems} registro{totalItems !== 1 ? 's' : ''} · Página {safePage} de {totalPages}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setPage(1)}
+            disabled={safePage === 1}
+            className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            «
+          </button>
+          <button
+            onClick={() => setPage(safePage - 1)}
+            disabled={safePage === 1}
+            className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Anterior
+          </button>
+          <button
+            onClick={() => setPage(safePage + 1)}
+            disabled={safePage === totalPages}
+            className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Siguiente
+          </button>
+          <button
+            onClick={() => setPage(totalPages)}
+            disabled={safePage === totalPages}
+            className="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-600 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            »
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // Agrupar por fecha si está activado
   const groupedData = useMemo(() => {
-    if (!groupByDate) return { all: filteredAndSortedData }
+    if (!groupByDate) return { all: pagedData }
 
     return filteredAndSortedData.reduce((groups, row) => {
       const dateKey = formatLocalDate(row.fecha)
@@ -314,7 +364,7 @@ export default function PremiosHistoryTable({ tableData }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[65vh]">
         {groupByDate ? (
           // Vista agrupada por fecha
           Object.entries(groupedData).map(([date, rows]) => (
@@ -415,7 +465,7 @@ export default function PremiosHistoryTable({ tableData }) {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredAndSortedData.map((row, index) => (
+              {pagedData.map((row, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {formatLocalDate(row.fecha)}
@@ -450,6 +500,7 @@ export default function PremiosHistoryTable({ tableData }) {
             </tbody>
           </table>
         )}
+        <PaginationControls totalItems={filteredAndSortedData.length} />
       </div>
 
       {filteredAndSortedData.length === 0 && (
