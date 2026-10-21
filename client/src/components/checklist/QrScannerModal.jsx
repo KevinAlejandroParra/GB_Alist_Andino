@@ -77,9 +77,9 @@ export default function QrScannerModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-auto">
-         <div className="flex justify-between items-center p-5 border-b">
-           <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
+       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-auto max-h-[90vh] flex flex-col overflow-hidden">
+         <div className="flex justify-between items-center p-4 sm:p-5 border-b">
+           <h3 className="text-lg sm:text-xl font-semibold text-gray-800">{title}</h3>
            {onClose && (
              <button
                onClick={onClose}
@@ -90,7 +90,7 @@ export default function QrScannerModal({
              </button>
            )}
          </div>
-         <div className="p-6">
+         <div className="p-4 sm:p-6 overflow-y-auto">
            <div id="qr-reader" className="w-full"></div>
            <div className="mt-4 space-y-2">
              <p className="text-center text-sm text-gray-600">

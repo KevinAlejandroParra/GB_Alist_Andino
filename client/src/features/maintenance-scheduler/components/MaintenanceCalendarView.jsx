@@ -197,7 +197,7 @@ export default function MaintenanceCalendarView({
       {/* Monthly Grid */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         {/* Days of week header */}
-        <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200 text-center font-bold text-xs uppercase text-gray-600 py-3">
+        <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200 text-center font-bold text-[9px] sm:text-xs uppercase text-gray-600 py-2 sm:py-3">
           {weekDayNames.map((d, idx) => (
             <div key={idx} className={idx === 0 || idx === 6 ? 'text-gray-400' : 'text-gray-700'}>
               {d}
@@ -206,10 +206,10 @@ export default function MaintenanceCalendarView({
         </div>
 
         {/* Days grid */}
-        <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-gray-200 bg-gray-100">
+        <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-gray-200 bg-gray-100 overflow-x-hidden">
           {/* Empty days before month start */}
           {Array.from({ length: firstDayWeekday }).map((_, i) => (
-            <div key={`empty-${i}`} className="bg-gray-50/50 min-h-[110px] p-2 opacity-50" />
+            <div key={`empty-${i}`} className="bg-gray-50/50 min-h-[56px] sm:min-h-[110px] p-0.5 sm:p-2 opacity-50" />
           ))}
 
           {/* Actual days of month */}
@@ -224,13 +224,13 @@ export default function MaintenanceCalendarView({
               <div
                 key={dateStr}
                 onClick={() => onSelectDay({ dateStr, dayNum, slots: daySlots, dayStatus })}
-                className={`bg-white min-h-[120px] p-2 hover:bg-blue-50/40 transition-colors flex flex-col justify-between cursor-pointer group ${
+                className={`bg-white min-h-[64px] sm:min-h-[120px] p-1 sm:p-2 hover:bg-blue-50/40 transition-colors flex flex-col justify-between cursor-pointer group ${
                   isWeekend ? 'bg-slate-50/60' : ''
                 }`}
               >
                 {/* Day Header */}
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
+                  <span className="text-[11px] sm:text-sm font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
                     {dayNum}
                   </span>
 
@@ -245,7 +245,7 @@ export default function MaintenanceCalendarView({
                 </div>
 
                 {/* Day Slots List */}
-                <div className="flex-1 space-y-1 overflow-y-auto max-h-[140px] pr-0.5">
+                <div className="flex-1 space-y-1 overflow-y-auto max-h-[36px] sm:max-h-[140px] pr-0.5">
                   {daySlots.map(slot => (
                     <div
                       key={slot.id}
@@ -278,15 +278,15 @@ export default function MaintenanceCalendarView({
                   ))}
 
                   {daySlots.length === 0 && !isWeekend && (
-                    <p className="text-[11px] text-gray-300 italic pt-2 text-center">Sin actividad</p>
+                    <p className="text-[11px] text-gray-300 italic pt-2 text-center hidden sm:block">Sin actividad</p>
                   )}
                 </div>
 
                 {/* Slot counter indicator */}
                 {daySlots.length > 0 && (
-                  <div className="pt-1 mt-1 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-500">
-                    <span>{daySlots.length} {daySlots.length === 1 ? 'máquina' : 'máquinas'}</span>
-                    <span className="text-blue-600 font-semibold group-hover:underline">Ver día →</span>
+                  <div className="pt-1 mt-1 border-t border-gray-100 flex items-center justify-between text-[9px] sm:text-[10px] text-gray-500">
+                    <span>{daySlots.length} {daySlots.length === 1 ? 'máq.' : 'máq.'}</span>
+                    <span className="text-blue-600 font-semibold group-hover:underline hidden sm:inline">Ver día →</span>
                   </div>
                 )}
               </div>

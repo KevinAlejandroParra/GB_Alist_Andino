@@ -210,8 +210,8 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="p-6 border-b border-gray-100 bg-slate-50 flex items-center justify-between">
-          <div>
+        <div className="p-4 sm:p-6 border-b border-gray-100 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
                 slot.slot_type === 'WEEKLY' ? 'bg-purple-100 text-purple-700' : slot.slot_type === 'BIWEEKLY' ? 'bg-cyan-100 text-cyan-700' : slot.slot_type === 'QUARTERLY' ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'
@@ -224,7 +224,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                 </span>
               )}
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mt-1">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mt-1 truncate">
               {slot.inspectable?.name || `Máquina #${slot.ins_id}`}
             </h3>
             <p className="text-xs text-gray-500">
@@ -243,7 +243,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
 
         {/* Stepper Progress */}
         {!isCompleted && (
-          <div className="px-6 py-3 bg-white border-b border-gray-100 flex items-center justify-between text-xs font-semibold">
+          <div className="px-3 sm:px-6 py-3 bg-white border-b border-gray-100 flex items-center gap-2 overflow-x-auto text-[10px] sm:text-xs font-semibold whitespace-nowrap">
             {stepLabels.map((label, idx) => (
               <div key={idx} className="flex items-center gap-2">
                 <span
@@ -267,7 +267,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
         )}
 
         {/* Body Content */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6">
           {/* STEP 0: QR VALIDATION */}
           {step === 0 && !isCompleted && (
             <div className="space-y-6 text-center py-4">
@@ -323,7 +323,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                   <div className="flex-1 h-px bg-gray-200" />
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
                     placeholder="Ej. MAINT-12-AB34CD"
@@ -347,7 +347,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
           {/* STEP 1: 4 MANDATORY EVIDENCES */}
           {step === 1 && !isCompleted && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h4 className="text-base font-bold text-gray-900">4 Evidencias Obligatorias (Foto o Video)</h4>
                   <p className="text-xs text-gray-500">
@@ -457,7 +457,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                 <SessionPartsManager sessionId={sessionId} onChange={setWoInfo} />
               </div>
 
-              <div className="pt-4 flex justify-between">
+              <div className="pt-4 flex flex-col-reverse sm:flex-row sm:justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => setStep(0)}
@@ -495,7 +495,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
                 className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl text-sm focus:ring-indigo-500 focus:border-indigo-500"
               />
 
-              <div className="pt-4 flex justify-between">
+              <div className="pt-4 flex flex-col-reverse sm:flex-row sm:justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
@@ -601,7 +601,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
 
               {/* Final Actions */}
               {!isCompleted ? (
-                <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                <div className="pt-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => setStep(2)}

@@ -38,8 +38,8 @@ export default function MaintenanceSchedulerPage() {
         {/* Top Navbar Header */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-3 sm:py-0 sm:h-16">
+              <div className="flex items-center gap-3 min-w-0">
                 <button
                   type="button"
                   onClick={() => router.push('/dashboard')}
@@ -49,7 +49,7 @@ export default function MaintenanceSchedulerPage() {
                   <i className="fas fa-arrow-left text-lg" />
                 </button>
                 <div>
-                  <h1 className="text-lg font-bold text-slate-900 leading-tight">
+                  <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight truncate">
                     Cronograma de Mantenimiento Preventivo
                   </h1>
                   <p className="text-xs text-slate-500">
@@ -59,12 +59,12 @@ export default function MaintenanceSchedulerPage() {
               </div>
 
               {/* Navigation Tabs */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl max-w-full overflow-x-auto">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
                       activeTab === tab.id
                         ? 'bg-white text-indigo-700 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'

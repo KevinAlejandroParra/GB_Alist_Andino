@@ -150,12 +150,12 @@ export default function MaintenanceDayDrawer({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex justify-end z-50 transition-all">
-      <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+      <div className="bg-white w-full max-w-lg h-full max-h-full sm:max-h-screen shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
         {/* Header */}
-        <div className="p-5 border-b border-gray-200 flex items-center justify-between bg-slate-50">
+        <div className="p-4 sm:p-5 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50">
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold text-gray-900">Día {dayNum}</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900">Día {dayNum}</h3>
               <span className="text-xs text-gray-500 font-mono">({dateStr})</span>
             </div>
             <div className="mt-2">{getStatusBadge(dayStatus)}</div>
@@ -168,7 +168,7 @@ export default function MaintenanceDayDrawer({
               disabled={downloadingPdf}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-black disabled:bg-gray-300 text-white transition-colors"
               title="Descargar informe consolidado del día (preventivos, tiempos, fallas cerradas y repuestos)"
-            >
+              >
               <i className={`fas ${downloadingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} />
               {downloadingPdf ? 'Generando…' : 'Informe del Día (PDF)'}
             </button>
@@ -184,7 +184,7 @@ export default function MaintenanceDayDrawer({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider">
               Máquinas Planificadas ({slots.length})
