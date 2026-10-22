@@ -1414,6 +1414,127 @@ class FailureController {
   }
 
   /**
+   * Desenlazar una falla de su Acta de Reparación (AR) enlazada
+   * DELETE /api/failures/:id/unlink-repair-execution
+   * Elimina la AR espejo (AR-SYNC-*) y actualiza las referencias de sincronización.
+   * La falla vuelve a quedar como PENDIENTE en el libro de fallas.
+   */
+  async unlinkFromRepairExecution(req, res) {
+    try {
+      const { id } = req.params;
+      const failureOrderId = parseInt(id);
+
+      console.log('🔓 [UNLINK REPAIR EXECUTION] Iniciando desenlace de AR');
+      console.log('🔓 Failure ID:', failureOrderId);
+
+      if (isNaN(failureOrderId)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_FAILURE_ID', message: 'ID de falla inválido' }
+        });
+      }
+
+      const { FailureOrder, RepairExecution, WorkOrder, WorkOrderPart } = require('../models');
+
+      // Verificar que la falla existe y TIENE una AR
+      const failureOrder = await FailureOrder.findByPk(failureOrderId, {
+        include: [{ model: RepairExecution, as: 'repairExecution' }]
+      });
+
+      if (!failureOrder) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'FAILURE_NOT_FOUND', message: 'Falla no encontrada' }
+        });
+      }
+
+      const repairExecution = failureOrder.repairExecution;
+
+      if (!repairExecution) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'NO_REPAIR_EXECUTION', message: 'Esta falla no tiene un Acta de Reparación asociada' }
+        });
+      }
+
+      // Solo se pueden desenlazar ARs "espejo" creadas por sincronización (AR-SYNC-*)
+      const isLinkedRepairExecution = repairExecution.repair_execution_id.startsWith('AR-SYNC-');
+
+      if (!isLinkedRepairExecution) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'CANNOT_UNLINK_ORIGINAL_AR',
+            message: 'No se puede desenlazar el Acta de Reparación original. Solo se pueden desenlazar ARs sincronizadas (espejo).'
+          }
+        });
+      }
+
+      // Obtener los IDs de fallas enlazadas de la AR espejo
+      let linkedFailureIds = [];
+      if (repairExecution.linked_failure_ids) {
+        try {
+          linkedFailureIds = JSON.parse(repairExecution.linked_failure_ids);
+        } catch (e) {
+          linkedFailureIds = [];
+        }
+      }
+
+      console.log('🔓 IDs enlazados antes de desenlazar AR:', linkedFailureIds);
+
+      // Remover esta falla de la lista de enlaces
+      const updatedLinkedIds = linkedFailureIds.filter(fid => fid !== failureOrderId);
+
+      // Actualizar las otras ARs enlazadas (incluida la fuente) con la nueva lista
+      if (updatedLinkedIds.length > 0) {
+        await RepairExecution.update(
+          { linked_failure_ids: JSON.stringify(updatedLinkedIds) },
+          { where: { failure_order_id: updatedLinkedIds } }
+        );
+        console.log(`✅ ARs de ${updatedLinkedIds.length} fallas actualizadas con nueva lista de enlaces`);
+      }
+
+      // Si la AR espejo tiene una OT espejo asociada, eliminarla junto con sus repuestos
+      const linkedWorkOrder = await WorkOrder.findOne({
+        where: { repair_execution_id: repairExecution.id }
+      });
+      if (linkedWorkOrder) {
+        await WorkOrderPart.destroy({ where: { work_order_id: linkedWorkOrder.id } });
+        await linkedWorkOrder.destroy();
+        console.log('✅ OT espejo asociada a la AR eliminada:', linkedWorkOrder.work_order_id);
+      }
+
+      // Eliminar la AR espejo
+      await repairExecution.destroy();
+
+      console.log('✅ AR espejo eliminada:', repairExecution.repair_execution_id);
+
+      res.status(200).json({
+        success: true,
+        message: 'Falla desenlazada del Acta de Reparación exitosamente',
+        data: {
+          failureOrderId,
+          deletedRepairExecutionId: repairExecution.repair_execution_id,
+          remainingLinkedFailures: updatedLinkedIds.length,
+          note: 'La falla volvió a estado pendiente y ya no se sincroniza con otras fallas'
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error en unlinkFromRepairExecution:', error);
+      console.error('❌ Stack:', error.stack);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'UNLINK_REPAIR_EXECUTION_ERROR',
+          message: error.message,
+          details: error.stack
+        }
+      });
+    }
+  }
+
+  /**
    * Enlazar una falla a una WorkOrder existente (para resolver duplicados)
    * POST /api/failures/:id/link-work-order
    * Body: { work_order_id: "OT-2026-444594" } (string, no número)

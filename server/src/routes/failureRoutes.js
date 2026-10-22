@@ -104,6 +104,9 @@ router.post('/:id/link-work-order', (req, res) => FailureController.linkToWorkOr
 // DELETE /api/failures/:id/unlink-work-order - Desenlazar falla de OT enlazada
 router.delete('/:id/unlink-work-order', (req, res) => FailureController.unlinkFromWorkOrder(req, res));
 
+// DELETE /api/failures/:id/unlink-repair-execution - Desenlazar falla de AR enlazada
+router.delete('/:id/unlink-repair-execution', (req, res) => FailureController.unlinkFromRepairExecution(req, res));
+
 // PUT /api/failures/:id/increment-recurrence - Incrementar contador de recurrencia
 router.put('/:id/increment-recurrence', (req, res) => FailureController.incrementRecurrence(req, res));
 

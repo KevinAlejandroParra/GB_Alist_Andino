@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import axiosInstance from '../../utils/axiosConfig';
 import Swal from 'sweetalert2';
 
-const LinkedFailuresSection = ({ failureId, currentFailureOrderId, onUnlink }) => {
+const LinkedFailuresSection = ({ failureId, currentFailureOrderId, repairExecution, onUnlink }) => {
   const [linkedFailures, setLinkedFailures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -89,7 +89,7 @@ const LinkedFailuresSection = ({ failureId, currentFailureOrderId, onUnlink }) =
       }
     } catch (error) {
       console.error('Error desenlazando falla:', error);
-      
+
       let errorMessage = 'No se pudo desenlazar la falla';
       if (error.response?.data?.error?.message) {
         errorMessage = error.response.data.error.message;
@@ -100,6 +100,67 @@ const LinkedFailuresSection = ({ failureId, currentFailureOrderId, onUnlink }) =
         text: errorMessage,
         icon: 'error'
       });
+    } finally {
+      setUnlinking(false);
+    }
+  };
+
+  const isLinkedRepairExecution = repairExecution?.repair_execution_id?.startsWith('AR-SYNC-');
+
+  const handleUnlinkAr = async () => {
+    const result = await Swal.fire({
+      title: '¿Desenlazar el Acta de Reparación (AR)?',
+      html: `
+        <div class="text-left">
+          <p class="mb-3">Estás a punto de desenlazar esta falla del Acta de Reparación sincronizada.</p>
+          <div class="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3">
+            <p class="text-sm text-yellow-800"><strong>⚠️ Importante:</strong></p>
+            <ul class="text-sm text-yellow-700 mt-2 space-y-1">
+              <li>• Se eliminará el acta de reparación (${repairExecution?.repair_execution_id || ''}) de esta falla</li>
+              <li>• La falla volverá a aparecer como <strong>PENDIENTE</strong> en el libro de fallas</li>
+              <li>• Ya no se sincronizará con las otras fallas enlazadas</li>
+              <li>• Esta acción no se puede deshacer</li>
+            </ul>
+          </div>
+          <p class="text-sm text-gray-600">¿Estás seguro de continuar?</p>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, desenlazar AR',
+      cancelButtonText: 'Cancelar',
+      customClass: { popup: 'text-left' }
+    });
+
+    if (!result.isConfirmed) return;
+
+    setUnlinking(true);
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
+      const response = await axiosInstance.delete(`${API_URL}/api/failures/${failureId}/unlink-repair-execution`);
+
+      if (response.data.success) {
+        await Swal.fire({
+          title: '✅ Acta Desenlazada',
+          text: 'La falla se desenlazó del acta de reparación y volvió a estado pendiente.',
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false
+        });
+
+        if (onUnlink) {
+          onUnlink();
+        }
+      }
+    } catch (error) {
+      console.error('Error desenlazando AR:', error);
+      let errorMessage = 'No se pudo desenlazar el acta de reparación';
+      if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      }
+      Swal.fire({ title: 'Error', text: errorMessage, icon: 'error' });
     } finally {
       setUnlinking(false);
     }
@@ -139,15 +200,17 @@ const LinkedFailuresSection = ({ failureId, currentFailureOrderId, onUnlink }) =
     );
   }
 
-  if (linkedFailures.length === 0) {
-    return null; // No mostrar nada si no hay fallas enlazadas
+  const hasLinkedAr = isLinkedRepairExecution && linkedFailures.length === 0;
+
+  if (linkedFailures.length === 0 && !hasLinkedAr) {
+    return null; // No mostrar nada si no hay fallas enlazadas ni AR sincronizada
   }
 
   return (
     <div className="mb-6">
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-blue-200 overflow-hidden">
         {/* Header */}
-        <div 
+        <div
           className="p-4 cursor-pointer hover:bg-blue-100 transition-colors"
           onClick={() => setExpanded(!expanded)}
         >
@@ -169,10 +232,10 @@ const LinkedFailuresSection = ({ failureId, currentFailureOrderId, onUnlink }) =
               </div>
             </div>
             <button className="text-blue-600 hover:text-blue-800 transition-colors">
-              <svg 
+              <svg
                 className={`w-6 h-6 transform transition-transform ${expanded ? 'rotate-180' : ''}`}
-                fill="none" 
-                stroke="currentColor" 
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -192,16 +255,26 @@ const LinkedFailuresSection = ({ failureId, currentFailureOrderId, onUnlink }) =
                     ¿Qué significa esto?
                   </p>
                   <p className="text-xs text-blue-700">
-                    Cuando actualizas el estado, actividad realizada, evidencias o repuestos de esta orden de trabajo, 
-                    <strong> automáticamente se actualizan todas las fallas enlazadas</strong>. 
+                    Cuando actualizas el estado, actividad realizada, evidencias o repuestos de esta orden de trabajo,
+                    <strong> automáticamente se actualizan todas las fallas enlazadas</strong>.
                     Esto evita duplicar trabajo y mantiene la información consistente.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Botón de desenlazar */}
-            <div className="mb-4 flex justify-end">
+            {/* Botones de desenlazar */}
+            <div className="mb-4 flex justify-end gap-2">
+              {isLinkedRepairExecution && (
+                <button
+                  onClick={handleUnlinkAr}
+                  disabled={unlinking}
+                  className="px-4 py-2 bg-orange-50 text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-100 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span>🔓</span>
+                  <span>{unlinking ? 'Desenlazando...' : 'Desenlazar Acta (AR)'}</span>
+                </button>
+              )}
               <button
                 onClick={handleUnlink}
                 disabled={unlinking}

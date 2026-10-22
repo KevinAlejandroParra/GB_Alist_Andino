@@ -816,19 +816,22 @@ const FailureDetailModal = ({
             </div>
           )}
 
+          {/* Sección de Fallas Enlazadas (por AR sincronizada o por OT) */}
+          {(failureDetail?.workOrder || failureDetail?.repairExecution?.repair_execution_id?.startsWith('AR-SYNC-')) && (
+            <LinkedFailuresSection
+              failureId={failure.id}
+              currentFailureOrderId={failureDetail.failure_order_id}
+              repairExecution={failureDetail?.repairExecution}
+              onUnlink={() => {
+                loadFailureDetail();
+                if (onSuccess) onSuccess();
+              }}
+            />
+          )}
+
           {/* Información de OT y Repuestos */}
           {failureDetail?.workOrder && (
             <>
-              {/* Sección de Fallas Enlazadas */}
-              <LinkedFailuresSection 
-                failureId={failure.id}
-                currentFailureOrderId={failureDetail.failure_order_id}
-                onUnlink={() => {
-                  loadFailureDetail();
-                  if (onSuccess) onSuccess();
-                }}
-              />
-
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                   <span className="mr-2">🔧</span>Orden de Trabajo y Repuestos
