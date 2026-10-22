@@ -11,7 +11,7 @@ const PHASES = [
   { key: 'INICIO', label: '1. Foto de Inicio', desc: 'Estado inicial antes de intervenir' },
   { key: 'PROCESO_1', label: '2. Foto Proceso 1', desc: 'Desarme o limpieza intermedia' },
   { key: 'PROCESO_2', label: '3. Foto Proceso 2', desc: 'Ajuste, lubricación o recambio' },
-  { key: 'FIN', label: '4. Foto Final', desc: 'Máquina rearmada y operativa' }
+  { key: 'FIN', label: '4. Foto Final', desc: 'Dispositivo rearmado y operativo' }
 ];
 
 export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) {
@@ -89,7 +89,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
       return Swal.fire({
         icon: 'warning',
         title: 'Código QR requerido',
-        text: 'Por favor escanee o ingrese el código QR de la máquina.',
+        text: 'Por favor escanee o ingrese el código QR del Dispositivo.',
         confirmButtonColor: '#3b82f6'
       });
     }
@@ -111,7 +111,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
     } catch (err) {
       Swal.fire({
         icon: 'error',
-        title: 'QR Inválido para esta máquina',
+        title: 'QR Inválido para este Dispositivo',
         text: err.response?.data?.error || err.message,
         confirmButtonColor: '#d33'
       });
@@ -225,7 +225,7 @@ export default function MaintenanceSessionWizard({ slot, onComplete, onClose }) 
               )}
             </div>
             <h3 className="text-lg sm:text-xl font-bold text-gray-900 mt-1 truncate">
-              {slot.inspectable?.name || `Máquina #${slot.ins_id}`}
+              {slot.inspectable?.name || `Dispositivo #${slot.ins_id}`}
             </h3>
             <p className="text-xs text-gray-500">
               Fecha programada: <span className="font-semibold">{slot.scheduled_date}</span>

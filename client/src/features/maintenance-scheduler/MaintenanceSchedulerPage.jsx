@@ -25,7 +25,7 @@ export default function MaintenanceSchedulerPage() {
     { id: 'calendar', label: 'Calendario Operativo', icon: 'fa-calendar-alt' },
     ...(isAdminOrSupport
       ? [
-          { id: 'configs', label: 'Configuración Máquinas', icon: 'fa-cogs' },
+          { id: 'configs', label: 'Configuración Dispositivos', icon: 'fa-cogs' },
           { id: 'settings', label: 'Estrategia y Capacidad', icon: 'fa-sliders-h' },
           { id: 'qrs', label: 'Códigos QR', icon: 'fa-qrcode' }
         ]

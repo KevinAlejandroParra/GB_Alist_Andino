@@ -27,7 +27,7 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
       console.error('Error fetching machine configs:', err);
       Swal.fire({
         icon: 'error',
-        title: 'Error al cargar máquinas',
+        title: 'Error al cargar Dispositivos',
         text: err.response?.data?.error || err.message
       });
     } finally {
@@ -140,7 +140,7 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
             <i className="fas fa-search absolute left-3.5 top-3 text-gray-400" />
             <input
               type="text"
-              placeholder="Buscar máquina por nombre o familia..."
+              placeholder="Buscar Dispositivo por nombre o familia..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:ring-blue-500 focus:border-blue-500"
@@ -176,7 +176,7 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
           type="button"
           onClick={fetchConfigs}
           className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-          title="Recargar máquinas"
+          title="Recargar Dispositivo"
         >
           <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`} />
         </button>
@@ -188,7 +188,7 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
         {totalPages > 1 && (
           <div className="flex items-center justify-between gap-2 px-5 py-3 border-b border-gray-200 bg-white flex-wrap">
             <span className="text-xs text-gray-500">
-              {filtered.length} máquina{filtered.length !== 1 ? 's' : ''} · Página {safePage} de {totalPages}
+              {filtered.length} Dispositivo{filtered.length !== 1 ? 's' : ''} · Página {safePage} de {totalPages}
             </span>
             <div className="flex items-center gap-1">
               <button type="button" onClick={() => setPage(1)} disabled={safePage === 1}
@@ -207,7 +207,7 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-600 sticky top-0 z-20">
               <tr>
-                <th className="px-5 py-4 sticky left-0 bg-slate-50 z-30">Máquina</th>
+                <th className="px-5 py-4 sticky left-0 bg-slate-50 z-30">Dispositivo</th>
                 <th className="px-5 py-4 text-center">Preventivo Semanal</th>
                 <th className="px-5 py-4">Día Fijo Semanal</th>
                 <th className="px-5 py-4 text-center">Preventivo Quincenal</th>
@@ -243,7 +243,7 @@ export default function MaintenanceConfigPanel({ premiseId = 1 }) {
                   return (
                     <tr key={cfg.ins_id} className="hover:bg-slate-50/70 transition-colors">
                       {/* Name & Family */}
-                      <td className="px-5 py-4 font-medium text-gray-900 sticky left-0 bg-white">
+                       <td className="px-5 py-4 font-medium text-gray-900 sticky left-0 bg-white z-10">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
                             #{cfg.ins_id}

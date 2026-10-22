@@ -135,12 +135,21 @@ export default function Dashboard() {
               <h1 className="text-3xl font-bold text-gray-900">{dashboardTitle}</h1>
               <p className="text-gray-600 mt-1">{dashboardDescription}</p>
             </div>
-            <button
-              onClick={logout}
-              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
-            >
-              Cerrar Sesión
-            </button>
+             <div className="flex items-center gap-3">
+               <button
+                 onClick={() => router.push('/')}
+                 className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition font-medium"
+               >
+                 <i className="fas fa-home" />
+                 Inicio
+               </button>
+               <button
+                 onClick={logout}
+                 className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
+               >
+                 Cerrar Sesión
+               </button>
+             </div>
           </div>
         </header>
         <main>

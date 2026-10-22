@@ -189,7 +189,7 @@ export default function MaintenanceCalendarView({
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-3.5 h-3.5 rounded bg-emerald-600 inline-block" />
-            <strong>Verde (Fase 2):</strong> Azul + Cierre falla en otra máquina
+            <strong>Verde (Fase 2):</strong> Azul + Cierre falla en otro Dispositivo
           </span>
         </div>
       </div>
@@ -261,7 +261,7 @@ export default function MaintenanceCalendarView({
                         <span className="font-bold mr-1">
                           {slot.slot_type === 'WEEKLY' ? '🗓️' : slot.slot_type === 'BIWEEKLY' ? '🔂' : slot.slot_type === 'QUARTERLY' ? '📅' : '⚙️'}
                         </span>
-                        <span className="truncate">{slot.inspectable?.name || `Máquina #${slot.ins_id}`}</span>
+                        <span className="truncate">{slot.inspectable?.name || `Dispositivo #${slot.ins_id}`}</span>
                         {slot.shared_enabled && (
                           <span className="ml-1 rounded bg-violet-900/25 px-1 text-[8px] font-extrabold uppercase">Compartido</span>
                         )}

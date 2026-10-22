@@ -371,17 +371,29 @@ export default function RequisitionManagement() {
                                 </div>
 
                                 <div className="flex flex-col md:flex-row gap-6">
-                                    {/* Imagen si existe */}
-                                    {req.image_url ? (
-                                        <div className="w-full md:w-48 h-48 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-                                            <img
-                                                src={getImageSrc(req.image_url)}
-                                                alt="Repuesto"
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Sin+Imagen' }}
-                                            />
-                                        </div>
-                                    ) : (
+                                 {/* Imagen si existe */}
+                                 {req.image_url ? (
+                                     <div className="w-full md:w-48 h-48 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 relative group">
+                                         {req.image_url.toLowerCase().endsWith('.pdf') ? (
+                                             <a 
+                                                 href={getImageSrc(req.image_url)} 
+                                                 target="_blank" 
+                                                 rel="noopener noreferrer"
+                                                 className="w-full h-full flex flex-col items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                                             >
+                                                 <i className="fa fa-file-pdf text-4xl mb-2"></i>
+                                                 <span className="text-xs font-bold uppercase">Ver PDF</span>
+                                             </a>
+                                         ) : (
+                                             <img
+                                                 src={getImageSrc(req.image_url)}
+                                                 alt="Repuesto"
+                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                 onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Sin+Imagen' }}
+                                             />
+                                         )}
+                                     </div>
+                                 ) : (
                                         <div className="w-full md:w-32 h-32 flex-shrink-0 bg-gray-50 rounded-lg flex items-center justify-center text-gray-300 border border-gray-200">
                                             <i className="fa fa-image text-3xl"></i>
                                         </div>

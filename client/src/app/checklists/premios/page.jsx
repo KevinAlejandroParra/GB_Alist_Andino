@@ -80,7 +80,7 @@ export default function PremiosChecklistIndex() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">¿Cómo usar los Checklists de Premios?</h2>
             <div className="space-y-4 text-gray-700">
-              <p>1. Completa el checklist semanal registrando en cada máquina sus 3 datos:</p>
+              <p>1. Completa el checklist semanal registrando en cada dispositivo sus 3 datos:</p>
               <ul className="list-disc list-inside pl-4 space-y-1 text-gray-600">
                 <li><strong>JUGADAS</strong>: lectura del contador de jugadas.</li>
                 <li><strong>PREMIOS</strong>: lectura del contador de premios.</li>
