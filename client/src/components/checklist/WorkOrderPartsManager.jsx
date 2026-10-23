@@ -12,7 +12,8 @@ const WorkOrderPartsManager = ({
   workOrderId,
   show,
   onClose,
-  onSuccess
+  onSuccess,
+  onPartsChange
 }) => {
   const { user } = useAuth();
   const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
@@ -21,6 +22,14 @@ const WorkOrderPartsManager = ({
   const [showInventorySearch, setShowInventorySearch] = useState(false);
   const [showRequisitionModal, setShowRequisitionModal] = useState(false);
   const [loadingParts, setLoadingParts] = useState(false);
+
+  // Notificar al padre cada vez que cambia la lista de repuestos
+  useEffect(() => {
+    if (show && onPartsChange) {
+      onPartsChange(linkedParts);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedParts, show]);
 
   // Cargar repuestos existentes al abrir el modal
   useEffect(() => {
@@ -33,7 +42,7 @@ const WorkOrderPartsManager = ({
   const loadLinkedParts = async () => {
     if (!workOrderId) {
       setLinkedParts([]);
-      return;
+      return [];
     }
 
     setLoadingParts(true);
@@ -51,12 +60,14 @@ const WorkOrderPartsManager = ({
         }));
 
         setLinkedParts(partsWithInventoryInfo);
-      } else {
-        setLinkedParts([]);
+        return partsWithInventoryInfo;
       }
+      setLinkedParts([]);
+      return [];
     } catch (error) {
       console.error('Error cargando repuestos enlazados:', error);
       setLinkedParts([]);
+      return [];
     } finally {
       setLoadingParts(false);
     }
@@ -89,10 +100,16 @@ const WorkOrderPartsManager = ({
           if (workOrderPartResponse.data.success) {
             // El endpoint ya maneja automáticamente el descuento del inventario
             // NO necesitamos llamar al endpoint de inventario por separado
-            console.log(`✅ Repuesto ${part.partData?.item_name || inventoryId} procesado correctamente`);
+            console.log(`✅ Repuesto ${part.partData?.part_name || part.partData?.item_name || inventoryId} procesado correctamente`);
           }
         } catch (partError) {
           console.error(`Error procesando repuesto:`, partError);
+          // Propagar el error para no mostrar una alerta de éxito falsa
+          throw new Error(
+            partError.response?.data?.error?.message ||
+            partError.message ||
+            'No se pudo asociar el repuesto a la orden de trabajo'
+          );
         }
       }
 
@@ -108,7 +125,7 @@ const WorkOrderPartsManager = ({
       console.error('Error enlazando repuestos:', error);
       setShowInventorySearch(false);
       await loadLinkedParts();
-      Swal.fire('Advertencia', 'Algunos repuestos pudieron no haberse enlazado correctamente.', 'warning');
+      Swal.fire('Advertencia', error.message || 'Algunos repuestos pudieron no haberse enlazado correctamente.', 'warning');
     } finally {
       setLoadingParts(false);
     }
@@ -270,8 +287,12 @@ const WorkOrderPartsManager = ({
           {/* Acciones */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
             <button
-              onClick={() => {
-                if (onSuccess) onSuccess(linkedParts);
+              onClick={async () => {
+                // Refrescar desde el servidor y propagar la lista fresca al padre
+                const freshParts = await loadLinkedParts();
+                const partsToReport = Array.isArray(freshParts) ? freshParts : linkedParts;
+                if (onPartsChange) onPartsChange(partsToReport);
+                if (onSuccess) onSuccess(partsToReport);
                 onClose();
               }}
               className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"

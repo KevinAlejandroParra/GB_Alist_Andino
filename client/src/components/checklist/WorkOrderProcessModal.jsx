@@ -62,11 +62,45 @@ export default function WorkOrderProcessModal({
     const isRepairExecutionRecord = (record) =>
         Boolean(record?.isRepairAct || record?.repair_execution_id?.startsWith('AR-'))
 
+    // El backend expone la OT formal de una AR como `formalWorkOrder` / `formalWorkOrderId`.
+    // Un registro de AR también puede traer `work_order_id` (el ID de la OT, no el de la AR),
+    // por eso hay que distinguirlo de `repair_execution_id`.
+    const resolveFormalWorkOrderId = (record) => {
+        if (!record) return null
+        const candidate =
+            record.formalWorkOrderId ||
+            record.formalWorkOrder?.id ||
+            record.workOrder?.id ||
+            (record.work_order_id && !record.repair_execution_id ? record.id : null)
+        return candidate ? Number(candidate) : null
+    }
+
     const [formalWorkOrderId, setFormalWorkOrderId] = useState(null)
 
+    // Si la falla ya tiene OT pero la AR no está enlazada, se enlaza en el backend.
+    // Así, al recargar, la AR siempre "recuerda" que ya se decidió requerir repuestos.
+    const ensureWorkOrderLinked = async (record, detectedWorkOrderId) => {
+        if (!record?.repair_execution_id || !detectedWorkOrderId) return
+        if (record?.formalWorkOrder?.id || record?.formalWorkOrderId) return
+        if (!record?.isRepairAct) return
+        try {
+            await axiosInstance.put(
+                `${API_URL}/api/failures/repair-executions/${record.id}/link-work-order`,
+                { work_order_id: detectedWorkOrderId },
+                { headers: { Authorization: `Bearer ${user.token}` } }
+            )
+        } catch (error) {
+            console.warn('No se pudo enlazar la OT a la AR:', error?.response?.data?.error?.message || error.message)
+        }
+    }
+
     // Función para cargar repuestos de la orden de trabajo
-    const loadWorkOrderParts = async () => {
-        const partsId = formalWorkOrderId || (!isRepairExecutionRecord(workOrder) ? workOrder?.id : null);
+    const loadWorkOrderParts = async (explicitId = null) => {
+        const partsId =
+            explicitId ||
+            formalWorkOrderId ||
+            resolveFormalWorkOrderId(workOrder) ||
+            (!isRepairExecutionRecord(workOrder) ? workOrder?.id : null);
         if (!partsId) {
             setWorkOrderParts([]);
             return;
@@ -110,7 +144,12 @@ export default function WorkOrderProcessModal({
             setFormalWorkOrderId(workOrder.formalWorkOrderId || workOrder.formalWorkOrder?.id || null)
             setFormData({
                 activityPerformed: workOrder.activity_performed || '',
-                requiresReplacement: workOrder.requiere_replacement || false,
+                // La OT/AR puede no tener la bandera, pero si ya existe un "sí" previo lo respetamos
+                requiresReplacement: Boolean(
+                    workOrder.requiere_replacement ||
+                    workOrder.formalWorkOrder?.requiere_replacement ||
+                    workOrder.workOrder?.requiere_replacement
+                ),
                 evidence: null,
                 signature: workOrder.closure_signature || null,
                 endTime: workOrder.end_time || null,
@@ -134,13 +173,16 @@ export default function WorkOrderProcessModal({
                 setHasExistingEvidence(false)
             }
 
-            // Determinar si la entidad es OT formal o AR
-            const detectedWorkOrderId = workOrder?.work_order_id ? workOrder.id : null;
+            // Determinar si la entidad es OT formal o AR (y si la AR ya tiene OT asociada)
+            const detectedWorkOrderId = resolveFormalWorkOrderId(workOrder);
             setFormalWorkOrderId(detectedWorkOrderId)
 
             // Cargar repuestos solo si existe una OT formal
             if (detectedWorkOrderId) {
                 loadWorkOrderParts(detectedWorkOrderId)
+                ensureWorkOrderLinked(workOrder, detectedWorkOrderId)
+            } else {
+                setWorkOrderParts([])
             }
             // Cargar lista de técnicos
             loadTechnicians()
@@ -172,7 +214,6 @@ export default function WorkOrderProcessModal({
         : (workOrder.work_order_id || workOrder.id)
     const headerColor = arMode ? 'text-blue-700' : 'text-orange-700'
     const partsTargetId = formalWorkOrderId || (!arMode ? workOrder.id : null)
-
     const updateRecord = (payload) =>
         axiosInstance.put(updateEndpoint, payload, { headers: { Authorization: `Bearer ${user.token}` } })
 
@@ -344,9 +385,6 @@ export default function WorkOrderProcessModal({
     const handleToggleRequiresReplacement = async () => {
         const currentValue = formData.requiresReplacement
         const newValue = !currentValue
-
-        console.log('Toggle requires replacement:', { currentValue, newValue })
-
         let cancellationReason = null
         if (!newValue) {
             const cancellation = await Swal.fire({
@@ -369,6 +407,8 @@ export default function WorkOrderProcessModal({
         setLoading(true)
         try {
             let createdWorkOrderId = null
+            // Solo creamos OT si la AR todavía no tiene una (formalWorkOrderId)
+            // y la OT existente no está cancelada.
             if (newValue && arMode && !formalWorkOrderId) {
                 const createResp = await axiosInstance.post(
                     `${API_URL}/api/failures/repair-executions/${workOrder.id}/create-work-order`,
@@ -378,6 +418,8 @@ export default function WorkOrderProcessModal({
                 if (createResp.data.success) {
                     createdWorkOrderId = createResp.data.data.id
                     setFormalWorkOrderId(createdWorkOrderId)
+                    // Persistir la bandera en la AR para que al recargar no se vuelva a preguntar
+                    await updateRecord({ requiere_replacement: true })
                 }
             }
 
@@ -388,6 +430,18 @@ export default function WorkOrderProcessModal({
                     { requiere_replacement: true },
                     { headers: { Authorization: `Bearer ${user.token}` } }
                 )
+                // Persistir la decisión en la AR para que sobreviva a recargas
+                if (arMode) {
+                    try {
+                        await axiosInstance.put(
+                            `${API_URL}/api/failures/repair-executions/${workOrder.id}/link-work-order`,
+                            { work_order_id: workOrderId },
+                            { headers: { Authorization: `Bearer ${user.token}` } }
+                        )
+                    } catch (linkError) {
+                        console.warn('No se pudo persistir la bandera de repuestos en la AR:', linkError?.response?.data?.error?.message)
+                    }
+                }
             } else if (!newValue) {
                 if (!workOrderId) {
                     throw new Error('No se encontro una orden de trabajo para cancelar.')
@@ -400,24 +454,13 @@ export default function WorkOrderProcessModal({
             }
 
             setFormData(prev => ({ ...prev, requiresReplacement: newValue }))
+            setFormalWorkOrderId(newValue ? workOrderId : null)
 
             // Cargar o limpiar repuestos según el nuevo estado
             if (newValue) {
-                if (createdWorkOrderId) {
-                    // Se acaba de crear una OT formal desde la AR
-                    loadWorkOrderParts(createdWorkOrderId);
-                } else if (formalWorkOrderId) {
-                    // Ya existía una OT formal
-                    loadWorkOrderParts(formalWorkOrderId);
-                } else if (!arMode) {
-                    // Es OT real — usar su propio ID
-                    setFormalWorkOrderId(workOrder.id);
-                    loadWorkOrderParts(workOrder.id);
-                } else {
-                    setWorkOrderParts([]);
-                }
+                // Siempre releer desde el backend con el ID real de la OT
+                loadWorkOrderParts(workOrderId);
             } else {
-                setFormalWorkOrderId(null);
                 setWorkOrderParts([]);
             }
 
@@ -432,6 +475,7 @@ export default function WorkOrderProcessModal({
             onUpdate && onUpdate({
                 ...workOrder,
                 requiere_replacement: newValue,
+                ...(newValue ? { formalWorkOrderId: workOrderId, formalWorkOrder: { id: workOrderId } : {}),
                 ...(newValue || arMode ? {} : {
                     status: 'CANCELADO',
                     cancellation_reason: cancellationReason,
@@ -879,7 +923,9 @@ export default function WorkOrderProcessModal({
                                         {formData.requiresReplacement && (
                                             <div className="flex items-center gap-2 text-blue-600">
                                                 <FontAwesomeIcon icon={faTools} />
-                                                <span className="text-sm font-medium">Se solicitará un motivo para cancelar la OT y deshabilitar los repuestos</span>
+                                                <span className="text-sm font-medium">
+                                                    OT formal {formalWorkOrderId ? `#${formalWorkOrderId}` : ''} activa — puedes gestionar los repuestos en el paso 3
+                                                </span>
                                             </div>
                                         )}
                                     </div>
@@ -1241,10 +1287,13 @@ export default function WorkOrderProcessModal({
                         show={showPartsManager}
                         onClose={() => setShowPartsManager(false)}
                         onSuccess={(parts) => {
-                            // Actualizar el estado local de repuestos
-                            setWorkOrderParts(parts)
-                            // Actualizar el objeto workOrder para mantener consistencia
+                            // Mantener consistencia en el contador y el objeto compartido
+                            if (Array.isArray(parts)) setWorkOrderParts(parts)
                             onUpdate && onUpdate({ ...workOrder, WorkOrderParts: parts })
+                        }}
+                        onPartsChange={(parts) => {
+                            // Refrescar el contador en vivo mientras el gestor está abierto
+                            setWorkOrderParts(Array.isArray(parts) ? parts : [])
                         }}
                     />
                 )}

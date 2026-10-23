@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import WorkOrderProcessModal from './WorkOrderProcessModal';
 import SyncSolutionModal from './SyncSolutionModal';
 import Swal from 'sweetalert2';
@@ -20,15 +20,26 @@ const ManageFailureModal = ({
   const [creatingWorkOrder, setCreatingWorkOrder] = useState(false);
   const [createdWorkOrder, setCreatedWorkOrder] = useState(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
+  // Copia local para reflejar cambios (AR/OT) sin esperar a que el padre recargue
+  const [localFailure, setLocalFailure] = useState(null);
+
+  useEffect(() => {
+    setLocalFailure(failure || null);
+  }, [failure?.id, failure?.workOrder?.id, failure?.repairExecution?.id]);
 
   if (!show || !failure) return null;
 
-  const effectiveExecution = failure.repairExecution || failure.workOrder || null;
+  const currentFailure = localFailure || failure;
+  const effectiveExecution = currentFailure.repairExecution || currentFailure.workOrder || null;
   const hasExecution = !!effectiveExecution;
   const isResolved = hasExecution && ['RESUELTA', 'CANCELADO'].includes(effectiveExecution.status);
   const effectiveStatus = effectiveExecution?.status;
-  const hasFormalWorkOrder = !!failure.workOrder?.work_order_id;
-  const processRecord = failure.workOrder || failure.repairExecution || null;
+  // La OT puede venir anidada (work_order_id) o expuesta por la AR (formalWorkOrder)
+  const formalWorkOrderRecord =
+    (currentFailure.workOrder?.id || currentFailure.workOrder?.work_order_id) ? currentFailure.workOrder
+      : (currentFailure.repairExecution?.formalWorkOrder || null);
+  const hasFormalWorkOrder = !!formalWorkOrderRecord;
+  const processRecord = formalWorkOrderRecord || currentFailure.repairExecution || null;
 
   const handleCreateWorkOrder = async () => {
     if (hasExecution) {
@@ -42,7 +53,7 @@ const ManageFailureModal = ({
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
 
       const response = await axiosInstance.post(`${API_URL}/api/work-orders/create-for-failure`, {
-        failure_order_id: failure.id,
+        failure_order_id: currentFailure.id,
         created_by_id: user.user_id
       });
 
@@ -74,12 +85,36 @@ const ManageFailureModal = ({
   };
 
   const openOtProcess = () => {
-    if (!failure.workOrder?.work_order_id) return;
+    if (!formalWorkOrderRecord) return;
     setShowProcessModal(true);
   };
 
   const handleProcessSuccess = (updated) => {
-    // Actualizar estado local si es necesario tras cada cambio parcial
+    // Reflejar los cambios parciales (repuestos, requiere_replacement, formalWorkOrder)
+    // en el estado local para que el siguiente render ya muestre la OT correcta.
+    if (!updated) return;
+    setLocalFailure((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      if (prev.workOrder && updated.requiere_replacement !== undefined) {
+        next.workOrder = { ...prev.workOrder, requiere_replacement: updated.requiere_replacement };
+      }
+      if (prev.repairExecution && updated.requiere_replacement !== undefined) {
+        next.repairExecution = { ...prev.repairExecution, requiere_replacement: updated.requiere_replacement };
+      }
+      if (updated.formalWorkOrderId) {
+        const formal = updated.formalWorkOrder || { id: updated.formalWorkOrderId };
+        next.workOrder = { ...(next.workOrder || {}), ...formal };
+        if (next.repairExecution) {
+          next.repairExecution = { ...next.repairExecution, formalWorkOrder: formal };
+        }
+      }
+      if (updated.status) {
+        if (next.workOrder) next.workOrder = { ...next.workOrder, status: updated.status };
+        if (next.repairExecution) next.repairExecution = { ...next.repairExecution, status: updated.status };
+      }
+      return next;
+    });
   };
 
   return (
@@ -91,7 +126,7 @@ const ManageFailureModal = ({
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Resolver falla</h2>
                 <p className="text-sm text-gray-600">
-                  {failure.failure_order_id || `OF-${failure.id}`}
+                  {currentFailure.failure_order_id || `OF-${currentFailure.id}`}
                 </p>
               </div>
               <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
@@ -99,7 +134,7 @@ const ManageFailureModal = ({
 
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <h3 className="font-semibold text-gray-900 mb-2">Descripción</h3>
-              <p className="text-gray-700">{failure.description}</p>
+              <p className="text-gray-700">{currentFailure.description}</p>
             </div>
 
             <div className="space-y-4">
@@ -198,7 +233,7 @@ const ManageFailureModal = ({
                     <div className="border-2 border-orange-200 rounded-lg p-6 bg-orange-50">
                       <h3 className="font-bold text-orange-900 mb-2">Orden de Trabajo (OT)</h3>
                       <p className="text-sm text-orange-800 mb-4">
-                        OT formal con repuestos: {failure.workOrder.work_order_id}
+                        OT formal con repuestos: {formalWorkOrderRecord.work_order_id || formalWorkOrderRecord.id}
                       </p>
                       <button
                         onClick={openOtProcess}
@@ -226,7 +261,7 @@ const ManageFailureModal = ({
         <SyncSolutionModal
           show={showSyncModal}
           onClose={() => setShowSyncModal(false)}
-          targetFailure={failure}
+          targetFailure={currentFailure}
           user={user}
           onSuccess={() => {
             setShowSyncModal(false);
@@ -256,7 +291,7 @@ const ManageFailureModal = ({
             onSuccess?.();
           }}
           workOrder={processRecord || createdWorkOrder || effectiveExecution}
-          failureId={failure.id}
+          failureId={currentFailure.id}
           onUpdate={handleProcessSuccess}
           user={user}
         />

@@ -296,7 +296,7 @@ function getListIncludes(status, needsSearchJoin) {
       attributes: [
         'id', 'repair_execution_id', 'status', 'activity_performed', 'evidence_url',
         'start_time', 'end_time', 'resolved_by_id', 'cancellation_reason',
-        'cancelled_at', 'cancelled_by_id', 'linked_failure_ids', 'updatedAt'
+        'cancelled_at', 'cancelled_by_id', 'linked_failure_ids', 'requiere_replacement', 'updatedAt'
       ],
       required: false,
       where:
@@ -316,13 +316,28 @@ function getListIncludes(status, needsSearchJoin) {
           as: 'cancelledBy',
           attributes: ['user_id', 'user_name'],
           required: false
+        },
+        // La OT formal puede colgar de la AR (no siempre de la falla)
+        {
+          model: WorkOrder,
+          as: 'formalWorkOrder',
+          attributes: ['id', 'work_order_id', 'status', 'repair_execution_id', 'requiere_replacement', 'updatedAt'],
+          required: false,
+          include: [
+            {
+              model: WorkOrderPart,
+              as: 'parts',
+              attributes: ['id'],
+              required: false
+            }
+          ]
         }
       ]
     },
     {
       model: WorkOrder,
       as: 'workOrder',
-      attributes: ['id', 'work_order_id', 'status', 'updatedAt', 'resolved_by_id', 'linked_failure_ids'],
+      attributes: ['id', 'work_order_id', 'status', 'updatedAt', 'resolved_by_id', 'linked_failure_ids', 'repair_execution_id', 'requiere_replacement'],
       required: false,
       where:
         status === 'resolved'

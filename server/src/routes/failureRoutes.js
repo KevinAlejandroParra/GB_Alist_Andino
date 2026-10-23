@@ -132,6 +132,11 @@ router.post('/repair-executions/:repairExecutionId/create-work-order', (req, res
   FailureController.createFormalWorkOrderFromRepair(req, res)
 );
 
+// PUT /api/failures/repair-executions/:repairExecutionId/link-work-order - Enlazar OT existente a la AR
+router.put('/repair-executions/:repairExecutionId/link-work-order', (req, res) =>
+  FailureController.linkWorkOrderToRepair(req, res)
+);
+
 // GET /api/failures/search-resolved-sources - Buscar fallas resueltas para sincronizar
 router.get('/search-resolved-sources', (req, res) => FailureController.searchResolvedSources(req, res));
 

@@ -2839,6 +2839,81 @@ class FailureController {
   }
 
   /**
+   * Enlaza la OT formal de una falla a su AR y marca la bandera de repuestos.
+   * PUT /api/failures/repair-executions/:repairExecutionId/link-work-order
+   * Body: { work_order_id?: number }
+   * Idempotente: si no se envía work_order_id toma la OT de la falla.
+   */
+  async linkWorkOrderToRepair(req, res) {
+    try {
+      const repairExecutionId = parseInt(req.params.repairExecutionId, 10);
+      if (Number.isNaN(repairExecutionId)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_ID', message: 'ID de acta de reparación inválido' }
+        });
+      }
+
+      const { RepairExecution, WorkOrder } = require('../models');
+      const repairExecution = await RepairExecution.findByPk(repairExecutionId);
+      if (!repairExecution) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'REPAIR_NOT_FOUND', message: 'Acta de reparación no encontrada' }
+        });
+      }
+
+      const requestedWorkOrderId = parseInt(req.body?.work_order_id, 10);
+      const workOrder = Number.isNaN(requestedWorkOrderId)
+        ? await WorkOrder.findOne({ where: { failure_order_id: repairExecution.failure_order_id } })
+        : await WorkOrder.findByPk(requestedWorkOrderId);
+
+      if (!workOrder) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'WORK_ORDER_NOT_FOUND', message: 'Orden de trabajo no encontrada para esta falla' }
+        });
+      }
+
+      // Validaciones mínimas de coherencia
+      if (workOrder.failure_order_id && workOrder.failure_order_id !== repairExecution.failure_order_id) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'WORK_ORDER_MISMATCH', message: 'La OT pertenece a otra falla' }
+        });
+      }
+      if (workOrder.repair_execution_id && workOrder.repair_execution_id !== repairExecutionId) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'WORK_ORDER_ALREADY_LINKED', message: 'La OT ya está vinculada a otra acta de reparación' }
+        });
+      }
+
+      const repairExecutionService = require('../services/repairExecutionService');
+      if (!workOrder.repair_execution_id) {
+        await workOrder.update({ repair_execution_id: repairExecutionId, requiere_replacement: true });
+      }
+      await repairExecutionService.markRequiresReplacement(repairExecutionId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Orden de trabajo enlazada al acta de reparación',
+        data: {
+          repair_execution_id: repairExecutionId,
+          work_order: workOrder,
+          requiere_replacement: true
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error en linkWorkOrderToRepair:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'LINK_WORK_ORDER_TO_REPAIR_ERROR', message: error.message }
+      });
+    }
+  }
+
+  /**
    * Cancelar una Orden de Falla (conserva historial)
    * PUT /api/failures/:id/cancel
    */

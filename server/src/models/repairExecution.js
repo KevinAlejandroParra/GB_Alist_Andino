@@ -56,6 +56,13 @@ module.exports = (sequelize, DataTypes) => {
     start_time: DataTypes.DATE,
     end_time: DataTypes.DATE,
     resolved_by_id: DataTypes.INTEGER,
+    // Decisión de repuestos persistida en la AR: si es true, la AR ya tiene (o tuvo) OT
+    // y el modal no debe volver a preguntar "¿Requiere repuestos?".
+    requiere_replacement: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
     linked_failure_ids: DataTypes.TEXT,
     cancellation_reason: DataTypes.TEXT,
     cancelled_at: DataTypes.DATE,
