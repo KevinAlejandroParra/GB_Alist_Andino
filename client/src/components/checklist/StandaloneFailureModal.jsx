@@ -6,10 +6,10 @@ import Swal from 'sweetalert2';
 import axiosInstance from '../../utils/axiosConfig';
 import { compressImage } from '../../utils/imageCompression';
 import SignaturePad from './SignaturePad';
-import { 
-  getFailureSignaturesInfo, 
-  createFailureReportSignature, 
-  canUserCreateReportSignature 
+import {
+  getFailureSignaturesInfo,
+  createFailureReportSignature,
+  canUserCreateReportSignature
 } from '../../utils/failureSignaturesApi';
 
 const StandaloneFailureModal = ({
@@ -20,7 +20,7 @@ const StandaloneFailureModal = ({
 }) => {
   const { user } = useAuth();
   const fileInputRef = useRef(null);
-  
+
   const initialFormData = {
     description: '',
     tipoMantenimiento: 'TECNICA',
@@ -52,12 +52,12 @@ const StandaloneFailureModal = ({
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
       console.log('🔍 Cargando inspectables desde:', `${API_URL}/api/inspectables`);
-      
+
       const response = await axiosInstance.get('/api/inspectables');
       console.log('📦 Respuesta completa:', response);
       console.log('📦 Status:', response.status);
       console.log('📦 Data:', response.data);
-      
+
       if (response.data && response.data.success) {
         console.log('✅ Inspectables cargados:', response.data.data);
         setInspectables(response.data.data);
@@ -84,7 +84,7 @@ const StandaloneFailureModal = ({
         Swal.fire('Error', 'Solo se permiten archivos de imagen', 'error');
         return;
       }
-      
+
       // Validar tamaño (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         Swal.fire('Error', 'La imagen debe ser menor a 10MB', 'error');
@@ -140,18 +140,18 @@ const StandaloneFailureModal = ({
     setLoading(true);
     try {
       const API_URL = process.env.NEXT_PUBLIC_API || "http://localhost:5000";
-      
+
       const submitData = new FormData();
       submitData.append('description', formData.description);
       submitData.append('tipo_maintenance', formData.tipoMantenimiento);
       submitData.append('severity', formData.severity);
       submitData.append('assigned_to', formData.assignedTo);
-      
+
       // Agregar inspectableId solo si se seleccionó uno
       if (formData.inspectableId) {
         submitData.append('inspectableId', formData.inspectableId);
       }
-      
+
       // Agregar evidencia comprimida (obligatorio)
       if (formData.evidenceFile) {
         const compressedFile = await compressImage(formData.evidenceFile);
@@ -176,25 +176,25 @@ const StandaloneFailureModal = ({
 
       if (response.data.success) {
         const failureOrder = response.data.data;
-        
+
         console.log('📋 [StandaloneFailureModal] Orden de falla creada:', {
           id: failureOrder.id,
           failure_order_id: failureOrder.failure_order_id,
           allFields: Object.keys(failureOrder),
           fullResponse: failureOrder
         });
-        
+
         // Validar que tenemos un ID válido
         if (!failureOrder.id) {
           throw new Error('No se pudo obtener el ID de la orden de falla creada');
         }
-        
+
         // Asegurar que el ID sea un número
         const failureOrderId = parseInt(failureOrder.id);
         if (isNaN(failureOrderId)) {
           throw new Error(`ID de orden de falla inválido: ${failureOrder.id}`);
         }
-        
+
         console.log('🔑 [StandaloneFailureModal] Creando firma de reporte para ID:', failureOrderId);
         console.log('🔑 [StandaloneFailureModal] Datos de firma:', {
           signatureDataLength: formData.signatureData?.length,
@@ -202,9 +202,9 @@ const StandaloneFailureModal = ({
           roleName: user.role_name,
           signatureDataPreview: formData.signatureData?.substring(0, 50) + '...'
         });
-        
+
         console.log('🚀 [StandaloneFailureModal] Llamando a createFailureReportSignature...');
-        
+
         // Crear la firma de reporte usando la nueva utilidad
         const signatureResult = await createFailureReportSignature(
           failureOrderId,
@@ -212,12 +212,12 @@ const StandaloneFailureModal = ({
           user.user_name,
           user.role_name
         );
-        
+
         console.log('📝 [StandaloneFailureModal] Resultado de firma:', signatureResult);
 
         if (signatureResult.success) {
-          Swal.fire('✅ Falla Reportada y Firmada', 
-            `Se ha creado la orden de falla ${failureOrder.failure_order_id} exitosamente.`, 
+          Swal.fire('✅ Falla Reportada y Firmada',
+            `Se ha creado la orden de falla ${failureOrder.failure_order_id} exitosamente.`,
             'success');
           if (onSuccess) onSuccess(failureOrder);
           onClose();
@@ -278,7 +278,7 @@ const StandaloneFailureModal = ({
 
           {/* Información automática */}
           <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="font-medium text-gray-700">Reportado por:</span>
                 <p className="text-gray-900">{user?.user_name || 'Usuario actual'}</p>
@@ -306,7 +306,7 @@ const StandaloneFailureModal = ({
           </div>
 
           {/* Tipo de Mantenimiento y Severidad */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Tipo de Mantenimiento <span className="text-red-500">*</span>
@@ -491,7 +491,7 @@ const StandaloneFailureModal = ({
             >
               Cancelar
             </button>
-            
+
             <button
               onClick={createStandaloneFailure}
               disabled={loading || !formData.description.trim() || !formData.evidenceFile || !formData.signatureData}

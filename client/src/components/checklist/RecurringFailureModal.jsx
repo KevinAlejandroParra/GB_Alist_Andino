@@ -181,7 +181,7 @@ export default function RecurringFailureModal({
       const compressedFile = await compressImage(file)
       const formData = new FormData()
       formData.append("evidence", compressedFile)
-      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData)
+      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-failure-evidence`, formData)
       return response.data.filePath
     } catch (error) {
       throw new Error(`Error al subir archivo: ${error.response?.data?.error || error.message}`)
@@ -469,13 +469,13 @@ export default function RecurringFailureModal({
         <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
 
           {/* Header */}
-          <div className="flex items-center justify-between px-8 py-6 bg-slate-50 border-b border-slate-200">
+          <div className="flex items-center justify-between gap-3 px-4 sm:px-8 py-4 sm:py-6 bg-slate-50 border-b border-slate-200">
             <div>
-              <h3 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+              <h3 className="text-lg sm:text-2xl font-bold text-slate-800 flex items-center gap-3">
                 <FontAwesomeIcon icon={faExclamationTriangle} className="text-amber-500" /> Gestión de Fallas
               </h3>
               {workOrders && workOrders.length > 0 ? (
-                <p className="text-slate-600 font-medium mt-1">
+                <p className="text-sm sm:text-base text-slate-600 font-medium mt-1">
                   Existen <span className="text-amber-600 font-bold">{workOrders.length}</span> fallas activas asociadas a este ítem.
                 </p>
               ) : (
@@ -490,8 +490,8 @@ export default function RecurringFailureModal({
           </div>
 
           {/* Tabs - SIEMPRE VISIBLES */}
-          <div className="border-b border-slate-200 bg-white px-8">
-            <nav className="flex gap-6">
+          <div className="border-b border-slate-200 bg-white px-4 sm:px-8 overflow-x-auto">
+            <nav className="flex gap-4 sm:gap-6 min-w-max">
               {[
                 { id: 'maintain', label: isAdmin ? 'Ver Fallas' : 'Mantener Falla', icon: faSync, disabledWhenNew: true },
                 { id: 'new', label: 'Nueva Falla', icon: faPlusCircle, disabledWhenNew: false, hiddenForAdmin: isAdmin && !isNewFailure },
@@ -514,7 +514,7 @@ export default function RecurringFailureModal({
           </div>
 
           {/* Content */}
-          <div className="p-8 overflow-y-auto flex-1 bg-white">
+          <div className="p-4 sm:p-8 overflow-y-auto flex-1 bg-white">
 
             {/* TAB: MANTENER */}
             {activeTab === 'maintain' && (
@@ -1106,8 +1106,8 @@ export default function RecurringFailureModal({
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-4 p-6 border-t border-slate-200 bg-slate-50">
-            <button onClick={onClose} className="px-6 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-700 font-bold hover:bg-slate-50">
+          <div className="flex justify-end gap-3 sm:gap-4 p-4 sm:p-6 border-t border-slate-200 bg-slate-50 flex-wrap">
+            <button onClick={onClose} className="px-4 sm:px-6 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-700 font-bold hover:bg-slate-50">
               Cancelar
             </button>
 

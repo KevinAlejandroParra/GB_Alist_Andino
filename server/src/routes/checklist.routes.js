@@ -65,6 +65,28 @@ router.get("/type/:checklistTypeId/analytics/premios/export", verifyToken, expor
 router.get("/type/:checklistTypeId/premios-config", verifyToken, getPremiosConfig)
 router.post("/type/:checklistTypeId/premios-config", verifyToken, savePremiosConfig)
 
+// Evidencias de FALLAS: se guardan en uploads/fallas/evidencias/ con el nombre original
+router.post("/upload-failure-evidence", verifyToken, uploadFailureEvidence.single("evidence"), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No se proporcionó ningún archivo" })
+    }
+
+    // Ruta relativa en DB: uploads/fallas/evidencias/<nombre_original>
+    const filePath = toRelativePath(req.file.path)
+
+    res.json({
+      message: "Archivo subido exitosamente",
+      filePath,
+      originalName: req.file.originalname,
+    })
+  } catch (error) {
+    console.error("Error uploading evidence:", error)
+    res.status(500).json({ error: "Error interno del servidor al subir archivo" })
+  }
+})
+
+// Adjuntos de REQUISICIONES: se guardan en uploads/requisiciones/ como requisicion-<timestamp>
 router.post("/upload-evidence", verifyToken, uploadRequisitionEvidence.single("evidence"), (req, res) => {
   try {
     if (!req.file) {

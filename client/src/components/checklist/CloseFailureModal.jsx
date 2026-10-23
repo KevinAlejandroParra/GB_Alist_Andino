@@ -6,10 +6,10 @@ import Swal from 'sweetalert2';
 import axiosInstance from '../../utils/axiosConfig';
 import SignaturePad from './SignaturePad';
 import FailureSignatureHistory from './FailureSignatureHistory';
-import { 
-  getFailureSignaturesInfo, 
+import {
+  getFailureSignaturesInfo,
   formatSignatureForDisplay,
-  getSignatureStatus 
+  getSignatureStatus
 } from '../../utils/failureSignaturesApi';
 
 const CloseFailureModal = ({
@@ -19,12 +19,12 @@ const CloseFailureModal = ({
   onSuccess
 }) => {
   const { user } = useAuth();
-  
+
   const [formData, setFormData] = useState({
     closureDetails: '',
     signatureData: null
   });
-  
+
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [showSignatureHistory, setShowSignatureHistory] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -159,8 +159,8 @@ const CloseFailureModal = ({
                 >
                   📝 Ver Historial de Firmas
                 </button>
-                <button 
-                  onClick={onClose} 
+                <button
+                  onClick={onClose}
                   className="text-gray-400 hover:text-gray-600 text-2xl p-2 hover:bg-gray-100 rounded-full transition-colors"
                 >
                   ✕
@@ -176,7 +176,7 @@ const CloseFailureModal = ({
                   <span className="mr-2">📋</span>Información de la Falla
                 </h3>
                 <div className="space-y-3 text-sm">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="font-medium text-gray-700">ID de Falla</label>
                       <p className="text-gray-900 font-mono">{failureOrder.failure_order_id || `OF-${failureOrder.id}`}</p>
@@ -190,7 +190,7 @@ const CloseFailureModal = ({
                     <label className="font-medium text-gray-700">Descripción</label>
                     <p className="text-gray-900">{failureOrder.description}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="font-medium text-gray-700">Severidad</label>
                       <p className="text-gray-900">{failureOrder.severity}</p>
@@ -216,7 +216,7 @@ const CloseFailureModal = ({
                 </h3>
                 {failureOrder.workOrder ? (
                   <div className="space-y-3 text-sm">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="font-medium text-gray-700">ID de OT</label>
                         <p className="text-gray-900 font-mono">{failureOrder.workOrder.work_order_id || `OT-${failureOrder.workOrder.id}`}</p>
@@ -261,9 +261,9 @@ const CloseFailureModal = ({
                     {signatureStatus.reportSignature ? (
                       <div className="flex items-center space-x-3">
                         <div className="w-12 h-8 border rounded overflow-hidden">
-                          <img 
-                            src={signatureStatus.reportSignature.image} 
-                            alt="Firma de reporte" 
+                          <img
+                            src={signatureStatus.reportSignature.image}
+                            alt="Firma de reporte"
                             className="w-full h-full object-cover"
                           />
                         </div>
@@ -292,9 +292,9 @@ const CloseFailureModal = ({
                     {signatureStatus.workOrderSignature ? (
                       <div className="flex items-center space-x-3">
                         <div className="w-12 h-8 border rounded overflow-hidden">
-                          <img 
-                            src={signatureStatus.workOrderSignature.image} 
-                            alt="Firma de cierre" 
+                          <img
+                            src={signatureStatus.workOrderSignature.image}
+                            alt="Firma de cierre"
                             className="w-full h-full object-cover"
                           />
                         </div>
@@ -383,8 +383,8 @@ const CloseFailureModal = ({
             </div>
 
             <div className="flex justify-end items-center pt-6 border-t border-gray-200">
-              <button 
-                onClick={onClose} 
+              <button
+                onClick={onClose}
                 className="px-6 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors mr-4"
               >
                 Cancelar

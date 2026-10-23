@@ -48,11 +48,11 @@ const SignaturePad = ({ onSave, onClose, existingSignature }) => {
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
-      <div className="relative p-8 border w-full max-w-md md:max-w-lg lg:max-w-xl shadow-lg rounded-md bg-white">
+      <div className="relative mx-4 p-4 sm:p-8 border w-full max-w-md md:max-w-lg lg:max-w-xl shadow-lg rounded-md bg-white my-8">
         <h3 className="text-2xl font-bold text-slate-800 mb-2 text-center">
           Firma Digital
         </h3>
-        
+
         {/* Indicador de quién está firmando */}
         {user && (
           <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
@@ -80,20 +80,20 @@ const SignaturePad = ({ onSave, onClose, existingSignature }) => {
             </div>
           </div>
         )}
-        
-        <div className="border border-gray-300 rounded-md overflow-hidden mb-4">
+
+        <div className="border border-gray-300 rounded-md overflow-hidden mb-4 max-w-full">
           <SignatureCanvas
             ref={sigCanvas}
             penColor="black"
+            clearOnResize={false}
             canvasProps={{
-              width: 500,
-              height: 200,
+              style: { width: "100%", height: 200, touchAction: "none" },
               className: "sigCanvas border-none",
             }}
             onBegin={handleBegin}
           />
         </div>
-        <div className="flex justify-between space-x-4">
+        <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-4">
           <button
             onClick={clearSignature}
             className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors duration-200 font-semibold"

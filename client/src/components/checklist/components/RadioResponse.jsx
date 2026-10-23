@@ -15,7 +15,7 @@ const RadioResponse = ({ uniqueId, currentResponse, itemDisabled, handleResponse
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-2 mb-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
       {options.map((option) => {
         const isSelected = currentResponse?.response_compliance === option.value;
         const buttonClasses = `
@@ -37,9 +37,9 @@ const RadioResponse = ({ uniqueId, currentResponse, itemDisabled, handleResponse
               }
             }}
           >
-            <div 
+            <div
               className={`
-                w-4 h-4 rounded-full border-2 mr-2
+                w-4 h-4 rounded-full border-2 mr-2 shrink-0
                 ${isSelected ? `bg-${option.colorClass}-500 border-${option.colorClass}-600` : 'border-gray-400'}
               `}
             >
@@ -48,7 +48,7 @@ const RadioResponse = ({ uniqueId, currentResponse, itemDisabled, handleResponse
               )}
             </div>
             <span className={`
-              text-sm font-medium
+              text-xs sm:text-sm font-medium text-center leading-tight
               ${isSelected ? `text-${option.colorClass}-700` : 'text-gray-700'}
             `}>
               {option.label}

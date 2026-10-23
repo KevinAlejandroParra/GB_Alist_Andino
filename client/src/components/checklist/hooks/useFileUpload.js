@@ -56,7 +56,7 @@ export function useFileUpload(user) {
       formData.append("evidence", compressedFile)
 
       const API_URL = process.env.NEXT_PUBLIC_API
-      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formData)
+      const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-failure-evidence`, formData)
 
       if (onSuccess) {
         onSuccess(itemId, response.data.filePath)

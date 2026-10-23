@@ -23,7 +23,7 @@ const normalizeCompliance = (value) => {
 // Componente Memoizado para optimizar el rendimiento de las opciones de radio.
 const RadioOption = React.memo(({ value, label, color, isSelected, isDisabled, onChange }) => (
   <label className={`
-    flex items-center p-3 border rounded-lg 
+    flex items-center justify-center p-3 border rounded-lg min-w-0
     ${isDisabled ? 'opacity-50 cursor-not-allowed' : `cursor-pointer hover:bg-${color}-50`}
     ${isSelected ? `bg-${color}-100 border-${color}-500 border-2` : 'border-gray-200'}
     transition-all duration-200 ease-in-out
@@ -35,7 +35,7 @@ const RadioOption = React.memo(({ value, label, color, isSelected, isDisabled, o
       onChange={() => !isDisabled && onChange()}
       disabled={isDisabled}
     />
-    <span className={`ml-2 text-sm font-medium ${isSelected ? `text-${color}-800` : 'text-gray-700'}`}>{label}</span>
+    <span className={`ml-2 text-xs sm:text-sm font-medium text-center leading-tight ${isSelected ? `text-${color}-800` : 'text-gray-700'}`}>{label}</span>
   </label>
 ));
 
@@ -48,7 +48,7 @@ const RadioGroup = React.memo(({ uniqueId, currentResponse, itemDisabled, handle
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-2 mb-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
       {options.map(option => (
         <RadioOption
           key={option.value}

@@ -233,7 +233,7 @@ export default function WorkOrderProcessModal({
             const formDataUpload = new FormData()
             formDataUpload.append("evidence", compressedFile)
 
-            const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-evidence`, formDataUpload)
+            const response = await axiosInstance.post(`${API_URL}/api/checklists/upload-failure-evidence`, formDataUpload)
 
 
             const newFilePath = response.data.filePath
